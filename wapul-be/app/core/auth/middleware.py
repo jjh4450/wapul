@@ -49,7 +49,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 sub = claims.get("sub")
                 if sub:
                     request.state.current_user = CurrentUser.from_claims(claims)
-            except Exception:
+            except Exception:  # noqa: BLE001 - 어떤 실패든 미인증으로 진행
                 # 토큰 검증 실패 - 미인증 상태로 진행
                 # 실제 인증 에러는 엔드포인트의 get_current_user에서 처리
                 pass

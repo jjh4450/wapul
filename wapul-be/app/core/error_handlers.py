@@ -83,7 +83,7 @@ def format_error_response(
     # DomainException 처리
     if isinstance(exc, DomainException):
         logger.warning(
-            f"Domain exception occurred",
+            "Domain exception occurred",
             extra={
                 "error_id": error_id,
                 "error_type": exc.__class__.__name__,
@@ -105,7 +105,7 @@ def format_error_response(
 
     # 내부 예외 처리
     logger.error(
-        f"Unexpected exception occurred",
+        "Unexpected exception occurred",
         extra={
             "error_id": error_id,
             "path": path,

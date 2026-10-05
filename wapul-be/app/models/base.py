@@ -34,8 +34,10 @@ class UpdateMixin:
         excluded = pk_fields | timestamp_fields | {"owner_id"} | set(exclude or [])
 
         for key, value in update_data.items():
-            if key in excluded: continue
-            if key not in columns: continue
+            if key in excluded:
+                continue
+            if key not in columns:
+                continue
 
             if value is MISSING:
                 continue

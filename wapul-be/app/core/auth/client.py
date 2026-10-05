@@ -151,13 +151,13 @@ class OIDCClient:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail=f"Invalid token: {str(e)}",
-            )
-        except httpx.HTTPError:
+            ) from e
+        except httpx.HTTPError as e:
             logger.exception("Failed to fetch JWKS")
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Authentication service unavailable",
-            )
+            ) from e
 
 
 # 싱글톤 OIDC 클라이언트 인스턴스

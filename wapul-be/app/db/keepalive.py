@@ -93,7 +93,7 @@ class DatabaseKeepAliveTask:
                 try:
                     await self._ping()
                     logger.debug("DB keep-alive ping OK")
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001 - 태스크가 죽지 않도록 모든 실패를 삼킴
                     # 일시적 장애는 무시하고 다음 주기에 재시도
                     logger.warning(
                         "DB keep-alive ping failed (will retry next interval): %s",

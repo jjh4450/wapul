@@ -139,7 +139,7 @@ class CloudflareIPManager:
                     logger.error("Failed to fetch any Cloudflare IP networks")
                     return False
 
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001 - 실패 시 Fail-Safe 모드로 진행
                 logger.error(f"Error fetching Cloudflare IPs: {e}")
                 return False
 

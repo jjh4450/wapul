@@ -3,7 +3,7 @@
 Monorepo.
 
 - `wapul-fe/` — SvelteKit frontend (pnpm). Lint: `pnpm lint` (prettier + eslint + oxlint with anti-slop rules).
-- `wapul-be/` — FastAPI backend (uv, Python 3.11+; 3.14 in Docker). Test: `uv run pytest`.
+- `wapul-be/` — FastAPI backend (uv, Python 3.11+; 3.14 in Docker). Lint: `uv run ruff check`. Test: `uv run pytest`.
 - Docs: unified mkdocs site at repo root (`docs/backend`, `docs/frontend`, Storybook built into `site/storybook/`). Local: `./scripts/serve-docs.sh`.
 - CI lives in root `.github/workflows/` (`be-*`, `fe-*`, `docs.yml`), path-filtered per package.
 
