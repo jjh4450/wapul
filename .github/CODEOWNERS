@@ -1,0 +1,10 @@
+# CODEOWNERS - 코드 영역별 리뷰어 지정
+#
+# 패턴 매칭은 위에서 아래로, 마지막 매칭이 우선합니다.
+# 참고: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+*                               @jjh4450
+
+/wapul-fe/                      @jjh4450
+/wapul-be/                      @jjh4450
+/.github/                       @jjh4450

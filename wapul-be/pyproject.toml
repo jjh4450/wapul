@@ -1,0 +1,52 @@
+[project]
+name = "wapul-be"
+version = "0.0.0"
+description = "wapul backend"
+requires-python = ">=3.11"
+dependencies = [
+    "aiosqlite>=0.22.1",
+    "alembic>=1.20.0",
+    "asyncpg>=0.31.0",
+    "cachetools>=7.2.0",
+    "cryptography>=50.0.2",
+    "fastapi>=0.142.2",
+    "httpx>=0.28.1",
+    "joserfc>=1.7.5",
+    "psycopg2-binary>=2.9.13",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
+    "python-dotenv>=1.2.4",
+    "sqlalchemy>=2.0.54",
+    "sqlmodel>=0.0.47",
+    "starlette>=1.7.0",
+    "tzdata>=2026.5",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+# 출력·빌드 산출물 디렉토리는 테스트 수집에서 제외
+norecursedirs = [".*", "build", "dist", "node_modules", ".venv", "venv", "site"]
+markers = [
+    "e2e: End-to-end 테스트 마커",
+    "integration: 통합 테스트 마커",
+    "ratelimit: 레이트 리밋 테스트 마커",
+]
+env_files = [".env"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.0",
+    "pytest-cov>=7.1.0",
+    "pytest-dotenv>=0.5.2",
+]
+docs = [
+    "mkdocs>=1.6.1",
+    "mkdocs-include-markdown-plugin>=7.3.0",
+    "mkdocs-material>=9.7.7",
+    "mkdocs-static-i18n[material]>=1.3.0",
+    "mkdocs-swagger-ui-tag>=0.8.1",
+]

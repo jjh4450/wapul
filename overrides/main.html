@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block extrahead %}
+{{ super() }}
+<!-- Open Graph -->
+<meta content="website" property="og:type"/>
+<meta content="wapul docs" property="og:site_name"/>
+<meta content="{% if page and page.title %}{{ page.title }} - wapul docs{% else %}wapul docs{% endif %}"
+      property="og:title"/>
+<meta content="{% if page and page.meta and page.meta.description %}{{ page.meta.description }}{% else %}wapul monorepo documentation{% endif %}"
+      property="og:description"/>
+<meta content="https://jjh4450.github.io/wapul/{% if page %}{{ page.url }}{% endif %}"
+      property="og:url"/>
+<meta content="https://jjh4450.github.io/wapul/assets/preview.png" property="og:image"/>
+
+<!-- Twitter Card -->
+<meta content="summary_large_image" name="twitter:card"/>
+<meta content="jjh4450.github.io" property="twitter:domain"/>
+<meta content="https://jjh4450.github.io/wapul/{% if page %}{{ page.url }}{% endif %}"
+      property="twitter:url"/>
+<meta content="{% if page and page.title %}{{ page.title }} - wapul docs{% else %}wapul docs{% endif %}"
+      name="twitter:title"/>
+<meta content="{% if page and page.meta and page.meta.description %}{{ page.meta.description }}{% else %}wapul monorepo documentation{% endif %}"
+      name="twitter:description"/>
+<meta content="https://jjh4450.github.io/wapul/assets/preview.png" name="twitter:image"/>
+{% endblock %}

@@ -1,0 +1,5 @@
+# mkdocs build output
+/site/
+
+# Generated at docs build time (scripts/serve-docs.sh, docs workflow)
+/docs/backend/api/openapi.json

@@ -1,0 +1,98 @@
+site_name: wapul docs
+site_url: https://jjh4450.github.io/wapul/
+site_description: wapul monorepo documentation (backend, frontend)
+
+repo_name: wapul
+repo_url: https://github.com/jjh4450/wapul
+
+theme:
+  name: material
+  custom_dir: overrides
+  language: en
+  palette:
+    - scheme: default
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-7
+        name: 다크 모드로 전환
+    - scheme: slate
+      primary: teal
+      accent: teal
+      toggle:
+        icon: material/brightness-4
+        name: 라이트 모드로 전환
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.expand
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+
+plugins:
+  - search:
+      lang: en
+  - include-markdown
+  - swagger-ui-tag:
+      syntaxHighlightTheme: "monokai"  # 다크 모드에 어울리는 테마
+  - i18n:
+      docs_structure: suffix
+      fallback_to_default: true
+      languages:
+        - locale: ko
+          name: 한국어
+          default: true
+          build: true
+        - locale: en
+          name: English
+          build: true
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - tables
+  - toc:
+      permalink: true
+
+nav:
+  - Home: index.md
+  - Project:
+    - Contributing: project/contributing.md
+    - Code of Conduct: project/code-of-conduct.md
+    - Security: project/security.md
+    - Changelog: project/changelog.md
+    - License: project/license.md
+  - Backend:
+    - Overview: backend/index.md
+    - Getting Started:
+      - Installation: backend/getting-started/installation.md
+      - Configuration: backend/getting-started/configuration.md
+    - API Reference:
+      - Overview: backend/api/overview.md
+      - REST API: backend/api/rest-api.md
+    - Guides:
+      - Authentication: backend/guides/auth.md
+    - Deployment:
+      - Docker: backend/deployment/docker.md
+      - Production: backend/deployment/production.md
+    - Development:
+      - Rate Limiting: backend/development/rate-limit.md
+      - MISSING Sentinel: backend/development/missing-sentinel.md
+      - Testing: backend/development/testing.md
+      - Python Version Testing: backend/development/python-version-testing.md
+  - Frontend:
+    - Overview: frontend/index.md
+    # 배포 시 site/storybook/에 함께 올라가는 정적 빌드 (mkdocs 페이지 아님)
+    - Storybook: storybook/index.html
+  - Development:
+    - Docs Guide: development/docs-guide.md

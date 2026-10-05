@@ -1,0 +1,146 @@
+name: Backend Docker
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'wapul-be/app/**'
+      - 'wapul-be/alembic/**'
+      - 'wapul-be/scripts/docker-entrypoint.sh'
+      - 'wapul-be/pyproject.toml'
+      - 'wapul-be/uv.lock'
+      - 'wapul-be/Dockerfile'
+      - '.github/workflows/be-docker.yml'
+  schedule:
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}-be
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Generate version
+        id: version
+        run: |
+          VERSION="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=${{ steps.version.outputs.version }}
+            ${{ github.event_name == 'push' && 'type=raw,value=latest' || '' }}
+            ${{ github.event_name == 'schedule' && 'type=raw,value=weekly' || '' }}
+
+      - name: Build and push image
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: wapul-be
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          platforms: linux/amd64,linux/arm64
+          build-args: |
+            APP_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          sbom: false
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Update CHANGELOG [Unreleased] to actual version
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          REPO_URL: https://github.com/${{ github.repository }}
+        working-directory: wapul-be
+        run: |
+          TODAY=$(date +'%Y-%m-%d')
+          # [Unreleased] 섹션이 실제 내용을 가지고 있을 때만 치환
+          if grep -q "^## \[Unreleased\]" CHANGELOG.md && \
+             ! grep -q "_No unreleased changes._" CHANGELOG.md; then
+            sed -i "s/^## \[Unreleased\]/## [${VERSION}] - ${TODAY}/" CHANGELOG.md
+            # 새로운 [Unreleased] 섹션을 상단에 추가
+            sed -i "/^## \[${VERSION}\]/i ## [Unreleased]\n\n_No unreleased changes._\n\n---\n" CHANGELOG.md
+            # 하단 reference link 업데이트: [Unreleased] 링크를 새 버전으로 갱신하고 새 버전 링크 추가
+            PREV_TAG=$(sed -n 's/^\[Unreleased\]: .*compare\/\(.*\)\.\.\.HEAD$/\1/p' CHANGELOG.md)
+            sed -i "s|^\[Unreleased\]: .*|[Unreleased]: ${REPO_URL}/compare/${VERSION}...HEAD|" CHANGELOG.md
+            if [ -n "$PREV_TAG" ]; then
+              VERSION_LINK="${REPO_URL}/compare/${PREV_TAG}...${VERSION}"
+            else
+              # 첫 릴리스: 비교 대상 태그가 없음
+              VERSION_LINK="${REPO_URL}/releases/tag/${VERSION}"
+            fi
+            sed -i "/^\[Unreleased\]: /a [${VERSION}]: ${VERSION_LINK}" CHANGELOG.md
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add CHANGELOG.md
+            git commit -m "chore: update CHANGELOG for ${VERSION}"
+            git push
+          fi
+
+      - name: Create GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          if gh release view "$VERSION" &>/dev/null; then
+            exit 0
+          fi
+
+          gh release create "$VERSION" \
+            --generate-notes \
+            --title "Release $VERSION" \
+            --notes "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION"
+
+      - name: Trigger docs rebuild
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run docs.yml
