@@ -14,8 +14,6 @@
 | 품질 | prettier + eslint + oxlint(anti-slop) — [린트 가이드](linting.md) |
 | 테스트 | vitest (node + 브라우저 모드), Storybook 10 — [테스트 가이드](testing.md) |
 
-프로젝트는 `sv` CLI로 생성했습니다. 같은 구성으로 다시 만들 때의 명령은 `wapul-fe/README.md`에 있습니다.
-
 ## 개발
 
 ```bash
