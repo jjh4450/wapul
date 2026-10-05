@@ -17,6 +17,7 @@ from app.core.auth import CurrentUser
 
 # ============ DB 타입 헬퍼 함수 ============
 
+
 def _get_test_database_url() -> str | None:
     """TEST_DATABASE_URL 환경변수 반환 (없으면 None)"""
     return os.environ.get("TEST_DATABASE_URL")
@@ -51,7 +52,7 @@ def test_user() -> CurrentUser:
 def test_engine():
     """
     테스트용 DB 엔진
-    
+
     TEST_DATABASE_URL 환경변수가 설정되면 해당 DB 사용,
     없으면 SQLite 메모리 DB 사용
     """
@@ -117,7 +118,7 @@ def test_session(test_engine):
 async def test_async_engine():
     """
     테스트용 비동기 DB 엔진
-    
+
     TEST_DATABASE_URL 환경변수가 설정되면 해당 DB 사용,
     없으면 SQLite 메모리 DB 사용
     """
@@ -173,9 +174,7 @@ async def test_async_engine():
 @pytest_asyncio.fixture
 async def test_async_session(test_async_engine):
     """트랜잭션 기반 비동기 테스트 세션"""
-    async_session_maker = async_sessionmaker(
-        test_async_engine, class_=AsyncSession, expire_on_commit=False
-    )
+    async_session_maker = async_sessionmaker(test_async_engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session_maker() as session:
         # 트랜잭션 시작
@@ -190,6 +189,7 @@ async def test_async_session(test_async_engine):
 
 
 # ============ E2E 다중 사용자 시뮬레이션 ============
+
 
 def _create_test_engine():
     """E2E용 테스트 엔진 생성 헬퍼"""
@@ -235,14 +235,14 @@ def make_user(sub: str, email: str = None, name: str = None) -> CurrentUser:
 def e2e_client():
     """
     E2E 테스트용 FastAPI 클라이언트
-    
+
     TEST_DATABASE_URL 환경변수가 설정되면 해당 DB 사용,
     없으면 SQLite 메모리 DB 사용
-    
+
     Bug Fix: StaticPool 사용 (SQLite 전용)
     - SQLite 메모리 DB는 커넥션마다 별도 인스턴스를 가짐
     - StaticPool을 사용하여 모든 커넥션이 동일한 메모리 DB 인스턴스를 공유하도록 함
-    
+
     Bug Fix: settings 재로드 + 스토리지 초기화
     - 레이트 리밋 테스트 후 settings가 변경될 수 있으므로 재로드하여 비활성화 보장
     - 레이트 리밋 스토리지도 초기화하여 이전 테스트의 카운트가 영향을 주지 않도록 함
@@ -259,6 +259,7 @@ def e2e_client():
 
     from app.core.config import Settings
     import app.core.config as config_module
+
     # 전역 settings 객체 교체는 반드시 finally에서 원본으로 복원 —
     # 미복원 시 모듈 레벨에서 settings를 바인딩한 코드(alembic env.py 등)가
     # 다른 객체를 보게 되어 테스트 간 간섭이 생긴다
@@ -268,6 +269,7 @@ def e2e_client():
     # 레이트 리밋 스토리지 초기화 (이전 테스트의 카운트 제거)
     from app.ratelimit.storage.memory import reset_storage
     from app.ratelimit.websocket import reset_ws_limiter
+
     reset_storage()
     reset_ws_limiter()  # WebSocket 리미터도 초기화
 
@@ -298,17 +300,17 @@ def e2e_client():
 def multi_user_e2e():
     """
     다중 사용자 E2E 테스트용 fixture
-    
+
     여러 사용자를 시뮬레이션하여 사용자 간 기능을 테스트합니다.
-    
+
     사용법:
         def test_shared_resource(multi_user_e2e):
             client_a = multi_user_e2e.as_user("user-a")
             client_b = multi_user_e2e.as_user("user-b")
-            
+
             # user-a로 리소스 생성
             response = client_a.post("/v1/items", json={...})
-            
+
             # user-b로 친구 요청 수락 등
             ...
     """
@@ -324,12 +326,14 @@ def multi_user_e2e():
 
     from app.core.config import Settings
     import app.core.config as config_module
+
     # 전역 settings 객체 교체는 finally에서 원본 복원 (e2e_client와 동일 이유)
     original_settings = config_module.settings
     config_module.settings = Settings()
 
     from app.ratelimit.storage.memory import reset_storage
     from app.ratelimit.websocket import reset_ws_limiter
+
     reset_storage()
     reset_ws_limiter()  # WebSocket 리미터도 초기화
 
@@ -343,12 +347,13 @@ def multi_user_e2e():
     class UserBoundClient:
         """
         특정 사용자로 바인딩된 TestClient 래퍼
-        
+
         각 요청 전에 올바른 사용자 override를 설정합니다.
         """
 
-        def __init__(self, client: TestClient, user: CurrentUser, app_ref, get_current_user_ref,
-                     get_optional_current_user_ref):
+        def __init__(
+            self, client: TestClient, user: CurrentUser, app_ref, get_current_user_ref, get_optional_current_user_ref
+        ):
             self._client = client
             self._user = user
             self._app = app_ref
@@ -384,7 +389,7 @@ def multi_user_e2e():
     class MultiUserTestClient:
         """
         다중 사용자 테스트 클라이언트
-        
+
         각 사용자별로 독립적인 UserBoundClient를 반환합니다.
         동일한 DB를 공유하지만 인증된 사용자가 다릅니다.
         """
@@ -397,7 +402,7 @@ def multi_user_e2e():
         def as_user(self, user_id: str, email: str = None, name: str = None) -> UserBoundClient:
             """
             특정 사용자로 인증된 클라이언트 반환
-            
+
             :param user_id: 사용자 ID (sub claim)
             :param email: 이메일 (기본값: {user_id}@example.com)
             :param name: 이름 (기본값: User {user_id})
@@ -406,13 +411,7 @@ def multi_user_e2e():
             if user_id not in self._users:
                 self._users[user_id] = make_user(user_id, email, name)
 
-            return UserBoundClient(
-                self._client,
-                self._users[user_id],
-                app,
-                get_current_user,
-                get_optional_current_user
-            )
+            return UserBoundClient(self._client, self._users[user_id], app, get_current_user, get_optional_current_user)
 
         def get_user(self, user_id: str) -> CurrentUser:
             """특정 사용자 ID에 대한 CurrentUser 객체 반환"""
@@ -446,4 +445,3 @@ def multi_user_e2e():
         test_engine.dispose()
         # 전역 settings 원본 복원
         config_module.settings = original_settings
-

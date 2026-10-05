@@ -71,6 +71,17 @@ cp .env.example .env
 
 프론트엔드(`wapul-fe/`)는 pnpm을 사용하며, 변경 시 `pnpm lint`를 통과해야 합니다.
 
+### 린트와 포맷
+
+**백엔드 변경은 ruff 린트와 포맷 검사를 통과해야 합니다** (CI에서 확인).
+
+```bash
+uv run ruff format   # 포맷 적용
+uv run ruff check    # 린트
+```
+
+규칙과 `noqa` 사용 원칙은 [린트와 포맷 가이드](https://jjh4450.github.io/wapul/backend/development/linting/)를 참고하세요.
+
 ### 테스트 실행
 
 **모든 코드 변경은 테스트를 통과해야 합니다.**
@@ -100,7 +111,7 @@ uv run uvicorn app.main:app --reload --port 2614
 
 **PEP 8**을 따르며, 다음 사항을 준수합니다:
 
-- 줄 길이: 최대 120자
+- 포맷은 `ruff format`이 결정합니다 (줄 길이 최대 120자)
 - 모든 함수 파라미터와 반환값에 타입 힌트 사용
 - 모든 public 함수, 클래스, 모듈에 docstring 작성
 

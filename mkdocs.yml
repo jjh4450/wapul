@@ -88,6 +88,7 @@ nav:
     - Development:
       - Rate Limiting: backend/development/rate-limit.md
       - MISSING Sentinel: backend/development/missing-sentinel.md
+      - Linting & Formatting: backend/development/linting.md
       - Testing: backend/development/testing.md
       - Python Version Testing: backend/development/python-version-testing.md
   - Frontend:

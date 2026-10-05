@@ -4,6 +4,7 @@ Rate Limit Middleware 통합 테스트
 rate_limit_client fixture를 사용하여 레이트 리밋이 활성화된 환경에서 테스트.
 다른 테스트와 완전히 격리됩니다.
 """
+
 import pytest
 
 from app.ratelimit.config import get_rule_for_request

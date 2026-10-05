@@ -11,6 +11,7 @@ CurrentUser 컨텍스트를 제공한다. 책임별로 분리:
 
 하위호환: 기존 `from app.core.auth import X`가 그대로 동작하도록 공개 심볼을 재export한다.
 """
+
 from app.core.auth.client import OIDCClient, oidc_client
 from app.core.auth.dependencies import (
     get_current_user,

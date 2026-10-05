@@ -3,6 +3,7 @@ WebSocket Rate Limit 테스트
 
 WebSocket 연결 및 메시지 레이트 리밋 테스트
 """
+
 import os
 from unittest.mock import patch, AsyncMock
 
@@ -174,6 +175,7 @@ class TestWSRateLimitGuard:
         os.environ이 아니라 live 객체를 직접 패치해야 순서 무관하게 동작한다.
         """
         import app.core.config as app_config
+
         monkeypatch.setattr(app_config.settings, "WS_RATE_LIMIT_ENABLED", True)
         reset_storage()
         reset_ws_limiter()
@@ -187,9 +189,7 @@ class TestWSRateLimitGuard:
         mock_websocket = AsyncMock()
         user_id = "guard-user-1"
 
-        allowed, error = await ws_rate_limit_guard(
-            mock_websocket, user_id, check_type="connect"
-        )
+        allowed, error = await ws_rate_limit_guard(mock_websocket, user_id, check_type="connect")
 
         assert allowed is True
         assert error is None
@@ -200,9 +200,7 @@ class TestWSRateLimitGuard:
         mock_websocket = AsyncMock()
         user_id = "guard-user-2"
 
-        allowed, error = await ws_rate_limit_guard(
-            mock_websocket, user_id, check_type="message"
-        )
+        allowed, error = await ws_rate_limit_guard(mock_websocket, user_id, check_type="message")
 
         assert allowed is True
         assert error is None
@@ -219,9 +217,7 @@ class TestWSRateLimitGuard:
             await ws_rate_limit_guard(mock_websocket, user_id, check_type="connect")
 
         # 다음 연결 차단
-        allowed, error = await ws_rate_limit_guard(
-            mock_websocket, user_id, check_type="connect"
-        )
+        allowed, error = await ws_rate_limit_guard(mock_websocket, user_id, check_type="connect")
 
         assert allowed is False
         assert error is not None
@@ -239,9 +235,7 @@ class TestWSRateLimitGuard:
             await ws_rate_limit_guard(mock_websocket, user_id, check_type="message")
 
         # 다음 메시지 차단
-        allowed, error = await ws_rate_limit_guard(
-            mock_websocket, user_id, check_type="message"
-        )
+        allowed, error = await ws_rate_limit_guard(mock_websocket, user_id, check_type="message")
 
         assert allowed is False
         assert error is not None
@@ -258,9 +252,7 @@ class TestWSRateLimitGuard:
             mock_settings.WS_RATE_LIMIT_ENABLED = False
 
             # 항상 허용
-            allowed, error = await ws_rate_limit_guard(
-                mock_websocket, user_id, check_type="connect"
-            )
+            allowed, error = await ws_rate_limit_guard(mock_websocket, user_id, check_type="connect")
 
             assert allowed is True
             assert error is None

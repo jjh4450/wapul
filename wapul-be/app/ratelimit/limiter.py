@@ -3,6 +3,7 @@ Rate Limiter 핵심 로직
 
 슬라이딩 윈도우 기반 레이트 리밋 서비스
 """
+
 from app.ratelimit.config import RateLimitRule, build_rate_limit_key
 from app.ratelimit.storage.base import RateLimitResult
 from app.ratelimit.storage.memory import get_storage
@@ -11,7 +12,7 @@ from app.ratelimit.storage.memory import get_storage
 class RateLimiter:
     """
     레이트 리밋 서비스
-    
+
     저장소를 사용하여 슬라이딩 윈도우 레이트 리밋 수행
     """
 
@@ -19,14 +20,14 @@ class RateLimiter:
         self._storage = get_storage()
 
     async def check_and_record(
-            self,
-            user_id: str,
-            method: str,
-            rule: RateLimitRule,
+        self,
+        user_id: str,
+        method: str,
+        rule: RateLimitRule,
     ) -> RateLimitResult:
         """
         요청을 체크하고 기록
-        
+
         :param user_id: 사용자 식별자
         :param method: HTTP 메서드
         :param rule: 적용할 규칙
@@ -40,14 +41,14 @@ class RateLimiter:
         )
 
     async def get_remaining(
-            self,
-            user_id: str,
-            method: str,
-            rule: RateLimitRule,
+        self,
+        user_id: str,
+        method: str,
+        rule: RateLimitRule,
     ) -> int:
         """
         남은 요청 수 조회 (기록하지 않음)
-        
+
         :param user_id: 사용자 식별자
         :param method: HTTP 메서드
         :param rule: 적용할 규칙
@@ -60,7 +61,7 @@ class RateLimiter:
     async def reset_user(self, user_id: str, method: str, rule: RateLimitRule) -> None:
         """
         특정 사용자의 레이트 리밋 초기화
-        
+
         :param user_id: 사용자 식별자
         :param method: HTTP 메서드
         :param rule: 적용할 규칙
@@ -71,7 +72,7 @@ class RateLimiter:
     async def cleanup(self) -> int:
         """
         만료된 엔트리 정리
-        
+
         :return: 정리된 엔트리 수
         """
         return await self._storage.cleanup_expired()

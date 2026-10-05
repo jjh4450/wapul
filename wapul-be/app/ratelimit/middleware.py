@@ -3,6 +3,7 @@ Rate Limit Middleware
 
 FastAPI 미들웨어로 모든 /v1/* 요청에 레이트 리밋 적용
 """
+
 import logging
 
 from fastapi import Request, Response
@@ -20,7 +21,7 @@ logger = logging.getLogger(__name__)
 class RateLimitMiddleware(BaseHTTPMiddleware):
     """
     레이트 리밋 미들웨어
-    
+
     처리 흐름:
     1. 요청 경로가 /v1/*인지 확인
     2. 경로에 맞는 규칙 찾기
@@ -30,9 +31,9 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(
-            self,
-            request: Request,
-            call_next: RequestResponseEndpoint,
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
     ) -> Response:
         # 레이트 리밋 비활성화 시 바로 통과
         if not app_config.settings.RATE_LIMIT_ENABLED:
@@ -61,8 +62,7 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if not result.allowed:
             # 429 Too Many Requests
             logger.warning(
-                f"Rate limit exceeded: user={user_id}, path={path}, "
-                f"count={result.current_count}/{result.max_requests}"
+                f"Rate limit exceeded: user={user_id}, path={path}, count={result.current_count}/{result.max_requests}"
             )
             return JSONResponse(
                 status_code=429,
@@ -91,18 +91,18 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
     async def _get_user_id(self, request: Request) -> str:
         """
         사용자 식별자 추출
-        
+
         우선순위:
         1. request.state.current_user (AuthMiddleware에서 설정됨 - 중복 검증 방지)
         2. Client IP 주소 (인증 없는 경우, 프록시 설정 고려)
-        
+
         프록시 설정:
         - CF_ENABLED=True: Cloudflare IP 검증 후 CF-Connecting-IP 사용
         - TRUSTED_PROXY_IPS 설정: 해당 IP에서 오는 X-Forwarded-For 신뢰
         - 그 외: request.client.host 직접 사용
         """
         # AuthMiddleware에서 이미 검증된 사용자 정보 사용
-        if hasattr(request.state, 'current_user') and request.state.current_user:
+        if hasattr(request.state, "current_user") and request.state.current_user:
             return request.state.current_user.sub
 
         # 실제 클라이언트 IP 추출 (프록시 설정 고려)

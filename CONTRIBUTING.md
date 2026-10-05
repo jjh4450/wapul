@@ -71,6 +71,17 @@ cp .env.example .env
 
 The frontend (`wapul-fe/`) uses pnpm; changes there must pass `pnpm lint`.
 
+### Lint and Format
+
+**Backend changes must pass ruff lint and format checks** (enforced in CI).
+
+```bash
+uv run ruff format   # apply formatting
+uv run ruff check    # lint
+```
+
+See the [Linting & Formatting guide](https://jjh4450.github.io/wapul/backend/development/linting/) for the rule set and `noqa` policy.
+
 ### Running Tests
 
 **All code changes must pass tests.**
@@ -100,7 +111,7 @@ uv run uvicorn app.main:app --reload --port 2614
 
 This project follows **PEP 8** with the following specifics:
 
-- Line length: 120 characters maximum
+- Formatting is decided by `ruff format` (max line length 120)
 - Use type hints for all function parameters and return values
 - Use `"""docstrings"""` for all public functions, classes, and modules
 

@@ -3,6 +3,7 @@ Cloudflare IP 관리 및 클라이언트 IP 추출 테스트
 
 Cloudflare IP 검증, Trusted Proxy, 클라이언트 IP 추출 로직 테스트.
 """
+
 import os
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -146,6 +147,7 @@ class TestTrustedProxyManager:
         # settings 재로드
         from app.core.config import Settings
         import app.core.config as config_module
+
         original_settings = config_module.settings
         config_module.settings = Settings()
 
@@ -165,6 +167,7 @@ class TestTrustedProxyManager:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         original_settings = config_module.settings
         config_module.settings = Settings()
 
@@ -186,6 +189,7 @@ class TestTrustedProxyManager:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         original_settings = config_module.settings
         config_module.settings = Settings()
 
@@ -228,6 +232,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         result = await get_real_client_ip(
@@ -247,6 +252,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         result = await get_real_client_ip(
@@ -266,6 +272,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         result = await get_real_client_ip(
@@ -284,6 +291,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         # Cloudflare IP 매니저 모킹 (is_cloudflare_ip는 동기 메서드)
@@ -308,6 +316,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -332,6 +341,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -357,6 +367,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -380,6 +391,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -405,6 +417,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -432,6 +445,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -456,6 +470,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -482,6 +497,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with pytest.raises(ProxyEnforcementError):
@@ -500,6 +516,7 @@ class TestGetRealClientIP:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         result = await get_real_client_ip(
@@ -567,6 +584,7 @@ class TestOriginVerifyHeader:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -595,6 +613,7 @@ class TestOriginVerifyHeader:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         result = await get_real_client_ip(
@@ -616,6 +635,7 @@ class TestOriginVerifyHeader:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -642,6 +662,7 @@ class TestOriginVerifyHeader:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -668,6 +689,7 @@ class TestOriginVerifyHeader:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -696,6 +718,7 @@ class TestOriginVerifyHeader:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with pytest.raises(ProxyEnforcementError):
@@ -741,6 +764,7 @@ class TestSpoofingPrevention:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -768,6 +792,7 @@ class TestSpoofingPrevention:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         result = await get_real_client_ip(
@@ -788,6 +813,7 @@ class TestSpoofingPrevention:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with patch("app.ratelimit.cloudflare.get_cloudflare_manager") as mock_get_manager:
@@ -813,6 +839,7 @@ class TestSpoofingPrevention:
 
         from app.core.config import Settings
         import app.core.config as config_module
+
         config_module.settings = Settings()
 
         with pytest.raises(ProxyEnforcementError):

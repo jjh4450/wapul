@@ -3,6 +3,7 @@
 
 검증된 JWT 클레임에서 추출한 현재 사용자. DB에 영속되지 않는 휘발성 값 객체이다.
 """
+
 from typing import Any
 
 from pydantic import BaseModel
@@ -10,6 +11,7 @@ from pydantic import BaseModel
 
 class CurrentUser(BaseModel):
     """현재 인증된 사용자 정보 (JWT 클레임에서 추출)"""
+
     sub: str  # 사용자 고유 식별자 (owner_id로 사용)
     email: str | None = None
     email_verified: bool = False  # OIDC `email_verified`

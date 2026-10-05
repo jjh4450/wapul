@@ -4,6 +4,7 @@ OIDC 클라이언트
 joserfc를 사용한 OIDC discovery, JWKS 캐싱, JWT Access Token 검증.
 이 서버는 OIDC Resource Server(Relying Party)로서 외부 Provider 발급 토큰을 검증한다.
 """
+
 import logging
 from typing import Any
 
@@ -39,14 +40,8 @@ class OIDCClient:
     """
 
     def __init__(self):
-        self._metadata_cache: TTLCache = TTLCache(
-            maxsize=1,
-            ttl=settings.OIDC_JWKS_CACHE_TTL_SECONDS
-        )
-        self._jwks_cache: TTLCache = TTLCache(
-            maxsize=1,
-            ttl=settings.OIDC_JWKS_CACHE_TTL_SECONDS
-        )
+        self._metadata_cache: TTLCache = TTLCache(maxsize=1, ttl=settings.OIDC_JWKS_CACHE_TTL_SECONDS)
+        self._jwks_cache: TTLCache = TTLCache(maxsize=1, ttl=settings.OIDC_JWKS_CACHE_TTL_SECONDS)
 
     @property
     def discovery_url(self) -> str:

@@ -12,9 +12,7 @@ def utc_now_naive() -> datetime:
 
 
 class TimestampMixin(SQLModel):
-    created_at: datetime = Field(
-        default_factory=utc_now_naive
-    )
+    created_at: datetime = Field(default_factory=utc_now_naive)
     updated_at: datetime = Field(
         default_factory=utc_now_naive,
         sa_column_kwargs={"onupdate": utc_now_naive},

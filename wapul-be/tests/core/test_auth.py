@@ -3,6 +3,7 @@ OIDC 인증 모듈 테스트
 
 OIDCClient, CurrentUser, get_current_user dependency 테스트
 """
+
 import time
 from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -20,6 +21,7 @@ from joserfc.jwk import KeySet, RSAKey
 # ============================================================================
 # 테스트용 RSA 키 동적 생성
 # ============================================================================
+
 
 def generate_rsa_keypair():
     """테스트용 RSA 키 쌍 동적 생성"""
@@ -52,13 +54,13 @@ TEST_PRIVATE_KEY, TEST_PUBLIC_KEY, TEST_JWKS = generate_rsa_keypair()
 
 
 def create_test_token(
-        sub: str = "test-user-123",
-        email: str = "test@example.com",
-        name: str = "Test User",
-        iss: str = "https://test-issuer.example.com",
-        aud: str | list = "test-client-id",
-        exp_delta: timedelta = timedelta(hours=1),
-        extra_claims: dict = None,
+    sub: str = "test-user-123",
+    email: str = "test@example.com",
+    name: str = "Test User",
+    iss: str = "https://test-issuer.example.com",
+    aud: str | list = "test-client-id",
+    exp_delta: timedelta = timedelta(hours=1),
+    extra_claims: dict = None,
 ) -> str:
     """테스트용 JWT 토큰 생성"""
     now = int(time.time())
@@ -86,6 +88,7 @@ def create_test_token(
 # ============================================================================
 # CurrentUser 모델 테스트
 # ============================================================================
+
 
 class TestCurrentUser:
     """CurrentUser 모델 테스트"""
@@ -121,6 +124,7 @@ class TestCurrentUser:
 # ============================================================================
 # OIDCClient 테스트
 # ============================================================================
+
 
 class TestOIDCClient:
     """OIDCClient 클래스 테스트"""
@@ -448,6 +452,7 @@ class TestOIDCClient:
 # get_current_user 테스트
 # ============================================================================
 
+
 class TestGetCurrentUser:
     """get_current_user dependency 테스트"""
 
@@ -554,6 +559,7 @@ class TestGetCurrentUser:
 # get_optional_current_user 테스트
 # ============================================================================
 
+
 class TestGetOptionalCurrentUser:
     """get_optional_current_user dependency 테스트"""
 
@@ -647,6 +653,7 @@ class TestGetOptionalCurrentUser:
 # ============================================================================
 # AuthenticationRequiredError 테스트
 # ============================================================================
+
 
 class TestAuthenticationRequiredError:
     """AuthenticationRequiredError 테스트"""

@@ -20,7 +20,7 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
                 "method": request.method,
                 "path": request.url.path,
                 "client": request.client.host if request.client else None,
-            }
+            },
         )
 
         response = await call_next(request)
@@ -36,7 +36,7 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
                 "path": request.url.path,
                 "status_code": response.status_code,
                 "process_time": process_time,
-            }
+            },
         )
 
         return response

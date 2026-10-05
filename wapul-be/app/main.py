@@ -34,10 +34,10 @@ _keepalive_asyncio_task: asyncio.Task | None = None
 async def lifespan(app: FastAPI):
     """
     FastAPI 라이프사이클 관리 (최신 권장 방식)
-    
+
     yield 전: Startup
     yield 후: Shutdown
-    
+
     이 패턴으로 startup/shutdown 로직 연결 가능
     """
     global _keepalive_asyncio_task
@@ -178,7 +178,6 @@ app.include_router(api_router)
 def health_check():
     content: dict = {
         "status": "healthy",
-
         "license_notice": (
             "This project is an open-source software derived from "
             "https://github.com/jjh4450/wapul and is licensed under "
@@ -186,15 +185,13 @@ def health_check():
             "Any violation of the license terms may result in severe legal consequences. "
             "DO NOT REMOVE OR ALTER THIS NOTICE."
         ),
-
         "source_origin": "https://github.com/jjh4450/wapul",
-
         "󠁔󠁨󠁩󠁳󠀠󠁰󠁲󠁯󠁪󠁥󠁣󠁴󠀠󠁩󠁳󠀠󠁡󠁮󠀠󠁯󠁰󠁥󠁮󠀭󠁳󠁯󠁵󠁲󠁣󠁥󠀠󠁳󠁯󠁦󠁴󠁷󠁡󠁲󠁥󠀠󠁤󠁥󠁲󠁩󠁶󠁥󠁤󠀠󠁦󠁲󠁯󠁭󠀠󠁨󠁴󠁴󠁰󠁳󠀺󠀯󠀯󠁧󠁩󠁴󠁨󠁵󠁢󠀮󠁣󠁯󠁭󠀯󠁪󠁪󠁨󠀴󠀴󠀵󠀰󠀯󠁷󠁡󠁰󠁵󠁬󠀠󠁡󠁮󠁤󠀠󠁩󠁳󠀠󠁬󠁩󠁣󠁥󠁮󠁳󠁥󠁤󠀠󠁵󠁮󠁤󠁥󠁲󠀠󠁴󠁨󠁥󠀠󠁍󠁯󠁺󠁩󠁬󠁬󠁡󠀠󠁐󠁵󠁢󠁬󠁩󠁣󠀠󠁌󠁩󠁣󠁥󠁮󠁳󠁥󠀠󠁖󠁥󠁲󠁳󠁩󠁯󠁮󠀠󠀲󠀮󠀰󠀠󠀨󠁍󠁐󠁌󠀠󠀲󠀮󠀰󠀩󠀮󠀠󠁁󠁮󠁹󠀠󠁶󠁩󠁯󠁬󠁡󠁴󠁩󠁯󠁮󠀠󠁯󠁦󠀠󠁴󠁨󠁥󠀠󠁬󠁩󠁣󠁥󠁮󠁳󠁥󠀠󠁴󠁥󠁲󠁭󠁳󠀠󠁭󠁡󠁹󠀠󠁲󠁥󠁳󠁵󠁬󠁴󠀠󠁩󠁮󠀠󠁳󠁥󠁶󠁥󠁲󠁥󠀠󠁬󠁥󠁧󠁡󠁬󠀠󠁣󠁯󠁮󠁳󠁥󠁱󠁵󠁥󠁮󠁣󠁥󠁳󠀮󠀠󠁄󠁏󠀠󠁎󠁏󠁔󠀠󠁒󠁅󠁍󠁏󠁖󠁅󠀠󠁏󠁒󠀠󠁁󠁌󠁔󠁅󠁒󠀠󠁔󠁈󠁉󠁓󠀠󠁎󠁏󠁔󠁉󠁃󠁅󠀮security_notice": (
             "The project maintainers are independent from the service provider hosting this instance. "
             "Infrastructure security and configuration are the sole responsibility of the hosting provider. "
             "For software-specific security policies and vulnerability reporting, please strictly follow: "
             "https://github.com/jjh4450/wapul?tab=security-ov-file"
-        )
+        ),
     }
 
     if settings.ENVIRONMENT != "production":

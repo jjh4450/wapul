@@ -14,13 +14,13 @@ class ErrorResponse:
     """표준화된 에러 응답"""
 
     def __init__(
-            self,
-            error_id: str,
-            status_code: int,
-            error_type: str,
-            message: str,
-            timestamp: str,
-            path: str,
+        self,
+        error_id: str,
+        status_code: int,
+        error_type: str,
+        message: str,
+        timestamp: str,
+        path: str,
     ):
         self.error_id = error_id
         self.status_code = status_code
@@ -42,6 +42,7 @@ class ErrorResponse:
 
 class DomainException(Exception):
     """모든 Domain 예외의 베이스"""
+
     status_code: int = 400
     detail: str = "Business logic error"
 
@@ -53,6 +54,7 @@ class DomainException(Exception):
 
 class AuthenticationRequiredError(DomainException):
     """인증이 필요한 요청에 인증 정보가 없는 경우"""
+
     status_code: int = 401
     detail: str = "인증이 필요합니다. Authorization 헤더에 Bearer 토큰을 제공해주세요."
 
@@ -61,17 +63,18 @@ class AuthenticationRequiredError(DomainException):
 # 공통 에러 처리 함수
 # ============================================================================
 
+
 def format_error_response(
-        exc: Exception,
-        path: str,
-        method: str = "POST",
+    exc: Exception,
+    path: str,
+    method: str = "POST",
 ) -> ErrorResponse:
     """
     단일 지점에서 에러 응답 포맷팅
-    
+
     REST API와 GraphQL 모두에서 사용하는 공통 에러 처리 함수입니다.
     모든 에러 처리 로직이 여기서 관리됩니다.
-    
+
     :param exc: 발생한 예외
     :param path: 요청 경로
     :param method: HTTP 메서드
@@ -91,7 +94,7 @@ def format_error_response(
                 "path": path,
                 "method": method,
                 "status_code": exc.status_code,
-            }
+            },
         )
 
         return ErrorResponse(
@@ -135,9 +138,8 @@ def format_error_response(
 # FastAPI Exception Handlers
 # ============================================================================
 
-async def domain_exception_handler(
-        request: Request, exc: DomainException
-) -> JSONResponse:
+
+async def domain_exception_handler(request: Request, exc: DomainException) -> JSONResponse:
     """Domain Exception → HTTP (format_error_response 사용)"""
     error_response = format_error_response(
         exc,
@@ -151,9 +153,7 @@ async def domain_exception_handler(
     )
 
 
-async def global_exception_handler(
-        request: Request, exc: Exception
-) -> JSONResponse:
+async def global_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """예상 못한 Exception (format_error_response 사용)"""
     error_response = format_error_response(
         exc,
@@ -171,4 +171,3 @@ def register_exception_handlers(app):
     """main.py에서 호출하여 Exception Handler 등록"""
     app.add_exception_handler(DomainException, domain_exception_handler)
     app.add_exception_handler(Exception, global_exception_handler)
-

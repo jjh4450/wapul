@@ -4,6 +4,7 @@
 레이트 리밋 테스트에서만 사용되는 별도의 클라이언트 fixture.
 기본 e2e_client와 완전히 분리되어 다른 테스트에 영향을 주지 않습니다.
 """
+
 import os
 
 import pytest
@@ -20,7 +21,7 @@ from app.ratelimit.storage.memory import reset_storage
 def rate_limit_client():
     """
     레이트 리밋 활성화된 테스트 클라이언트
-    
+
     특징:
     - 레이트 리밋 활성화 상태
     - 별도의 메모리 DB 인스턴스
@@ -34,6 +35,7 @@ def rate_limit_client():
     # settings 재로드
     from app.core.config import Settings
     import app.core.config as config_module
+
     config_module.settings = Settings()
 
     # 저장소 초기화
@@ -65,6 +67,7 @@ def rate_limit_client():
 
     # 3. TestClient 생성
     from app.main import app
+
     client = TestClient(app)
 
     yield client

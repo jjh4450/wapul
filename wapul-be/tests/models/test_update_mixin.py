@@ -1,6 +1,7 @@
 """
 UpdateMixin.apply_update Tests
 """
+
 import uuid
 from datetime import datetime
 
@@ -12,6 +13,7 @@ from tests.models.conftest import FakeUpdateDTO
 # ============================================================
 # 일반 필드 업데이트
 # ============================================================
+
 
 def test_apply_update_regular_fields(fake_model):
     """일반 필드 업데이트 성공"""
@@ -32,6 +34,7 @@ def test_apply_update_empty_data(fake_model):
 # ============================================================
 # 보호 필드 (PK, owner_id, timestamps)
 # ============================================================
+
 
 def test_apply_update_protects_pk(fake_model):
     """PK(id) 변경 차단"""
@@ -71,6 +74,7 @@ def test_apply_update_protects_updated_at(fake_model):
 # nullable 처리
 # ============================================================
 
+
 def test_apply_update_allows_none_on_nullable_field(fake_model):
     """nullable 필드에 None 허용"""
     assert fake_model.description == "original desc"
@@ -91,6 +95,7 @@ def test_apply_update_blocks_none_on_non_nullable_field(fake_model):
 # 기타 (unknown fields, custom exclude)
 # ============================================================
 
+
 def test_apply_update_ignores_unknown_fields(fake_model):
     """모델에 없는 필드 무시"""
     fake_model.apply_update({"nonexistent_field": "value"})
@@ -108,6 +113,7 @@ def test_apply_update_custom_exclude(fake_model):
 # ============================================================
 # MISSING sentinel 처리 - DTO model_dump() 경유 (정상 사용 경로)
 # ============================================================
+
 
 def test_apply_update_skips_missing_via_dto(fake_model):
     """DTO.model_dump()시 MISSING 필드는 자동 제외되어 업데이트 안됨"""
@@ -152,6 +158,7 @@ def test_apply_update_all_missing_via_dto(fake_model):
 # apply_update는 model_dump() 없이 raw dict를 받더라도 안전해야 함
 # ============================================================
 
+
 def test_apply_update_raw_dict_skips_missing(fake_model):
     """raw dict에 MISSING이 섞여도 해당 필드는 건드리지 않음"""
     fake_model.apply_update({"name": MISSING, "score": MISSING})
@@ -162,11 +169,13 @@ def test_apply_update_raw_dict_skips_missing(fake_model):
 
 def test_apply_update_raw_dict_mixed_missing(fake_model):
     """raw dict에 MISSING과 실제 값이 섞인 경우 실제 값만 반영"""
-    fake_model.apply_update({
-        "name": "updated",
-        "description": MISSING,
-        "score": MISSING,
-    })
+    fake_model.apply_update(
+        {
+            "name": "updated",
+            "description": MISSING,
+            "score": MISSING,
+        }
+    )
 
     assert fake_model.name == "updated"
     assert fake_model.description == "original desc"
@@ -175,10 +184,12 @@ def test_apply_update_raw_dict_mixed_missing(fake_model):
 
 def test_apply_update_raw_dict_missing_vs_none(fake_model):
     """raw dict: MISSING은 스킵, None은 nullable 필드에 적용"""
-    fake_model.apply_update({
-        "name": MISSING,
-        "description": None,
-    })
+    fake_model.apply_update(
+        {
+            "name": MISSING,
+            "description": None,
+        }
+    )
 
     assert fake_model.name == "original"
     assert fake_model.description is None
@@ -186,11 +197,13 @@ def test_apply_update_raw_dict_missing_vs_none(fake_model):
 
 def test_apply_update_raw_dict_all_missing(fake_model):
     """raw dict: 모든 값이 MISSING이면 아무것도 변경되지 않음"""
-    fake_model.apply_update({
-        "name": MISSING,
-        "description": MISSING,
-        "score": MISSING,
-    })
+    fake_model.apply_update(
+        {
+            "name": MISSING,
+            "description": MISSING,
+            "score": MISSING,
+        }
+    )
 
     assert fake_model.name == "original"
     assert fake_model.description == "original desc"

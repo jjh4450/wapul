@@ -4,6 +4,7 @@ Cloudflare IP 관리 및 클라이언트 IP 추출
 Cloudflare 프록시 환경에서 실제 클라이언트 IP를 안전하게 추출하기 위한 모듈.
 Cloudflare IP 목록을 fetch하고 캐시하며, 요청이 Cloudflare에서 왔는지 검증합니다.
 """
+
 import asyncio
 import logging
 import time
@@ -27,7 +28,7 @@ FETCH_TIMEOUT = 10.0
 class CloudflareIPManager:
     """
     Cloudflare IP 목록 관리자
-    
+
     Cloudflare 공식 URL에서 IP 목록을 fetch하고 캐시합니다.
     TTL 기반으로 캐시를 갱신하며, fetch 실패 시 이전 캐시를 사용합니다.
     """
@@ -55,9 +56,9 @@ class CloudflareIPManager:
     async def initialize(self) -> bool:
         """
         Cloudflare IP 목록 초기화
-        
+
         앱 시작 시 호출됩니다. fetch 실패 시 False 반환.
-        
+
         :return: 초기화 성공 여부
         """
         return await self._fetch_ips()
@@ -65,7 +66,7 @@ class CloudflareIPManager:
     async def ensure_initialized(self) -> None:
         """
         IP 목록이 초기화되어 있는지 확인하고, 필요 시 갱신
-        
+
         캐시가 만료되었으면 백그라운드에서 갱신을 시도합니다.
         """
         if not self._initialized:
@@ -77,9 +78,9 @@ class CloudflareIPManager:
     async def _fetch_ips(self) -> bool:
         """
         Cloudflare IP 목록 fetch
-        
+
         동시에 여러 요청이 fetch를 시도하지 않도록 lock 사용.
-        
+
         :return: fetch 성공 여부
         """
         async with self._fetch_lock:
@@ -130,8 +131,7 @@ class CloudflareIPManager:
                         self._last_fetch_time = time.time()
                         self._initialized = True
                         logger.info(
-                            f"Cloudflare IP list updated: {len(ipv4_networks)} IPv4, "
-                            f"{len(ipv6_networks)} IPv6 networks"
+                            f"Cloudflare IP list updated: {len(ipv4_networks)} IPv4, {len(ipv6_networks)} IPv6 networks"
                         )
                         return True
 
@@ -146,7 +146,7 @@ class CloudflareIPManager:
     def is_cloudflare_ip(self, ip_str: str) -> bool:
         """
         주어진 IP가 Cloudflare IP 대역에 속하는지 확인
-        
+
         :param ip_str: 확인할 IP 주소 문자열
         :return: Cloudflare IP 여부
         """
@@ -170,7 +170,7 @@ class CloudflareIPManager:
 class TrustedProxyManager:
     """
     Trusted Proxy IP 관리자
-    
+
     TRUSTED_PROXY_IPS 환경변수에 설정된 IP/CIDR 목록을 관리합니다.
     """
 
@@ -198,7 +198,7 @@ class TrustedProxyManager:
     def is_trusted_proxy(self, ip_str: str) -> bool:
         """
         주어진 IP가 Trusted Proxy인지 확인
-        
+
         :param ip_str: 확인할 IP 주소 문자열
         :return: Trusted Proxy 여부
         """
@@ -245,16 +245,16 @@ def reset_managers() -> None:
 
 
 def _extract_client_ip_from_xff(
-        x_forwarded_for: str,
-        trusted_proxy_manager: TrustedProxyManager,
-        cf_manager: CloudflareIPManager | None = None,
+    x_forwarded_for: str,
+    trusted_proxy_manager: TrustedProxyManager,
+    cf_manager: CloudflareIPManager | None = None,
 ) -> str | None:
     """
     X-Forwarded-For 헤더에서 실제 클라이언트 IP 추출
-    
+
     형식: "client, proxy1, proxy2" - 왼쪽이 원본 클라이언트
     첫 번째 비-프록시 IP를 반환합니다.
-    
+
     :param x_forwarded_for: X-Forwarded-For 헤더 값
     :param trusted_proxy_manager: Trusted Proxy 관리자
     :param cf_manager: Cloudflare IP 관리자 (선택)
@@ -274,18 +274,18 @@ def _extract_client_ip_from_xff(
 
 
 async def get_real_client_ip(
-        request_client_host: str | None,
-        cf_connecting_ip: str | None,
-        x_forwarded_for: str | None,
-        origin_verify_header: str | None = None,
+    request_client_host: str | None,
+    cf_connecting_ip: str | None,
+    x_forwarded_for: str | None,
+    origin_verify_header: str | None = None,
 ) -> str:
     """
     실제 클라이언트 IP 추출
-    
+
     프록시 설정에 따라 적절한 IP를 반환합니다.
     request.client.host가 신뢰할 수 있는 프록시(Cloudflare 또는 TRUSTED_PROXY_IPS)일 때만
     X-Forwarded-For 헤더를 신뢰합니다.
-    
+
     :param request_client_host: request.client.host (직접 연결된 IP)
     :param cf_connecting_ip: CF-Connecting-IP 헤더 값
     :param x_forwarded_for: X-Forwarded-For 헤더 값
@@ -313,13 +313,9 @@ async def get_real_client_ip(
     # 2. PROXY_FORCE 검증: 프록시가 아니면 차단
     if app_config.settings.PROXY_FORCE and not is_from_proxy:
         if app_config.settings.CF_ENABLED:
-            raise ProxyEnforcementError(
-                "Cloudflare 또는 신뢰할 수 있는 프록시를 통하지 않은 접근은 허용되지 않습니다."
-            )
+            raise ProxyEnforcementError("Cloudflare 또는 신뢰할 수 있는 프록시를 통하지 않은 접근은 허용되지 않습니다.")
         else:
-            raise ProxyEnforcementError(
-                "프록시를 통하지 않은 접근은 허용되지 않습니다. (TRUSTED_PROXY_IPS 확인)"
-            )
+            raise ProxyEnforcementError("프록시를 통하지 않은 접근은 허용되지 않습니다. (TRUSTED_PROXY_IPS 확인)")
 
     # 3. Origin Verify 검증 (프록시에서 온 경우만, 설정된 경우만)
     if is_from_proxy:
@@ -335,17 +331,12 @@ async def get_real_client_ip(
 
         # X-Forwarded-For에서 클라이언트 IP 추출
         if x_forwarded_for:
-            client_ip = _extract_client_ip_from_xff(
-                x_forwarded_for, trusted_proxy_manager, cf_manager
-            )
+            client_ip = _extract_client_ip_from_xff(x_forwarded_for, trusted_proxy_manager, cf_manager)
             if client_ip:
                 return client_ip
 
         # 헤더가 없으면 경고 후 직접 IP 사용
-        logger.warning(
-            f"Request from proxy but no client IP header found. "
-            f"Using direct IP: {request_client_host}"
-        )
+        logger.warning(f"Request from proxy but no client IP header found. Using direct IP: {request_client_host}")
 
     # 프록시가 아니거나 헤더가 없으면 직접 IP 사용
     return request_client_host

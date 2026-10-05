@@ -5,6 +5,7 @@
 RateLimitMiddleware 등 라우팅 전 단계나 Depends에서 중복 검증 없이 재사용하기 위함.
 실제 401 게이트는 get_current_user 의존성이 담당한다.
 """
+
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
@@ -28,9 +29,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
     """
 
     async def dispatch(
-            self,
-            request: Request,
-            call_next: RequestResponseEndpoint,
+        self,
+        request: Request,
+        call_next: RequestResponseEndpoint,
     ) -> Response:
         # 기본값 설정 (미인증 상태)
         request.state.current_user = None

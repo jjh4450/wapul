@@ -1,6 +1,7 @@
 """
 CORS 환경변수 설정 테스트
 """
+
 import os
 
 import pytest
@@ -42,13 +43,18 @@ class TestCORSSettings:
         os.environ.pop("CORS_ALLOWED_ORIGINS", None)
         settings = Settings()
 
-        assert settings.CORS_ALLOWED_ORIGINS == "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000,ws://localhost:8000,ws://127.0.0.1:8000"
-        assert settings.cors_origins == ['http://localhost:3000',
-                                         'http://localhost:8000',
-                                         'http://127.0.0.1:3000',
-                                         'http://127.0.0.1:8000',
-                                         'ws://localhost:8000',
-                                         'ws://127.0.0.1:8000']
+        assert (
+            settings.CORS_ALLOWED_ORIGINS
+            == "http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000,ws://localhost:8000,ws://127.0.0.1:8000"
+        )
+        assert settings.cors_origins == [
+            "http://localhost:3000",
+            "http://localhost:8000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+            "ws://localhost:8000",
+            "ws://127.0.0.1:8000",
+        ]
 
     def test_cors_origins_single_origin(self):
         """단일 origin 설정"""
@@ -63,22 +69,14 @@ class TestCORSSettings:
         os.environ["CORS_ALLOWED_ORIGINS"] = "http://localhost:3000,https://example.com,https://app.example.com"
         settings = Settings()
 
-        assert settings.cors_origins == [
-            "http://localhost:3000",
-            "https://example.com",
-            "https://app.example.com"
-        ]
+        assert settings.cors_origins == ["http://localhost:3000", "https://example.com", "https://app.example.com"]
 
     def test_cors_origins_with_spaces(self):
         """공백이 포함된 origin 목록 정리"""
         os.environ["CORS_ALLOWED_ORIGINS"] = " http://localhost:3000 , https://example.com , https://app.example.com "
         settings = Settings()
 
-        assert settings.cors_origins == [
-            "http://localhost:3000",
-            "https://example.com",
-            "https://app.example.com"
-        ]
+        assert settings.cors_origins == ["http://localhost:3000", "https://example.com", "https://app.example.com"]
 
     def test_cors_origins_empty_string(self):
         """빈 문자열 처리"""
@@ -123,22 +121,14 @@ class TestCORSSettings:
         os.environ["CORS_ALLOW_HEADERS"] = "Content-Type,Authorization,X-Requested-With"
         settings = Settings()
 
-        assert settings.cors_headers == [
-            "Content-Type",
-            "Authorization",
-            "X-Requested-With"
-        ]
+        assert settings.cors_headers == ["Content-Type", "Authorization", "X-Requested-With"]
 
     def test_cors_headers_with_spaces(self):
         """공백이 포함된 헤더 목록 정리"""
         os.environ["CORS_ALLOW_HEADERS"] = " Content-Type , Authorization , X-Requested-With "
         settings = Settings()
 
-        assert settings.cors_headers == [
-            "Content-Type",
-            "Authorization",
-            "X-Requested-With"
-        ]
+        assert settings.cors_headers == ["Content-Type", "Authorization", "X-Requested-With"]
 
     def test_cors_allow_credentials_default(self):
         """기본값은 credentials 허용 안 함"""

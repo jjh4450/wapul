@@ -75,8 +75,11 @@ class SessionManager:
             pool_recycle=settings.DB_POOL_RECYCLE,  # 연결 재활용 시간
         )
 
-        logger.info("✅ PostgreSQL engine initialized (pool_size=%d, pool_pre_ping=%s)",
-                    settings.POOL_SIZE, settings.DB_POOL_PRE_PING)
+        logger.info(
+            "✅ PostgreSQL engine initialized (pool_size=%d, pool_pre_ping=%s)",
+            settings.POOL_SIZE,
+            settings.DB_POOL_PRE_PING,
+        )
 
     def _init_default_engine(self):
         """기본 엔진 초기화 (기타 DB)"""
@@ -129,8 +132,7 @@ def get_db() -> Generator[Session, None, None]:
         finally:
             if session.new or session.dirty or session.deleted:
                 logger.warning(
-                    "Read-only session rolled back with pending changes. "
-                    "new=%d dirty=%d deleted=%d",
+                    "Read-only session rolled back with pending changes. new=%d dirty=%d deleted=%d",
                     len(session.new),
                     len(session.dirty),
                     len(session.deleted),
@@ -156,10 +158,11 @@ def get_db_transactional() -> Generator[Session, None, None]:
 
 # ============ 비동기 세션 (제한적 사용) ============
 
+
 def _get_async_database_url() -> str:
     """
     동기 DATABASE_URL을 비동기 URL로 변환
-    
+
     SQLite: sqlite:/// -> sqlite+aiosqlite:///
     PostgreSQL: postgresql:// -> postgresql+asyncpg://
     Oracle: oracle:// -> oracle+oracledb://
@@ -223,9 +226,7 @@ def _create_async_engine():
 async_engine = _create_async_engine()
 
 # 비동기 Session factory
-async_session_maker = async_sessionmaker(
-    async_engine, class_=AsyncSession, expire_on_commit=False
-)
+async_session_maker = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
 
 @asynccontextmanager
@@ -248,7 +249,7 @@ async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
 async def init_db_async() -> None:
     """
     비동기 DB 테이블 자동 생성
-    
+
     startup 시 호출되어 모든 SQLModel 테이블 생성
     """
     async with async_engine.begin() as conn:

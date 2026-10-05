@@ -4,6 +4,7 @@
 단일 인스턴스 환경에서 사용하는 dict 기반 저장소
 슬라이딩 윈도우 알고리즘 구현
 """
+
 import asyncio
 import time
 from typing import Dict, List
@@ -14,12 +15,12 @@ from app.ratelimit.storage.base import RateLimitResult, RateLimitStorage
 class InMemoryStorage(RateLimitStorage):
     """
     인메모리 슬라이딩 윈도우 저장소
-    
+
     특징:
     - dict 기반으로 키별 타임스탬프 리스트 저장
     - asyncio.Lock으로 동시성 제어
     - 주기적 cleanup으로 메모리 관리 필요
-    
+
     제한:
     - 단일 프로세스/인스턴스에서만 유효
     - 서버 재시작 시 데이터 손실
@@ -32,14 +33,14 @@ class InMemoryStorage(RateLimitStorage):
         self._lock = asyncio.Lock()
 
     async def record_request(
-            self,
-            key: str,
-            window_seconds: int,
-            max_requests: int,
+        self,
+        key: str,
+        window_seconds: int,
+        max_requests: int,
     ) -> RateLimitResult:
         """
         요청 기록 및 레이트 리밋 체크
-        
+
         슬라이딩 윈도우:
         1. 현재 시간 기준 window_seconds 이전의 오래된 요청 제거
         2. 새 요청 타임스탬프 추가
@@ -54,10 +55,7 @@ class InMemoryStorage(RateLimitStorage):
                 self._requests[key] = []
 
             # 윈도우 밖의 오래된 요청 제거
-            self._requests[key] = [
-                ts for ts in self._requests[key]
-                if ts > window_start
-            ]
+            self._requests[key] = [ts for ts in self._requests[key] if ts > window_start]
 
             current_count = len(self._requests[key])
 
@@ -105,10 +103,7 @@ class InMemoryStorage(RateLimitStorage):
                 return 0
 
             # 윈도우 내 요청만 카운트
-            return len([
-                ts for ts in self._requests[key]
-                if ts > window_start
-            ])
+            return len([ts for ts in self._requests[key] if ts > window_start])
 
     async def reset(self, key: str) -> None:
         """특정 키 초기화"""
@@ -119,7 +114,7 @@ class InMemoryStorage(RateLimitStorage):
     async def cleanup_expired(self) -> int:
         """
         만료된 엔트리 정리
-        
+
         기본 윈도우(5분)보다 오래된 모든 타임스탬프 제거
         빈 키는 삭제
         """
@@ -134,10 +129,7 @@ class InMemoryStorage(RateLimitStorage):
 
             for key, timestamps in self._requests.items():
                 original_len = len(timestamps)
-                self._requests[key] = [
-                    ts for ts in timestamps
-                    if ts > window_start
-                ]
+                self._requests[key] = [ts for ts in timestamps if ts > window_start]
                 cleaned += original_len - len(self._requests[key])
 
                 # 빈 리스트는 삭제 대상
@@ -158,7 +150,7 @@ _storage_instance: InMemoryStorage | None = None
 def get_storage() -> InMemoryStorage:
     """
     저장소 싱글톤 인스턴스 반환
-    
+
     향후 Redis 등 다른 저장소로 교체 시 이 함수만 수정
     """
     global _storage_instance

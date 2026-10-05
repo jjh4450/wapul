@@ -1,6 +1,7 @@
 """
 TimestampMixin & utc_now_naive Tests
 """
+
 from datetime import datetime
 
 from app.models.base import utc_now_naive
@@ -10,6 +11,7 @@ from tests.models.conftest import FakeModel
 # ============================================================
 # utc_now_naive
 # ============================================================
+
 
 def test_utc_now_naive_returns_naive_datetime():
     """timezone 정보 없는 datetime 반환"""
@@ -30,6 +32,7 @@ def test_utc_now_naive_returns_current_utc():
 # ============================================================
 # TimestampMixin
 # ============================================================
+
 
 def test_timestamp_created_at_auto_set():
     """생성 시 created_at 자동 설정"""

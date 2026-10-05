@@ -1,6 +1,7 @@
 """
 UUIDBase Tests
 """
+
 import uuid
 
 from tests.models.conftest import FakeModel

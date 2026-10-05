@@ -1,6 +1,7 @@
 """
 Rate Limit Config 테스트
 """
+
 import pytest
 
 from app.ratelimit.config import (

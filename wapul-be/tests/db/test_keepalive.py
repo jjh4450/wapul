@@ -4,6 +4,7 @@ DatabaseKeepAliveTask 테스트
 DB keep-alive 백그라운드 태스크의 활성화 조건, 주기적 ping,
 실패 내성, 정상 종료(cancel) 동작을 검증한다.
 """
+
 import asyncio
 from contextlib import asynccontextmanager
 from unittest.mock import AsyncMock, patch

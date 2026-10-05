@@ -4,6 +4,7 @@
 - get_current_user: 인증 게이트(실패 시 401). AuthMiddleware가 채운 request.state를 재사용.
 - get_optional_current_user: 선택적 인증(미인증 허용 엔드포인트용).
 """
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -16,8 +17,8 @@ security = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-        request: Request,
-        credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> CurrentUser:
     """
     FastAPI Dependency: 현재 인증된 사용자 반환
@@ -29,7 +30,7 @@ async def get_current_user(
     OIDC_ENABLED=false인 경우 테스트용 mock 사용자 반환
     """
     # AuthMiddleware에서 이미 검증된 경우 재사용
-    if hasattr(request.state, 'current_user') and request.state.current_user:
+    if hasattr(request.state, "current_user") and request.state.current_user:
         return request.state.current_user
 
     # 인증 비활성화 시 테스트용 사용자 반환
@@ -59,8 +60,8 @@ async def get_current_user(
 
 
 async def get_optional_current_user(
-        request: Request,
-        credentials: HTTPAuthorizationCredentials | None = Depends(security),
+    request: Request,
+    credentials: HTTPAuthorizationCredentials | None = Depends(security),
 ) -> CurrentUser | None:
     """
     FastAPI Dependency: 선택적 인증 (인증 없어도 접근 가능한 엔드포인트용)
@@ -68,7 +69,7 @@ async def get_optional_current_user(
     토큰이 없으면 None 반환, 토큰이 있으면 검증 후 CurrentUser 반환
     """
     # AuthMiddleware에서 이미 검증된 경우 재사용
-    if hasattr(request.state, 'current_user') and request.state.current_user:
+    if hasattr(request.state, "current_user") and request.state.current_user:
         return request.state.current_user
 
     if not settings.OIDC_ENABLED:
@@ -81,4 +82,3 @@ async def get_optional_current_user(
         return await get_current_user(request, credentials)
     except HTTPException:
         return None
-

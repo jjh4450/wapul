@@ -3,6 +3,7 @@ Rate Limit 규칙 설정
 
 엔드포인트별 레이트 리밋 규칙 정의 및 매칭 로직
 """
+
 import fnmatch
 from typing import List, Optional
 
@@ -14,14 +15,15 @@ from app.core.config import settings
 class RateLimitRule(BaseModel):
     """
     엔드포인트별 레이트 리밋 규칙
-    
+
     Examples:
         # POST /v1/todos에만 적용 (생성 제한)
         RateLimitRule(methods=["POST"], path_pattern="/v1/todos", ...)
-        
+
         # /v1/todos/* 모든 메서드에 적용
         RateLimitRule(path_pattern="/v1/todos/*", ...)
     """
+
     methods: Optional[List[str]] = None  # None = 모든 메서드, ["POST", "PUT"] = 특정 메서드만
     path_pattern: str  # fnmatch 패턴: "/v1/todos/*", "/v1/todos"
     window_seconds: int  # 윈도우 크기 (초)
@@ -30,7 +32,7 @@ class RateLimitRule(BaseModel):
     def matches(self, method: str, path: str) -> bool:
         """
         요청이 이 규칙에 매칭되는지 확인
-        
+
         :param method: HTTP 메서드 (GET, POST, etc.)
         :param path: 요청 경로
         :return: 매칭 여부
@@ -52,7 +54,6 @@ class RateLimitRule(BaseModel):
 
 RATE_LIMIT_RULES: List[RateLimitRule] = [
     # 엔드포인트별 세분화 규칙은 폴백 규칙보다 위에 추가
-
     # --------------------------------------------------------
     # 전역 폴백 규칙
     # --------------------------------------------------------
@@ -67,12 +68,12 @@ RATE_LIMIT_RULES: List[RateLimitRule] = [
 def get_rule_for_request(method: str, path: str) -> Optional[RateLimitRule]:
     """
     요청에 맞는 규칙 찾기 (메서드 + 경로 매칭)
-    
+
     매칭 우선순위:
     1. RATE_LIMIT_RULES 리스트 순서대로 순회
     2. 첫 번째 매칭되는 규칙 반환
     3. 매칭되는 규칙이 없으면 None 반환 (레이트 리밋 미적용)
-    
+
     :param method: HTTP 메서드
     :param path: 요청 경로
     :return: 매칭된 규칙 또는 None
@@ -86,11 +87,11 @@ def get_rule_for_request(method: str, path: str) -> Optional[RateLimitRule]:
 def build_rate_limit_key(user_id: str, method: str, rule: RateLimitRule) -> str:
     """
     레이트 리밋 키 생성
-    
+
     키 구조: "ratelimit:{user_id}:{method}:{path_pattern}"
-    
+
     동일한 규칙(path_pattern)에 대해 사용자별로 독립적인 카운트 유지
-    
+
     :param user_id: 사용자 식별자 (OIDC sub 또는 IP)
     :param method: HTTP 메서드
     :param rule: 적용된 규칙

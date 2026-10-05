@@ -4,6 +4,7 @@ App model timestamp contract tests.
 These tests guard against accidentally dropping TimestampMixin from a table
 model during model refactors.
 """
+
 import importlib
 import inspect
 import pkgutil

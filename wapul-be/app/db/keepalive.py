@@ -19,6 +19,7 @@ DB Keep-Alive 백그라운드 태스크
 - 스케줄링 (주기적 ping)
 - 상태 관리 (is_running)
 """
+
 import asyncio
 import logging
 
@@ -44,9 +45,7 @@ class DatabaseKeepAliveTask:
                               0 이하이면 비활성화된다.
         """
         self.interval_seconds = (
-            interval_seconds
-            if interval_seconds is not None
-            else settings.DB_KEEPALIVE_INTERVAL_SECONDS
+            interval_seconds if interval_seconds is not None else settings.DB_KEEPALIVE_INTERVAL_SECONDS
         )
         self.is_running = False
 

@@ -6,6 +6,7 @@ Best Practices:
 2. 환경 변수/설정에서 DB URL 가져오기
 3. 모든 모델 자동 import로 autogenerate 지원
 """
+
 from logging.config import fileConfig
 
 from alembic import context
