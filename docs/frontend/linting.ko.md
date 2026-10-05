@@ -1,10 +1,10 @@
 # 린트와 포맷
 
-`pnpm lint`는 세 도구를 순서대로 실행하고, 하나라도 실패하면 멈춥니다.
+`pnpm lint`는 네 단계를 순서대로 실행하고, 하나라도 실패하면 멈춥니다.
 
 ```bash
 pnpm format   # prettier --write . (먼저 실행)
-pnpm lint     # prettier --check . && eslint . && oxlint
+pnpm lint     # prettier --check . && eslint . && oxlint && pnpm ui:check
 ```
 
 | 단계 | 도구 | 역할 |
@@ -12,6 +12,7 @@ pnpm lint     # prettier --check . && eslint . && oxlint
 | 1 | prettier | 포맷 |
 | 2 | eslint | TypeScript, Svelte, Storybook 규칙 |
 | 3 | oxlint | anti-slop 규칙 (AI가 자주 만드는 "근거 없는" 패턴 차단) |
+| 4 | `ui:check` | 스토리 없는 컴포넌트 검출 ([UI 문서](ui.md)) |
 
 ## prettier
 

@@ -22,10 +22,11 @@ pnpm exec vitest run --project server      # node 테스트만 (CI와 동일)
 pnpm exec vitest run --project client      # 컴포넌트 테스트만
 ```
 
-브라우저 프로젝트를 로컬에서 처음 돌릴 때는 Chromium을 한 번 설치해야 합니다 (약 100MB 이상).
+브라우저 프로젝트를 로컬에서 처음 돌릴 때는 Chromium과 Linux 시스템 라이브러리를 한 번 설치해야 합니다.
 
 ```bash
-pnpm exec playwright install chromium
+pnpm exec playwright install chromium            # 이미 ~/.cache/ms-playwright에 있으면 생략
+sudo pnpm exec playwright install-deps chromium  # libnss3, libnspr4 등 (Linux/WSL)
 ```
 
 ### CI

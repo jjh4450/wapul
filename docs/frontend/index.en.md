@@ -17,7 +17,7 @@ pnpm storybook      # Storybook (http://localhost:6006)
 
 ```bash
 pnpm format         # apply prettier first
-pnpm lint           # prettier check + eslint + oxlint (anti-slop rules)
+pnpm lint           # prettier check + eslint + oxlint (anti-slop rules) + story check (ui:check)
 pnpm check          # svelte-check type checking
 pnpm test           # vitest (browser projects need local Chromium)
 ```

@@ -43,7 +43,7 @@ export default defineConfig({
           name: 'client',
           browser: {
             enabled: true,
-            provider: playwright(),
+            provider: playwright({ launchOptions: { channel: 'chromium' } }),
             instances: [
               {
                 browser: 'chromium',
@@ -78,7 +78,7 @@ export default defineConfig({
           browser: {
             enabled: true,
             headless: true,
-            provider: playwright({}),
+            provider: playwright({ launchOptions: { channel: 'chromium' } }),
             instances: [
               {
                 browser: 'chromium'

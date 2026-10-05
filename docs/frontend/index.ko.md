@@ -30,7 +30,7 @@ pnpm build          # 정적 빌드 → build/
 
 ```bash
 pnpm format         # prettier 적용 (lint 전에 실행)
-pnpm lint           # prettier 검사 + eslint + oxlint
+pnpm lint           # prettier 검사 + eslint + oxlint + 스토리 검사(ui:check)
 pnpm check          # svelte-check 타입 검사
 pnpm test           # vitest 전체 (브라우저 프로젝트 포함, 로컬 Chromium 필요)
 ```
@@ -42,7 +42,7 @@ wapul-fe/
 ├── src/
 │   ├── routes/            # 페이지 (+layout.svelte에서 layout.css 로드)
 │   ├── lib/
-│   │   ├── components/ui/ # shadcn-svelte 컴포넌트 (CLI로 추가)
+│   │   ├── components/ui/ # shadcn-svelte 컴포넌트 (pnpm ui:add로 추가, 스토리 필수)
 │   │   ├── hooks/
 │   │   ├── utils.ts       # cn() 등 shadcn 유틸
 │   │   └── vitest-examples/  # vitest 예제 (참고용)
