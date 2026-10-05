@@ -5,6 +5,7 @@ Monorepo.
 - `wapul-fe/` — SvelteKit frontend (pnpm). Lint: `pnpm lint` (prettier + eslint + oxlint with anti-slop rules).
 - `wapul-be/` — FastAPI backend (uv, Python 3.11+; 3.14 in Docker). Lint/format: `uv run ruff check`, `uv run ruff format`. Test: `uv run pytest`.
 - Docs: unified mkdocs site at repo root (`docs/backend`, `docs/frontend`, Storybook built into `site/storybook/`). Local: `./scripts/serve-docs.sh`.
+- UI components: shadcn-svelte MCP is registered in `.mcp.json`. Add components with `pnpm ui:add <name>` (auto-scaffolds a story); every component needs a story (`pnpm ui:check`, part of `pnpm lint`). See the `ui-component` skill.
 - CI lives in root `.github/workflows/` (`be-*`, `fe-*`, `docs.yml`), path-filtered per package.
 
 ---
@@ -72,3 +73,11 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 ---
 
 **These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
+
+## Docs
+
+Docs (`README`, `CONTRIBUTING*`, `docs/`) exist to help a newcomer follow this project's rules: setup, run, lint, test, and conventions.
+
+- Don't update docs just because code changed. Update only when a rule or workflow a contributor must follow changes.
+- Describe the current rules only. No change history, no "updated to...", no narration of past work. That goes in commit messages.
+- Test before adding a line: does a newcomer need this to follow the project's rules? If not, leave it out.

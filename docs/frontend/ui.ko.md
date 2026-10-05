@@ -21,8 +21,26 @@ prettier의 `prettier-plugin-tailwindcss`가 클래스 순서를 자동 정렬�
 
 ```bash
 cd wapul-fe
-pnpm dlx shadcn-svelte@latest add button
+pnpm ui:add button          # shadcn-svelte add + 스토리 생성 + prettier
 ```
+
+### Storybook 연동
+
+`src/lib/components/` 아래 모든 컴포넌트는 스토리가 있어야 합니다. `tools/ui-stories.ts`가 이를 관리합니다.
+
+| 명령 | 동작 |
+|------|------|
+| `pnpm ui:add <name...>` | `shadcn-svelte add` 실행 후, 스토리 없는 컴포넌트에 `<name>.stories.svelte` 생성, prettier 적용 |
+| `pnpm ui:stories` | 직접 만든 컴포넌트 등 스토리 없는 것에 스토리 생성 |
+| `pnpm ui:check` | 스토리 없는 컴포넌트가 있으면 실패 (`pnpm lint`에 포함) |
+
+- 대상: `src/lib/components/ui/`와 `src/lib/components/`의 직속 항목. 폴더(shadcn 형식)는 안에 `*.stories.svelte`가 하나 있어야 하고, 단일 `Name.svelte` 파일은 옆에 `Name.stories.svelte`가 있어야 합니다.
+- 생성되는 스토리는 `Root`만 렌더링하는 최소 골격입니다(제목 `UI/<Name>`, 직접 만든 건 `Components/<Name>`). Card, Dialog 같은 복합 컴포넌트는 실제 사용 예로 채워야 합니다. 예: `<Dialog.Root />`만 있으면 아무것도 보이지 않습니다.
+- `.storybook/preview.ts`가 `src/routes/layout.css`를 불러오므로 스토리에도 디자인 토큰이 적용되고, 툴바에서 라이트/다크를 바꿀 수 있습니다.
+
+### shadcn-svelte MCP
+
+루트 `.mcp.json`에 커뮤니티 MCP 서버 [shadcn-svelte-mcp](https://github.com/Michael-Obele/shadcn-svelte-mcp)가 등록되어 있습니다(공식 서버는 없음). Claude Code가 컴포넌트 문서, 데모 코드, Bits UI API를 조회해 props를 추측하지 않게 합니다. 처음 열 때 Claude Code가 프로젝트 MCP 사용 승인을 묻습니다. 컴포넌트 추가 절차는 `.claude/skills/ui-component/SKILL.md`에 있습니다.
 
 `components.json` 주요 설정:
 

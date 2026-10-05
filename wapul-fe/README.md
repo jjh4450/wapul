@@ -29,6 +29,7 @@ pnpm lint       # prettier 검사 + eslint + oxlint(anti-slop)
 pnpm check      # 타입 검사
 pnpm test       # vitest (브라우저 프로젝트는 로컬 Chromium 필요)
 pnpm storybook  # Storybook
+pnpm ui:add button  # shadcn 컴포넌트 추가 + 스토리 생성
 ```
 
 자세한 내용은 문서 사이트의 [프론트엔드 문서](https://jjh4450.github.io/wapul/frontend/)를 참고하세요 (원본: `docs/frontend/`).
