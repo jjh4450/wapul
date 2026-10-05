@@ -275,6 +275,8 @@ The backend uses `vX.Y.Z` (starting at 1.0.0):
 
 Don't make breaking changes under `/v1`. Add breaking changes under `/v2`.
 
+The frontend uses `fe-vX.Y.Z` with the same rules (Y bumps when the frontend ships against a new API contract; X via the Frontend Deploy workflow's `major` input). On each frontend release CI tags the `main` commit and force-updates the `deploy/fe` branch with a `wapul-fe/VERSION` file; the hosting provider builds and deploys from `deploy/fe`. Don't push to `deploy/fe` or create `fe-v*` tags by hand.
+
 ### How It Works
 
 Versioning is **fully automated** via CI/CD. When backend changes are merged to `main`:

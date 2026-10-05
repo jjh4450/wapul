@@ -59,8 +59,10 @@ jobs:
           echo "changed=true" >> $GITHUB_OUTPUT
 
       # GITHUB_TOKEN으로 push한 커밋은 다른 워크플로를 트리거하지 않으므로 직접 실행
-      - name: Trigger frontend CI
+      - name: Trigger frontend CI and deploy
         if: steps.commit.outputs.changed == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow run fe-ci.yml
+        run: |
+          gh workflow run fe-ci.yml
+          gh workflow run fe-deploy.yml

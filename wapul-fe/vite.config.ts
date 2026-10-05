@@ -6,11 +6,17 @@ import tailwindcss from '@tailwindcss/vite';
 import adapter from '@sveltejs/adapter-static';
 import { sveltekit } from '@sveltejs/kit/vite';
 import path from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 
 const dirname =
   typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
+
+// VERSION은 deploy/fe 브랜치에만 있다 (fe-deploy 워크플로가 커밋). 없으면 SvelteKit 기본값(빌드 시각).
+const versionFile = path.join(dirname, 'VERSION');
+
+const appVersion = existsSync(versionFile) ? readFileSync(versionFile, 'utf8').trim() : undefined;
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
@@ -24,6 +30,7 @@ export default defineConfig({
           filename.split(/[/\\]/).includes('node_modules') ? undefined : true
       },
       adapter: adapter(),
+      version: { name: appVersion },
       preprocess: [
         mdsvex({
           extensions: ['.svx', '.md']
