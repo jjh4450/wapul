@@ -7,9 +7,9 @@
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
-    "prepare": "svelte-kit sync || echo ''",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "prepare": "(svelte-kit sync && pnpm api:gen) || echo ''",
+    "check": "svelte-kit sync && pnpm api:gen && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && pnpm api:gen && svelte-check --tsconfig ./tsconfig.json --watch",
     "lint": "prettier --check . && eslint . && oxlint && pnpm ui:check",
     "format": "prettier --write .",
     "test:unit": "vitest",
@@ -18,7 +18,8 @@
     "build-storybook": "storybook build",
     "ui:add": "node tools/ui-stories.ts --add",
     "ui:stories": "node tools/ui-stories.ts",
-    "ui:check": "node tools/ui-stories.ts --check"
+    "ui:check": "node tools/ui-stories.ts --check",
+    "api:gen": "openapi-typescript ../openapi/openapi.json -o src/lib/api/schema.ts"
   },
   "devDependencies": {
     "@chromatic-com/storybook": "latest",
@@ -47,6 +48,7 @@
     "eslint-plugin-svelte": "^3.19.0",
     "globals": "^17.6.0",
     "mdsvex": "^0.12.7",
+    "openapi-typescript": "^7.13.0",
     "oxlint": "1.86.0",
     "playwright": "^1.60.0",
     "prettier": "^3.8.3",

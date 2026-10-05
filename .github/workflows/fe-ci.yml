@@ -5,11 +5,14 @@ on:
     branches: [ main ]
     paths:
       - 'wapul-fe/**'
+      - 'openapi/openapi.json'
       - '.github/workflows/fe-ci.yml'
   pull_request:
     paths:
       - 'wapul-fe/**'
+      - 'openapi/openapi.json'
       - '.github/workflows/fe-ci.yml'
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

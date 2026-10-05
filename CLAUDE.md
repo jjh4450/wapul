@@ -6,6 +6,7 @@ Monorepo.
 - `wapul-be/` — FastAPI backend (uv, Python 3.11+; 3.14 in Docker). Lint/format: `uv run ruff check`, `uv run ruff format`. Test: `uv run pytest`.
 - Docs: unified mkdocs site at repo root (`docs/backend`, `docs/frontend`, Storybook built into `site/storybook/`). Local: `./scripts/serve-docs.sh`.
 - UI components: shadcn-svelte MCP is registered in `.mcp.json`. Add components with `pnpm ui:add <name>` (auto-scaffolds a story); every component needs a story (`pnpm ui:check`, part of `pnpm lint`). See the `ui-component` skill.
+- API contract: root `openapi/openapi.json` is generated from the backend (`wapul-be/scripts/export_openapi.py`) and committed by CI (`openapi.yml`) on main; don't hand-edit. Frontend types: `pnpm api:gen` → `wapul-fe/src/lib/api/schema.ts` (gitignored).
 - CI lives in root `.github/workflows/` (`be-*`, `fe-*`, `docs.yml`), path-filtered per package.
 
 ---

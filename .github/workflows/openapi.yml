@@ -1,0 +1,79 @@
+name: OpenAPI
+
+# 백엔드 변경 시 루트 openapi/openapi.json을 재생성해 커밋한다. 프론트엔드는 이 파일에서 타입을 생성한다(pnpm api:gen).
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'wapul-be/app/**'
+      - 'wapul-be/scripts/export_openapi.py'
+      - 'wapul-be/pyproject.toml'
+      - 'wapul-be/uv.lock'
+      - 'openapi/**'  # 수동 수정 시 원복
+      - '.github/workflows/openapi.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  actions: write
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+
+      # 소스 해시가 openapi/source.sha256과 같으면(로컬에서 생성해 함께 push한 경우 등) 이후 단계 생략
+      - name: Check source hash
+        id: hash
+        working-directory: wapul-be
+        run: |
+          if python3 scripts/export_openapi.py --check; then
+            echo "fresh=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set up uv
+        if: steps.hash.outputs.fresh != 'true'
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: wapul-be/uv.lock
+
+      - name: Install dependencies
+        if: steps.hash.outputs.fresh != 'true'
+        working-directory: wapul-be
+        run: uv sync --locked --no-dev
+
+      - name: Generate OpenAPI spec
+        if: steps.hash.outputs.fresh != 'true'
+        working-directory: wapul-be
+        run: uv run --no-sync python scripts/export_openapi.py
+
+      # 스펙 내용이 바뀐 경우만 커밋 (해시만 바뀐 건 커밋하지 않아 main에 노이즈 커밋을 만들지 않음)
+      - name: Commit if changed
+        if: steps.hash.outputs.fresh != 'true'
+        id: commit
+        run: |
+          git add openapi/
+          if git diff --cached --quiet -- openapi/openapi.json; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: update openapi spec"
+          git pull --rebase
+          git push
+          echo "changed=true" >> $GITHUB_OUTPUT
+
+      # GITHUB_TOKEN으로 push한 커밋은 다른 워크플로를 트리거하지 않으므로 직접 실행
+      - name: Trigger frontend CI
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow run fe-ci.yml

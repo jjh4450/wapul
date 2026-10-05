@@ -10,3 +10,6 @@ bun.lockb
 
 # Vendored lint plugin
 /tools/oxlint/anti-slop/
+
+# Generated from ../openapi/openapi.json (pnpm api:gen)
+/src/lib/api/schema.ts

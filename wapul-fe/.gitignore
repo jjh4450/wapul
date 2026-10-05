@@ -23,3 +23,6 @@ vite.config.ts.timestamp-*
 
 *storybook.log
 storybook-static
+
+# Generated from ../openapi/openapi.json (pnpm api:gen)
+/src/lib/api/schema.ts
