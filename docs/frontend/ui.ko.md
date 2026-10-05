@@ -26,7 +26,18 @@ pnpm ui:add button          # shadcn-svelte add + 스토리 생성 + prettier
 
 ### Storybook 연동
 
-`src/lib/components/` 아래 모든 컴포넌트는 스토리가 있어야 합니다.
+`src/lib/components/` 아래 모든 컴포넌트는 스토리가 있어야 합니다. 스토리 하나가 Storybook 화면, 자동 문서, 테스트를 함께 만듭니다.
+
+```
+pnpm ui:add button
+  1. shadcn-svelte add  → src/lib/components/ui/button/ 에 소스 복사
+  2. 스토리 골격 생성     → button/button.stories.svelte (스토리가 없을 때만)
+  3. prettier
+        ↓
+Storybook: src/**/*.stories.svelte 를 자동 인식 → 사이드바 UI/Button, 자동 문서(autodocs)
+        ↓
+pnpm test: addon-vitest가 스토리를 테스트로 실행 (렌더링, play, a11y)
+```
 
 | 명령 | 동작 |
 |------|------|
@@ -35,7 +46,46 @@ pnpm ui:add button          # shadcn-svelte add + 스토리 생성 + prettier
 | `pnpm ui:check` | 스토리 없는 컴포넌트가 있으면 실패 (`pnpm lint`에 포함) |
 
 - 대상: `src/lib/components/ui/`와 `src/lib/components/`의 직속 항목. 폴더(shadcn 형식)는 안에 `*.stories.svelte`가 하나 있어야 하고, 단일 `Name.svelte` 파일은 옆에 `Name.stories.svelte`가 있어야 합니다.
-- 생성되는 스토리는 `Root`만 렌더링하는 골격입니다. Card, Dialog 같은 복합 컴포넌트는 실제 사용 예로 채웁니다.
+- 이미 스토리가 있는 컴포넌트는 건드리지 않습니다. shadcn 컴포넌트를 다시 받아도 작성한 스토리는 유지됩니다.
+- 스토리에는 앱과 같은 `layout.css`가 적용됩니다. 툴바의 테마 버튼으로 다크 모드도 확인합니다.
+
+#### 골격을 실제 사용 예로 채우기
+
+생성된 골격은 `index.ts`가 내보내는 `Root`만 렌더링합니다.
+
+```svelte
+<script module lang="ts">
+  import { defineMeta } from '@storybook/addon-svelte-csf';
+  import * as Button from './index.js';
+
+  const { Story } = defineMeta({
+    title: 'UI/Button',
+    component: Button.Root,
+    tags: ['autodocs']
+  });
+</script>
+
+<Story name="Default">
+  <Button.Root>Button</Button.Root>
+</Story>
+```
+
+골격 그대로 두지 말고 실제 사용 예로 바꿉니다.
+
+- **복합 컴포넌트**(Card, Dialog 등)는 부품(`Header`, `Trigger`, `Content` 등)을 조합해 씁니다. `<Dialog.Root />`만 있으면 화면에 아무것도 나오지 않습니다.
+- **변형**(`variant`, `size` 등)마다 스토리를 하나씩 둡니다.
+
+```svelte
+<Story name="Outline">
+  <Button.Root variant="outline">Outline</Button.Root>
+</Story>
+
+<Story name="Small">
+  <Button.Root size="sm">Small</Button.Root>
+</Story>
+```
+
+- 상호작용(클릭, 포커스 이동, 위치)은 `play` 함수로, 접근성은 `addon-a11y`로 검사합니다. 둘 다 실제 브라우저에서 돌기 때문에 `pnpm test`에 Chromium이 필요합니다 ([테스트 문서](testing.md)).
 
 `components.json` 주요 설정:
 
