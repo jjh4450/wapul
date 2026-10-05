@@ -93,6 +93,9 @@ nav:
       - Python Version Testing: backend/development/python-version-testing.md
   - Frontend:
     - Overview: frontend/index.md
+    - UI (Tailwind, shadcn-svelte): frontend/ui.md
+    - Linting & Formatting: frontend/linting.md
+    - Testing & Storybook: frontend/testing.md
     # 배포 시 site/storybook/에 함께 올라가는 정적 빌드 (mkdocs 페이지 아님)
     - Storybook: storybook/index.html
   - Development:

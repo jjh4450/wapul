@@ -2,6 +2,8 @@
 
 `wapul-fe/` — SvelteKit frontend (pnpm), deployed on Vercel.
 
+Stack: SvelteKit 3 + Svelte 5 (runes mode enforced), TypeScript, Vite, `adapter-static`, Tailwind CSS 4 + shadcn-svelte, mdsvex, enhanced-img, vitest, Storybook 10.
+
 ## Development
 
 ```bash
@@ -14,10 +16,15 @@ pnpm storybook      # Storybook (http://localhost:6006)
 ## Checks
 
 ```bash
-pnpm lint           # prettier + eslint + oxlint (anti-slop rules)
+pnpm format         # apply prettier first
+pnpm lint           # prettier check + eslint + oxlint (anti-slop rules)
 pnpm check          # svelte-check type checking
-pnpm test           # vitest (including browser mode)
+pnpm test           # vitest (browser projects need local Chromium)
 ```
+
+CI runs only the node (`server`) vitest project. Imports use the `#lib` subpath alias instead of `$lib`.
+
+Detailed guides (UI, linting, testing) are written in Korean; see the Korean pages for the full reference.
 
 ## Component catalog
 

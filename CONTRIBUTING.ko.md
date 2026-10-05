@@ -69,7 +69,7 @@ uv sync
 cp .env.example .env
 ```
 
-프론트엔드(`wapul-fe/`)는 pnpm을 사용하며, 변경 시 `pnpm lint`를 통과해야 합니다.
+프론트엔드(`wapul-fe/`)는 pnpm을 사용하며, 변경 시 `pnpm format` 후 `pnpm lint`, `pnpm check`, `pnpm test`를 통과해야 합니다. 자세한 내용은 [프론트엔드 문서](https://jjh4450.github.io/wapul/frontend/)를 참고하세요.
 
 ### 린트와 포맷
 

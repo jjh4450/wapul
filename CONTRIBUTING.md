@@ -69,7 +69,7 @@ uv sync
 cp .env.example .env
 ```
 
-The frontend (`wapul-fe/`) uses pnpm; changes there must pass `pnpm lint`.
+The frontend (`wapul-fe/`) uses pnpm; run `pnpm format`, then make sure `pnpm lint`, `pnpm check` and `pnpm test` pass. See the [frontend docs](https://jjh4450.github.io/wapul/frontend/).
 
 ### Lint and Format
 
