@@ -1,6 +1,6 @@
 # 프론트엔드
 
-`wapul-fe/` — SvelteKit 프론트엔드 (pnpm). 배포는 Vercel에서 합니다.
+`wapul-fe/` — SvelteKit 프론트엔드.
 
 ## 스택
 

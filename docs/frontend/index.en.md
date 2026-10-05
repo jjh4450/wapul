@@ -1,6 +1,6 @@
 # Frontend
 
-`wapul-fe/` — SvelteKit frontend (pnpm), deployed on Vercel.
+`wapul-fe/` — SvelteKit frontend.
 
 Stack: SvelteKit 3 + Svelte 5 (runes mode enforced), TypeScript, Vite, `adapter-static`, Tailwind CSS 4 + shadcn-svelte, mdsvex, enhanced-img, vitest, Storybook 10.
 
