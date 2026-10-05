@@ -9,13 +9,8 @@ root="$(cd "$(dirname "$0")/.." && pwd)"
 echo "Generating docs/backend/api/openapi.json..."
 (
   cd "$root/wapul-be"
-  OIDC_ENABLED=false DATABASE_URL="sqlite:///:memory:" uv run --group docs python -c "
-import json
-from app.main import app
-with open('../docs/backend/api/openapi.json', 'w') as f:
-    json.dump(app.openapi(), f, indent=2)
-print('openapi.json generated.')
-"
+  uv run --group docs python scripts/export_openapi.py
+  cp ../openapi/openapi.json ../docs/backend/api/openapi.json
 )
 
 echo "Starting mkdocs serve..."

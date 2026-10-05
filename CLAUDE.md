@@ -7,6 +7,7 @@ Monorepo.
 - Docs: unified mkdocs site at repo root (`docs/backend`, `docs/frontend`, Storybook built into `site/storybook/`). Local: `./scripts/serve-docs.sh`.
 - UI components: shadcn-svelte MCP is registered in `.mcp.json`. Add components with `pnpm ui:add <name>` (auto-scaffolds a story); every component needs a story (`pnpm ui:check`, part of `pnpm lint`). See the `ui-component` skill.
 - API contract: root `openapi/openapi.json` is generated from the backend (`wapul-be/scripts/export_openapi.py`) and committed by CI (`openapi.yml`) on main; don't hand-edit. Frontend types: `pnpm api:gen` → `wapul-fe/src/lib/api/schema.ts` (gitignored).
+- Backend versioning: `vX.Y.Z` computed by CI (`be-docker.yml`); Y bumps on API contract change, Z otherwise, X via manual `major` dispatch. Never bump or tag versions by hand. Details: `CONTRIBUTING.md`.
 - CI lives in root `.github/workflows/` (`be-*`, `fe-*`, `docs.yml`), path-filtered per package.
 
 ---

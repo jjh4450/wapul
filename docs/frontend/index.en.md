@@ -28,7 +28,7 @@ Detailed guides (UI, linting, testing) are written in Korean; see the Korean pag
 
 ## Backend API types
 
-The root `openapi/openapi.json` is the source of truth for the backend API. CI (`.github/workflows/openapi.yml`) regenerates and commits it when backend changes land on main, so don't edit it by hand. To refresh it locally, run `cd wapul-be && uv run python scripts/export_openapi.py` and commit both generated files in `openapi/` (`openapi.json`, `source.sha256`). When the source hash matches, CI skips regeneration.
+The root `openapi/openapi.json` is the source of truth for the backend API. CI (`.github/workflows/openapi.yml`) regenerates and commits it when backend changes land on main, so don't edit it by hand. To refresh it locally, run `cd wapul-be && uv run python scripts/export_openapi.py` and commit the result.
 
 `pnpm api:gen` generates `src/lib/api/schema.ts` from it (gitignored). It runs on `pnpm install` and `pnpm check`; run it yourself during development after the spec changes.
 

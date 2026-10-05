@@ -52,13 +52,8 @@ jobs:
       - name: Generate OpenAPI JSON
         working-directory: wapul-be
         run: |
-          VERSION="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
-          OIDC_ENABLED=false DATABASE_URL='sqlite:///:memory:' APP_VERSION="$VERSION" uv run --no-sync python -c "
-          import json
-          from app.main import app
-          with open('../docs/backend/api/openapi.json', 'w') as f:
-              json.dump(app.openapi(), f, indent=2)
-          "
+          uv run --no-sync python scripts/export_openapi.py
+          cp ../openapi/openapi.json ../docs/backend/api/openapi.json
 
       - name: Fetch OG preview image
         continue-on-error: true

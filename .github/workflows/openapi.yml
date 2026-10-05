@@ -28,39 +28,26 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # 소스 해시가 openapi/source.sha256과 같으면(로컬에서 생성해 함께 push한 경우 등) 이후 단계 생략
-      - name: Check source hash
-        id: hash
-        working-directory: wapul-be
-        run: |
-          if python3 scripts/export_openapi.py --check; then
-            echo "fresh=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Set up uv
-        if: steps.hash.outputs.fresh != 'true'
         uses: astral-sh/setup-uv@v10.2.0
         with:
           enable-cache: true
           cache-dependency-glob: wapul-be/uv.lock
 
       - name: Install dependencies
-        if: steps.hash.outputs.fresh != 'true'
         working-directory: wapul-be
         run: uv sync --locked --no-dev
 
       - name: Generate OpenAPI spec
-        if: steps.hash.outputs.fresh != 'true'
         working-directory: wapul-be
         run: uv run --no-sync python scripts/export_openapi.py
 
-      # 스펙 내용이 바뀐 경우만 커밋 (해시만 바뀐 건 커밋하지 않아 main에 노이즈 커밋을 만들지 않음)
+      # 스펙 내용이 바뀐 경우만 커밋 (로컬에서 생성해 함께 push했다면 변경 없음)
       - name: Commit if changed
-        if: steps.hash.outputs.fresh != 'true'
         id: commit
         run: |
           git add openapi/
-          if git diff --cached --quiet -- openapi/openapi.json; then
+          if git diff --cached --quiet; then
             echo "changed=false" >> $GITHUB_OUTPUT
             exit 0
           fi

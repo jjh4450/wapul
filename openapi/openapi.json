@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "wapul-be",
-    "version": "dev"
+    "version": "86d8f7b48ac4"
   },
   "paths": {
     "/health": {

@@ -265,22 +265,26 @@ Use the PR template. Include:
 
 ### Version Format
 
-This project uses **Calendar Versioning (CalVer)** with git hash:
+The backend uses `vX.Y.Z` (starting at 1.0.0):
 
-```
-v{YYYY}.{MM}.{DD}-{SHORT_GIT_HASH}
-```
+| Part | Bumped when | By |
+|------|-------------|----|
+| X | API path version changes (`/v1` → `/v2`) | A maintainer runs the Backend Docker workflow manually with the `major` input |
+| Y | API contract changes (`info.version` in `openapi/openapi.json`, a hash of the spec) | CI, automatically |
+| Z | Every other release | CI, automatically |
 
-Example: `v2026.10.05-a1b2c3d`
+Don't make breaking changes under `/v1`. Add breaking changes under `/v2`.
 
 ### How It Works
 
-Versioning is **fully automated** via CI/CD. When a PR is merged to `main`:
+Versioning is **fully automated** via CI/CD. When backend changes are merged to `main`:
 
-1. GitHub Actions generates the version from the merge date and commit hash
-2. Docker image is built and tagged with the version
+1. GitHub Actions compares the last release tag and API contract to compute the next version
+2. Docker image is built and tagged `X.Y.Z`, `X.Y`, `X`, and `latest`
 3. `[Unreleased]` section in CHANGELOG.md is replaced with the actual version
-4. A GitHub Release is created automatically
+4. The release tag and GitHub Release are created automatically
+
+Every week the last release is rebuilt under the same tags to pick up base image and system package security patches. To pin an exact image, use its digest (`@sha256:...`) instead of a tag.
 
 **Contributors should never manually set or bump version numbers.**
 

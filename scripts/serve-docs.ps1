@@ -6,21 +6,14 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 
 Write-Host "Generating docs/backend/api/openapi.json..." -ForegroundColor Cyan
-$env:OIDC_ENABLED = "false"
-$env:DATABASE_URL = "sqlite:///:memory:"
 Push-Location "$root\wapul-be"
 try {
-    & uv run --group docs python -c @"
-import json
-from app.main import app
-with open('../docs/backend/api/openapi.json', 'w') as f:
-    json.dump(app.openapi(), f, indent=2)
-print('openapi.json generated.')
-"@
+    & uv run --group docs python scripts/export_openapi.py
     if ($LASTEXITCODE -ne 0) {
         Write-Host "Failed to generate openapi.json. Ensure uv is installed." -ForegroundColor Red
         exit 1
     }
+    Copy-Item "$root\openapi\openapi.json" "$root\docs\backend\api\openapi.json"
 } finally {
     Pop-Location
 }

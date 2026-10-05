@@ -14,36 +14,114 @@ on:
   schedule:
     - cron: '0 0 * * 1'
   workflow_dispatch:
+    inputs:
+      major:
+        description: 'X 버전 올리기 (API 경로 버전 변경, 예: /v2 추가)'
+        type: boolean
+        default: false
 
+# 버전 계산이 직전 릴리스 태그에 의존하므로 실행을 직렬화 (취소 시 태그/CHANGELOG가 어긋날 수 있음)
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}-be
 
 jobs:
-  build:
+  # 버전 vX.Y.Z: X는 수동(major 입력), Y는 API 계약(openapi info.version) 변경 시, Z는 그 외 릴리스마다 증가
+  # schedule은 새 버전 없이 마지막 릴리스 코드를 같은 태그로 다시 빌드해 베이스 이미지/apt 보안 패치를 반영
+  version:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 10
     permissions:
       contents: read
-      packages: write
     outputs:
+      skip: ${{ steps.version.outputs.skip }}
       version: ${{ steps.version.outputs.version }}
-      digest: ${{ steps.build.outputs.digest }}
+      sha: ${{ steps.version.outputs.sha }}
+      contract: ${{ steps.version.outputs.contract }}
+      release: ${{ steps.version.outputs.release }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Generate version
-        id: version
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          enable-cache: true
+          cache-dependency-glob: wapul-be/uv.lock
+
+      - name: Generate OpenAPI spec
+        working-directory: wapul-be
         run: |
-          VERSION="v$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)"
-          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          uv sync --locked --no-dev
+          uv run --no-sync python scripts/export_openapi.py
+
+      - name: Compute version
+        id: version
+        env:
+          EVENT: ${{ github.event_name }}
+          MAJOR: ${{ inputs.major }}
+        run: |
+          LAST=$(git tag --list 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
+          # 릴리스 태그는 annotated 태그이고 메시지에 해당 릴리스의 API 계약 버전을 기록한다
+          LAST_CONTRACT=""
+          if [ -n "$LAST" ]; then
+            LAST_CONTRACT=$(git tag --list --format='%(contents:subject)' "$LAST" | sed -n 's/^api-contract: //p')
+          fi
+
+          if [ "$EVENT" = "schedule" ] || { [ -n "$LAST" ] && [ "$MAJOR" != "true" ] && [ "$(git rev-list -n1 "$LAST")" = "$(git rev-parse HEAD)" ]; }; then
+            if [ -z "$LAST" ]; then
+              echo "skip=true" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            # 이미 릴리스된 코드를 같은 버전으로 다시 빌드 (주간 패치 또는 수동 재실행)
+            {
+              echo "version=${LAST#v}"
+              echo "sha=$(git rev-list -n1 "$LAST")"
+              echo "contract=${LAST_CONTRACT}"
+              echo "release=false"
+            } >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          CONTRACT=$(jq -r .info.version openapi/openapi.json)
+          if [ -z "$LAST" ]; then
+            VERSION="1.0.0"
+          else
+            IFS=. read -r X Y Z <<< "${LAST#v}"
+            if [ "$MAJOR" = "true" ]; then
+              VERSION="$((X + 1)).0.0"
+            elif [ "$CONTRACT" != "$LAST_CONTRACT" ]; then
+              VERSION="${X}.$((Y + 1)).0"
+            else
+              VERSION="${X}.${Y}.$((Z + 1))"
+            fi
+          fi
+          {
+            echo "version=${VERSION}"
+            echo "sha=$(git rev-parse HEAD)"
+            echo "contract=${CONTRACT}"
+            echo "release=true"
+          } >> $GITHUB_OUTPUT
+
+  build:
+    needs: version
+    if: needs.version.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.version.outputs.sha }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v4
@@ -58,15 +136,20 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # X.Y.Z, X.Y, X, latest: 주간 리빌드가 같은 태그를 패치된 이미지로 갱신. 고정이 필요하면 digest로 지정
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=${{ steps.version.outputs.version }}
-            ${{ github.event_name == 'push' && 'type=raw,value=latest' || '' }}
-            ${{ github.event_name == 'schedule' && 'type=raw,value=weekly' || '' }}
+            type=semver,pattern={{version}},value=${{ needs.version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.version.outputs.version }}
+            type=semver,pattern={{major}},value=${{ needs.version.outputs.version }}
+            type=raw,value=latest
+          labels: |
+            org.opencontainers.image.revision=${{ needs.version.outputs.sha }}
+            org.wapul.api-contract=${{ needs.version.outputs.contract }}
 
       - name: Build and push image
         id: build
@@ -78,14 +161,15 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
           build-args: |
-            APP_VERSION=${{ steps.version.outputs.version }}
+            APP_VERSION=${{ needs.version.outputs.version }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
           sbom: false
 
   release:
-    needs: build
+    needs: [version, build]
+    if: needs.version.outputs.release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -96,9 +180,14 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
       - name: Update CHANGELOG [Unreleased] to actual version
         env:
-          VERSION: ${{ needs.build.outputs.version }}
+          VERSION: v${{ needs.version.outputs.version }}
           REPO_URL: https://github.com/${{ github.repository }}
         working-directory: wapul-be
         run: |
@@ -119,26 +208,35 @@ jobs:
               VERSION_LINK="${REPO_URL}/releases/tag/${VERSION}"
             fi
             sed -i "/^\[Unreleased\]: /a [${VERSION}]: ${VERSION_LINK}" CHANGELOG.md
-            git config user.name "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
             git add CHANGELOG.md
             git commit -m "chore: update CHANGELOG for ${VERSION}"
             git push
           fi
 
-      - name: Create GitHub Release
+      # 태그는 이미지를 빌드한 커밋에 붙이고, 메시지에 API 계약 버전을 남겨 다음 릴리스의 Y 판정에 쓴다
+      - name: Create tag and GitHub Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERSION: ${{ needs.build.outputs.version }}
+          TAG: v${{ needs.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
+          SHA: ${{ needs.version.outputs.sha }}
+          CONTRACT: ${{ needs.version.outputs.contract }}
         run: |
-          if gh release view "$VERSION" &>/dev/null; then
+          if gh release view "$TAG" &>/dev/null; then
             exit 0
           fi
 
-          gh release create "$VERSION" \
+          if ! git rev-parse -q --verify "refs/tags/$TAG" >/dev/null; then
+            git tag -a "$TAG" "$SHA" -m "api-contract: $CONTRACT"
+            git push origin "$TAG"
+          fi
+
+          gh release create "$TAG" \
+            --verify-tag \
             --generate-notes \
-            --title "Release $VERSION" \
-            --notes "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION"
+            --title "Release $TAG" \
+            --notes "docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:$VERSION
+          API contract: \`$CONTRACT\`"
 
       - name: Trigger docs rebuild
         env:

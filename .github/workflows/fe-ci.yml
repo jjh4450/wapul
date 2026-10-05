@@ -5,12 +5,12 @@ on:
     branches: [ main ]
     paths:
       - 'wapul-fe/**'
-      - 'openapi/openapi.json'
+      - 'openapi/**'
       - '.github/workflows/fe-ci.yml'
   pull_request:
     paths:
       - 'wapul-fe/**'
-      - 'openapi/openapi.json'
+      - 'openapi/**'
       - '.github/workflows/fe-ci.yml'
   workflow_dispatch:
 

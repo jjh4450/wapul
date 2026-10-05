@@ -68,7 +68,7 @@ import favicon from '#lib/assets/favicon.svg';
 
 ### 백엔드 API 타입
 
-루트 `openapi/openapi.json`이 백엔드 API의 원본입니다. main에 백엔드 변경이 push되면 CI(`.github/workflows/openapi.yml`)가 재생성해 커밋하므로 직접 수정하지 않습니다. 로컬에서 미리 갱신하려면 `cd wapul-be && uv run python scripts/export_openapi.py`를 실행하고 생성된 `openapi/` 두 파일(`openapi.json`, `source.sha256`)을 함께 커밋합니다. 소스 해시가 일치하면 CI는 재생성을 생략합니다.
+루트 `openapi/openapi.json`이 백엔드 API의 원본입니다. main에 백엔드 변경이 push되면 CI(`.github/workflows/openapi.yml`)가 재생성해 커밋하므로 직접 수정하지 않습니다. 로컬에서 미리 갱신하려면 `cd wapul-be && uv run python scripts/export_openapi.py`를 실행해 함께 커밋합니다.
 
 `pnpm api:gen`이 이 파일로 `src/lib/api/schema.ts`를 생성합니다(gitignore 대상). `pnpm install`, `pnpm check` 시 자동 실행되며, 스펙이 바뀐 뒤 개발 중이면 직접 실행합니다.
 

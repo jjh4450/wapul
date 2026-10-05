@@ -215,8 +215,8 @@ Cloudflare 사용 시에는 `CF_ENABLED=true`, `PROXY_FORCE=true`를 권장하�
 # 최신 이미지
 docker pull ghcr.io/jjh4450/wapul-be:latest
 
-# 특정 버전
-docker pull ghcr.io/jjh4450/wapul-be:v2026.10.05-a1b2c3d
+# 특정 버전 (1.3.2 / 1.3 / 1). 태그는 매주 보안 패치로 갱신되며, 고정하려면 @sha256 digest 사용
+docker pull ghcr.io/jjh4450/wapul-be:1.3
 ```
 
 ### 단일 컨테이너 실행
