@@ -48,9 +48,6 @@ jobs:
       - name: Type check
         run: pnpm check
 
-      # vitest client/storybook 프로젝트가 브라우저 모드로 실행됨
-      - name: Install Playwright Chromium
-        run: pnpm exec playwright install --with-deps chromium
-
+      # 브라우저(Chromium)가 필요한 client/storybook 프로젝트는 제외, node 환경만 실행
       - name: Test
-        run: pnpm test
+        run: pnpm exec vitest run --project server
