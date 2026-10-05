@@ -10,7 +10,8 @@ If you discover a security vulnerability, please report it privately:
 
 ### How to Report
 
-- **GitHub Security Advisory**: Use the [private vulnerability reporting](https://github.com/jjh4450/wapul/security/advisories/new) feature
+1. **Email**: Send details to jjh4450git@gmail.com
+2. **GitHub Security Advisory**: Use the [private vulnerability reporting](https://github.com/jjh4450/wapul/security/advisories/new) feature (preferred)
 
 ### What to Include
 
@@ -75,7 +76,7 @@ When deploying the wapul backend (`wapul-be`):
 
 ### Software Provided "As Is"
 
-The backend (`wapul-be/`) is licensed under the [Mozilla Public License 2.0 (MPL 2.0)](https://www.mozilla.org/en-US/MPL/2.0/). As stated in the license, the software is provided **"as is"**, without warranty of any kind, either expressed, implied, or statutory. The entire risk as to the quality, performance, and security of the software is with you.
+This project is licensed under the [Mozilla Public License 2.0 (MPL 2.0)](https://www.mozilla.org/en-US/MPL/2.0/). As stated in the license, the software is provided **"as is"**, without warranty of any kind, either expressed, implied, or statutory. The entire risk as to the quality, performance, and security of the software is with you.
 
 ### Modifications and Derivative Works
 
@@ -109,7 +110,8 @@ Nothing in this software or its documentation constitutes legal, security, or pr
 
 ### 신고 방법
 
-- **GitHub Security Advisory**: [비공개 취약점 신고](https://github.com/jjh4450/wapul/security/advisories/new) 기능 사용
+1. **이메일**: jjh4450git@gmail.com으로 세부 사항 전송
+2. **GitHub Security Advisory**: [비공개 취약점 신고](https://github.com/jjh4450/wapul/security/advisories/new) 기능 사용 (권장)
 
 ### 포함할 내용
 
@@ -174,7 +176,7 @@ wapul 백엔드(`wapul-be`) 배포 시:
 
 ### 소프트웨어 "있는 그대로" 제공
 
-백엔드(`wapul-be/`)는 [Mozilla Public License 2.0 (MPL 2.0)](https://www.mozilla.org/en-US/MPL/2.0/) 하에 라이선스됩니다. 라이선스에 명시된 바와 같이, 소프트웨어는 명시적이든 묵시적이든 어떠한 종류의 보증 없이 **"있는 그대로"** 제공됩니다. 소프트웨어의 품질, 성능 및 보안에 대한 모든 위험은 사용자가 부담합니다.
+본 프로젝트는 [Mozilla Public License 2.0 (MPL 2.0)](https://www.mozilla.org/en-US/MPL/2.0/) 하에 라이선스됩니다. 라이선스에 명시된 바와 같이, 소프트웨어는 명시적이든 묵시적이든 어떠한 종류의 보증 없이 **"있는 그대로"** 제공됩니다. 소프트웨어의 품질, 성능 및 보안에 대한 모든 위험은 사용자가 부담합니다.
 
 ### 수정 및 파생 저작물
 

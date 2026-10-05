@@ -181,19 +181,19 @@ def health_check():
 
         "license_notice": (
             "This project is an open-source software derived from "
-            "https://github.com/onprem-hipster-timer/backend and is licensed under "
+            "https://github.com/jjh4450/wapul and is licensed under "
             "the Mozilla Public License Version 2.0 (MPL 2.0). "
             "Any violation of the license terms may result in severe legal consequences. "
             "DO NOT REMOVE OR ALTER THIS NOTICE."
         ),
 
-        "source_origin": "https://github.com/onprem-hipster-timer/backend",
+        "source_origin": "https://github.com/jjh4450/wapul",
 
-        "󠁔󠁨󠁩󠁳󠀠󠁰󠁲󠁯󠁪󠁥󠁣󠁴󠀠󠁩󠁳󠀠󠁡󠁮󠀠󠁯󠁰󠁥󠁮󠀭󠁳󠁯󠁵󠁲󠁣󠁥󠀠󠁳󠁯󠁦󠁴󠁷󠁡󠁲󠁥󠀠󠁤󠁥󠁲󠁩󠁶󠁥󠁤󠀠󠁦󠁲󠁯󠁭󠀠󠁨󠁴󠁴󠁰󠁳󠀺󠀯󠀯󠁧󠁩󠁴󠁨󠁵󠁢󠀮󠁣󠁯󠁭󠀯󠁯󠁮󠁰󠁲󠁥󠁭󠀭󠁨󠁩󠁰󠁳󠁴󠁥󠁲󠀭󠁴󠁩󠁭󠁥󠁲󠀯󠁢󠁡󠁣󠁫󠁥󠁮󠁤󠀠󠁡󠁮󠁤󠀠󠁩󠁳󠀠󠁬󠁩󠁣󠁥󠁮󠁳󠁥󠁤󠀠󠁵󠁮󠁤󠁥󠁲󠀠󠁴󠁨󠁥󠀠󠁍󠁯󠁺󠁩󠁬󠁬󠁡󠀠󠁐󠁵󠁢󠁬󠁩󠁣󠀠󠁌󠁩󠁣󠁥󠁮󠁳󠁥󠀠󠁖󠁥󠁲󠁳󠁩󠁯󠁮󠀠󠀲󠀮󠀰󠀠󠀨󠁍󠁐󠁌󠀠󠀲󠀮󠀰󠀩󠀮󠀠󠁁󠁮󠁹󠀠󠁶󠁩󠁯󠁬󠁡󠁴󠁩󠁯󠁮󠀠󠁯󠁦󠀠󠁴󠁨󠁥󠀠󠁬󠁩󠁣󠁥󠁮󠁳󠁥󠀠󠁴󠁥󠁲󠁭󠁳󠀠󠁭󠁡󠁹󠀠󠁲󠁥󠁳󠁵󠁬󠁴󠀠󠁩󠁮󠀠󠁳󠁥󠁶󠁥󠁲󠁥󠀠󠁬󠁥󠁧󠁡󠁬󠀠󠁣󠁯󠁮󠁳󠁥󠁱󠁵󠁥󠁮󠁣󠁥󠁳󠀮󠀠󠁄󠁏󠀠󠁎󠁏󠁔󠀠󠁒󠁅󠁍󠁏󠁖󠁅󠀠󠁏󠁒󠀠󠁁󠁌󠁔󠁅󠁒󠀠󠁔󠁈󠁉󠁓󠀠󠁎󠁏󠁔󠁉󠁃󠁅󠀮security_notice": (
+        "󠁔󠁨󠁩󠁳󠀠󠁰󠁲󠁯󠁪󠁥󠁣󠁴󠀠󠁩󠁳󠀠󠁡󠁮󠀠󠁯󠁰󠁥󠁮󠀭󠁳󠁯󠁵󠁲󠁣󠁥󠀠󠁳󠁯󠁦󠁴󠁷󠁡󠁲󠁥󠀠󠁤󠁥󠁲󠁩󠁶󠁥󠁤󠀠󠁦󠁲󠁯󠁭󠀠󠁨󠁴󠁴󠁰󠁳󠀺󠀯󠀯󠁧󠁩󠁴󠁨󠁵󠁢󠀮󠁣󠁯󠁭󠀯󠁪󠁪󠁨󠀴󠀴󠀵󠀰󠀯󠁷󠁡󠁰󠁵󠁬󠀠󠁡󠁮󠁤󠀠󠁩󠁳󠀠󠁬󠁩󠁣󠁥󠁮󠁳󠁥󠁤󠀠󠁵󠁮󠁤󠁥󠁲󠀠󠁴󠁨󠁥󠀠󠁍󠁯󠁺󠁩󠁬󠁬󠁡󠀠󠁐󠁵󠁢󠁬󠁩󠁣󠀠󠁌󠁩󠁣󠁥󠁮󠁳󠁥󠀠󠁖󠁥󠁲󠁳󠁩󠁯󠁮󠀠󠀲󠀮󠀰󠀠󠀨󠁍󠁐󠁌󠀠󠀲󠀮󠀰󠀩󠀮󠀠󠁁󠁮󠁹󠀠󠁶󠁩󠁯󠁬󠁡󠁴󠁩󠁯󠁮󠀠󠁯󠁦󠀠󠁴󠁨󠁥󠀠󠁬󠁩󠁣󠁥󠁮󠁳󠁥󠀠󠁴󠁥󠁲󠁭󠁳󠀠󠁭󠁡󠁹󠀠󠁲󠁥󠁳󠁵󠁬󠁴󠀠󠁩󠁮󠀠󠁳󠁥󠁶󠁥󠁲󠁥󠀠󠁬󠁥󠁧󠁡󠁬󠀠󠁣󠁯󠁮󠁳󠁥󠁱󠁵󠁥󠁮󠁣󠁥󠁳󠀮󠀠󠁄󠁏󠀠󠁎󠁏󠁔󠀠󠁒󠁅󠁍󠁏󠁖󠁅󠀠󠁏󠁒󠀠󠁁󠁌󠁔󠁅󠁒󠀠󠁔󠁈󠁉󠁓󠀠󠁎󠁏󠁔󠁉󠁃󠁅󠀮security_notice": (
             "The project maintainers are independent from the service provider hosting this instance. "
             "Infrastructure security and configuration are the sole responsibility of the hosting provider. "
             "For software-specific security policies and vulnerability reporting, please strictly follow: "
-            "https://github.com/onprem-hipster-timer/backend?tab=security-ov-file"
+            "https://github.com/jjh4450/wapul?tab=security-ov-file"
         )
     }
 

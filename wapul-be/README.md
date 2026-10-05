@@ -106,7 +106,7 @@ All settings are read from environment variables (or `.env`). See `.env.example`
 
 ## License
 
-This project is licensed under the Mozilla Public License 2.0. See [LICENSE](LICENSE).
+This project is licensed under the Mozilla Public License 2.0. See [LICENSE](../LICENSE).
 
 ---
 

@@ -106,7 +106,7 @@ uv sync --project wapul-be --group docs
 
 ## 라이선스
 
-이 프로젝트는 Mozilla Public License 2.0 하에 배포됩니다. [LICENSE](LICENSE)를 참고하세요.
+이 프로젝트는 Mozilla Public License 2.0 하에 배포됩니다. [LICENSE](../LICENSE)를 참고하세요.
 
 ---
 

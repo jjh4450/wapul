@@ -8,6 +8,8 @@ from typing import List, Optional
 
 from pydantic import BaseModel
 
+from app.core.config import settings
+
 
 class RateLimitRule(BaseModel):
     """
@@ -56,8 +58,8 @@ RATE_LIMIT_RULES: List[RateLimitRule] = [
     # --------------------------------------------------------
     RateLimitRule(
         path_pattern="/v1/*",
-        window_seconds=60,
-        max_requests=60,
+        window_seconds=settings.RATE_LIMIT_DEFAULT_WINDOW,
+        max_requests=settings.RATE_LIMIT_DEFAULT_REQUESTS,
     ),
 ]
 

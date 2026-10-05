@@ -13,7 +13,7 @@ on:
       - 'wapul-be/app/**'  # OpenAPI 스펙 변경 감지
       - 'wapul-be/README*.md'  # include-markdown → backend/index.*.md
       - 'wapul-be/CHANGELOG.md'  # include-markdown → project/changelog.*.md
-      - 'wapul-be/LICENSE'  # include-markdown → project/license.*.md
+      - 'LICENSE'  # include-markdown → project/license.*.md
       - 'wapul-be/uv.lock'
       - 'wapul-fe/src/**'  # Storybook 스토리/컴포넌트
       - 'wapul-fe/.storybook/**'
