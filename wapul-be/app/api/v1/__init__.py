@@ -6,10 +6,13 @@
 
 from fastapi import APIRouter, Depends
 
+from app.api.v1 import groups, records
 from app.core.auth import get_current_user
 
 api_router = APIRouter()
 
 # 인증이 필요한 라우터는 authed에, 공개 라우터는 api_router에 직접 등록한다.
 authed = APIRouter(prefix="/v1", dependencies=[Depends(get_current_user)])
+authed.include_router(records.router)
+authed.include_router(groups.router)
 api_router.include_router(authed)
