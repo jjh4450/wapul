@@ -46,7 +46,11 @@ def finetune(base: str, sols: list[Solution], out: Path, seed: int = 0) -> str:
     if (out / "config.json").exists():
         return str(out)
     from datasets import Dataset
-    from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer, SentenceTransformerTrainingArguments
+    from sentence_transformers import (
+        SentenceTransformer,
+        SentenceTransformerTrainer,
+        SentenceTransformerTrainingArguments,
+    )
     from sentence_transformers.losses import CosineSimilarityLoss
 
     rng = random.Random(seed)

@@ -35,8 +35,17 @@ CONTAINERS = {
 }
 # Parts of a compound statement that hold statements of their own
 BODY_FIELDS = {"body", "consequence", "alternative", "definition"}
-CLAUSES = {"else_clause", "elif_clause", "except_clause", "finally_clause", "catch_clause", "case_statement",
-           "switch_block_statement_group", "switch_rule", "case_clause"}
+CLAUSES = {
+    "else_clause",
+    "elif_clause",
+    "except_clause",
+    "finally_clause",
+    "catch_clause",
+    "case_statement",
+    "switch_block_statement_group",
+    "switch_rule",
+    "case_clause",
+}
 # Case labels hold their statements directly, with no body field
 CASES = {"case_statement", "switch_block_statement_group"}
 COMMENTS = {"comment", "line_comment", "block_comment"}

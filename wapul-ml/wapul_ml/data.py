@@ -13,7 +13,9 @@ def context_text(units, i: int) -> str:
     """The unit with K units of context on each side, as in CodeSeg's line-by-line setup."""
     prev = "\n".join(u.text for u in units[max(0, i - K) : i])
     nxt = "\n".join(u.text for u in units[i + 1 : i + 1 + K])
-    return f"<previous_context>{prev}</previous_context><target>{units[i].text}</target><next_context>{nxt}</next_context>"
+    return (
+        f"<previous_context>{prev}</previous_context><target>{units[i].text}</target><next_context>{nxt}</next_context>"
+    )
 
 
 @dataclass

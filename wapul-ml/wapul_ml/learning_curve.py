@@ -123,8 +123,10 @@ def main() -> None:
     for k, vals in boot.items():
         se = float(np.std(vals))
         # A difference needs about 2 * sqrt(2) * SE to stand out between two independent runs
-        print(f"  {k:<7} SE {se:.4f}  detectable diff ~{2.83 * se:.3f}  "
-              + "  ".join(f"at {m} scored: ~{2.83 * se * np.sqrt(n_eval / m):.3f}" for m in (300, 600, 1000)))
+        print(
+            f"  {k:<7} SE {se:.4f}  detectable diff ~{2.83 * se:.3f}  "
+            + "  ".join(f"at {m} scored: ~{2.83 * se * np.sqrt(n_eval / m):.3f}" for m in (300, 600, 1000))
+        )
 
 
 if __name__ == "__main__":

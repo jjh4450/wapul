@@ -61,13 +61,19 @@ def main() -> None:
     args = ap.parse_args()
 
     from datasets import Dataset
-    from sentence_transformers import SentenceTransformer, SentenceTransformerTrainer, SentenceTransformerTrainingArguments
+    from sentence_transformers import (
+        SentenceTransformer,
+        SentenceTransformerTrainer,
+        SentenceTransformerTrainingArguments,
+    )
     from sentence_transformers.losses import DenoisingAutoEncoderLoss
 
     texts = corpus_texts(args.sentences)
     prefix = "query: " if "e5" in args.model else ""
     rng = random.Random(1)
-    train = Dataset.from_dict({"damaged": [prefix + damage(t, rng) for t in texts], "original": [prefix + t for t in texts]})
+    train = Dataset.from_dict(
+        {"damaged": [prefix + damage(t, rng) for t in texts], "original": [prefix + t for t in texts]}
+    )
     print(f"training texts: {len(texts)}")
 
     model = SentenceTransformer(args.model)

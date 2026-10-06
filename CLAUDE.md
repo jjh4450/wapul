@@ -4,7 +4,7 @@ Monorepo.
 
 - `wapul-fe/` — SvelteKit frontend (pnpm). Lint: `pnpm lint` (prettier + eslint + oxlint with anti-slop rules + `ui:check` story check).
 - `wapul-be/` — FastAPI backend (uv, Python 3.11+; 3.14 in Docker). Lint/format: `uv run ruff check`, `uv run ruff format`. Test: `uv run pytest`.
-- `wapul-ml/` — block-splitting model. Runs in Docker on GPU (host PyTorch is blocked by Windows app control). `wapul_ml/normalize.py` and `wapul_ml/units.py` are the model's input format, shared with the private data repo cloned at `wapul-ml/data/`; changing them means re-checking corpus and labels. Details: `docs/ml/`.
+- `wapul-ml/` — block-splitting model. Runs in Docker on GPU (host PyTorch is blocked by Windows app control). `wapul_ml/normalize.py` and `wapul_ml/units.py` are the model's input format, shared with the private data repo cloned at `wapul-ml/data/`; changing them means re-checking corpus and labels. Lint/format: `uv run ruff check`, `uv run ruff format` (same rules as the backend). Details: `docs/ml/`.
 - Docs: unified mkdocs site at repo root (`docs/backend`, `docs/frontend`, Storybook built into `site/storybook/`). Local: `./scripts/serve-docs.sh`.
 - UI components: shadcn-svelte MCP is registered in `.mcp.json`. Add components with `pnpm ui:add <name>` (auto-scaffolds a story); every component needs a story (`pnpm ui:check`, part of `pnpm lint`). See the `ui-component` skill.
 - API contract: root `openapi/openapi.json` is generated from the backend (`wapul-be/scripts/export_openapi.py`) and committed by CI (`openapi.yml`) on main; don't hand-edit. Frontend types: `pnpm api:gen` → `wapul-fe/src/lib/api/schema.ts` (gitignored).
