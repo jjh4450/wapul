@@ -3,3 +3,6 @@
 
 # Generated at docs build time (scripts/serve-docs.sh, docs workflow)
 /docs/backend/api/openapi.json
+
+# Local ML dataset, never committed
+/wapul-ml/data/
