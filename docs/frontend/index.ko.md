@@ -44,8 +44,8 @@ wapul-fe/
 │   ├── lib/
 │   │   ├── components/ui/ # shadcn-svelte 컴포넌트 (pnpm ui:add로 추가, 스토리 필수)
 │   │   ├── hooks/
-│   │   ├── utils.ts       # cn() 등 shadcn 유틸
-│   │   └── vitest-examples/  # vitest 예제 (참고용)
+│   │   ├── api/           # API 클라이언트, story용 가짜 API와 데이터
+│   │   └── utils.ts       # cn() 등 shadcn 유틸
 │   └── stories/           # Storybook 예제 스토리
 ├── tools/oxlint/anti-slop/   # vendoring한 oxlint 플러그인 (직접 수정 금지)
 ├── .storybook/

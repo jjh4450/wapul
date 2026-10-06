@@ -39,6 +39,10 @@ export default defineConfig({
       extensions: ['.svelte', '.svx', '.md']
     })
   ],
+  // 개발 중 API 요청은 로컬 백엔드(wapul-be)로 넘긴다. 배포에서는 VITE_API_BASE_URL을 쓴다.
+  server: {
+    proxy: { '/v1': 'http://localhost:2614' }
+  },
   test: {
     expect: {
       requireAssertions: true

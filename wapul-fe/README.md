@@ -23,7 +23,7 @@
 
 ```bash
 pnpm install
-pnpm dev        # 개발 서버
+pnpm dev        # 개발 서버 (/v1 요청은 localhost:2614의 wapul-be로 프록시)
 pnpm format     # prettier 적용
 pnpm lint       # prettier 검사 + eslint + oxlint(anti-slop) + 스토리 검사
 pnpm check      # 타입 검사
@@ -32,5 +32,7 @@ pnpm storybook  # Storybook
 pnpm ui:add button  # shadcn 컴포넌트 추가 + 스토리 생성
 pnpm api:gen    # ../openapi/openapi.json → src/lib/api/schema.ts (백엔드 API 타입)
 ```
+
+배포 빌드에서는 `VITE_API_BASE_URL`에 백엔드 주소를 넣어야 합니다.
 
 자세한 내용은 문서 사이트의 [프론트엔드 문서](https://jjh4450.github.io/wapul/frontend/)를 참고하세요 (원본: `docs/frontend/`).

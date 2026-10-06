@@ -10,9 +10,37 @@
 | `client` | 브라우저 (Playwright) | `src/**/*.svelte.{test,spec}.{js,ts}` | 필요 |
 | `storybook` | 브라우저 (Playwright) | 모든 story를 테스트로 렌더링 | 필요 |
 
-- 순수 로직은 `*.spec.ts`(server), 컴포넌트는 `*.svelte.spec.ts`(client)로 작성합니다. 예제: `src/lib/vitest-examples/`.
+- **화면과 컴포넌트의 동작은 story의 `play` 함수로 검증합니다.** 사용자가 보는 상태(불러오는 중, 빈 목록, 에러 등)마다 story를 두고, `play`에서 클릭·입력한 뒤 결과를 확인합니다. 같은 시나리오를 `*.svelte.spec.ts`에 다시 쓰지 않습니다.
+- **UI가 아닌 로직은 `*.spec.ts`(server)로 작성합니다.** 예: `src/lib/study.spec.ts`, `src/lib/api/client.spec.ts`. CI에서 도는 테스트는 이것뿐입니다.
+- 화면 컴포넌트는 라우터에 기대지 않습니다. `id`는 props로 받고 이동은 콜백(`onsaved` 등)으로 넘기며, `+page.svelte`가 `$app/state`와 `goto`로 연결합니다. vitest에서는 SvelteKit 라우터가 돌지 않기 때문입니다.
 - `expect.requireAssertions: true`: assertion이 하나도 없는 테스트는 실패합니다.
 - 모듈 mock(`vi.mock`)은 anti-slop `no-module-mocking` 규칙으로 금지됩니다. 의존성은 인터페이스로 주입해 교체합니다.
+
+### 가짜 API
+
+백엔드 없이 화면을 돌릴 때는 `src/lib/api/fake.ts`의 `FakeApi`로 `fetch`를 바꿔 끼웁니다. 화면은 실제 API 클라이언트를 그대로 쓰고 응답만 가짜가 정합니다. 데이터는 `src/lib/api/fixtures.ts`에 API 타입으로 적어 두어, API 계약이 바뀌면 `pnpm check`에서 드러납니다.
+
+```svelte
+<script module lang="ts">
+  const api = new FakeApi([
+    ['GET /v1/records/:id', reply(record)],
+    ['PATCH /v1/records/:id/answers', empty()]
+  ]);
+</script>
+
+<Story
+  name="SavesOnlyChangedAnswers"
+  beforeEach={() => api.install()}
+  play={async ({ canvas, userEvent }) => {
+    // ...입력한 뒤
+    await expect(api.callsTo('PATCH', '/v1/records/record-1/answers')).toHaveLength(1);
+  }}
+/>
+```
+
+- `install()`은 되돌리는 함수를 돌려주므로 `beforeEach`에서 그대로 반환합니다.
+- 정하지 않은 요청은 501로 응답하고 콘솔에 에러를 남깁니다.
+- 화면 story는 story마다 가짜 API가 달라서 `autodocs`(여러 story를 한 페이지에 렌더)를 쓰지 않습니다.
 
 ### 실행
 
