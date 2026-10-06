@@ -21,6 +21,7 @@ docs/
 │   ├── deployment/
 │   └── development/
 ├── frontend/                # frontend docs (+ Storybook link)
+├── ml/                      # block-splitting model docs
 └── development/             # shared docs such as this guide
 ```
 

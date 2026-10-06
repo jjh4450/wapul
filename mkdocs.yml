@@ -98,5 +98,9 @@ nav:
     - Testing & Storybook: frontend/testing.md
     # 배포 시 site/storybook/에 함께 올라가는 정적 빌드 (mkdocs 페이지 아님)
     - Storybook: storybook/index.html
+  - ML:
+    - Overview: ml/index.md
+    - Design: ml/design.md
+    - Experiments: ml/experiments.md
   - Development:
     - Docs Guide: development/docs-guide.md

@@ -21,6 +21,7 @@ docs/
 │   ├── deployment/
 │   └── development/
 ├── frontend/                # 프론트엔드 문서 (+ Storybook 링크)
+├── ml/                      # 블럭 분할 모델 문서
 └── development/             # 문서 작성 가이드 등 공통 개발 문서
 ```
 
