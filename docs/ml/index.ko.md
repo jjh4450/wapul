@@ -17,20 +17,32 @@
 
 ```
 wapul-ml/
-├── wapul_ml/
-│   ├── normalize.py       # 코드 정규화 (입력 형식)
-│   ├── units.py           # 문장 단위 분할 (입력 형식)
-│   ├── ast_features.py    # 문장별 AST 정보 (변수 흐름, 감싸는 제어문, 문장 범주)
-│   ├── data.py            # 라벨과 corpus를 문장 단위 데이터로 불러오기
-│   ├── metrics.py         # 블럭 묶기 평가 지표
-│   ├── codeseg.py         # 종류 분류: CodeBERT 미세조정과 교차 검증
-│   ├── disentangle_ast.py # 블럭 묶기: 후보 중 고르기, 점수기 비교와 교차 검증
-│   ├── model.py           # 최종 모델: 학습, 예측, 검토 화면
-│   ├── baseline.py        # 비교 기준: 쌍 분류 + α 군집, 전체(end to end) 교차 검증
-│   └── cpu_time.py        # 최종 모델의 CPU 추론 시간
-├── models/                # 학습한 모델 (git에서 무시)
-├── Dockerfile             # 실험 실행 환경
-└── data/                  # 비공개 데이터 저장소 (git에서 무시)
+├── wapul_ml/                  # 라이브러리: 역할별 폴더
+│   ├── normalize.py           # 코드 정규화 (입력 형식)
+│   ├── units.py               # 문장 단위 분할 (입력 형식)
+│   ├── paths.py               # data/, cache/, models/ 위치
+│   ├── __main__.py            # 최종 모델 명령: train, predict, review
+│   ├── data/
+│   │   └── solutions.py       # 라벨과 corpus를 문장 단위 데이터로 불러오기
+│   ├── features/
+│   │   ├── unit_ast.py        # 문장별 AST 정보 (변수 흐름, 감싸는 제어문, 문장 범주)와 SEGMENT 쌍 특징
+│   │   └── candidates.py      # 블럭 묶기 후보 행 (앞 문장 단위, 블럭 단위)
+│   ├── models/
+│   │   ├── kind_classifier.py # 종류 분류: CodeBERT 미세조정
+│   │   ├── block_ranker.py    # 블럭 묶기: 후보 점수기(MLP, LightGBM)와 디코딩
+│   │   ├── segmenter.py       # 최종 모델: 학습, 저장, 예측
+│   │   └── baseline.py        # 비교 기준: 쌍 분류 + α 군집
+│   └── evaluation/
+│       ├── metrics.py         # 블럭 묶기 평가 지표
+│       └── review.py          # 검토 화면 (HTML)
+├── notebooks/                 # 실험: jupytext 형식의 노트북
+│   ├── kinds_cv.py            # 종류 분류 교차 검증
+│   ├── blocks_cv.py           # 블럭 묶기 교차 검증
+│   ├── baseline_cv.py         # 비교 기준과 전체(end to end) 교차 검증
+│   └── cpu_time.py            # 최종 모델의 CPU 추론 시간
+├── models/                    # 학습한 모델 (git에서 무시)
+├── Dockerfile                 # 실험 실행 환경
+└── data/                      # 비공개 데이터 저장소 (git에서 무시)
 ```
 
 `data/`는 비공개 저장소 `wapul-data-private`를 clone한 것입니다. 원본 풀이, 출처, corpus 생성 스크립트, 라벨이 들어 있고 모노레포에는 올리지 않습니다. 준비 방법은 그 저장소의 README를 따릅니다.
@@ -61,26 +73,42 @@ docker build -t wapul-ml .
 docker run --rm --gpus all \
   -v "$(pwd):/work" \
   -v wapul-hf:/root/.cache/huggingface \
-  wapul-ml python -m wapul_ml.baseline
+  wapul-ml python notebooks/baseline_cv.py
 ```
 
-- 같은 방식으로 다른 모듈을 돌립니다.
-  - `python -m wapul_ml.codeseg`: 종류 분류 교차 검증
-  - `python -m wapul_ml.disentangle_ast [blocks-ensemble | blocks-mlp | blocks-lgbm | mlp | lgbm | ensemble]`: 블럭 묶기 교차 검증
-  - `python -m wapul_ml.baseline [--sweep] [--pair-features structural]`: 비교 기준과 전체 점수
-  - `python -m wapul_ml.cpu_time`: CPU 추론 시간. `--gpus all` 없이 돌립니다
+- 실험은 `notebooks/`에 있고, 같은 방식으로 돌립니다.
+  - `python notebooks/kinds_cv.py [--epochs N]`: 종류 분류 교차 검증
+  - `python notebooks/blocks_cv.py [--variant blocks-ensemble | blocks-mlp | blocks-lgbm | mlp | lgbm | ensemble]`: 블럭 묶기 교차 검증
+  - `python notebooks/baseline_cv.py [--sweep] [--pair-features structural]`: 비교 기준과 전체 점수
+  - `python notebooks/cpu_time.py`: CPU 추론 시간. `--gpus all` 없이 돌립니다
 - 서로 다른 실험은 순서대로 돌립니다. 컨테이너마다 PyTorch와 LightGBM이 CPU 코어를 전부 쓰려 해서, 동시에 띄우면 서로 느려집니다.
+
+### 노트북
+
+`notebooks/`의 `.py`는 jupytext percent 형식의 노트북입니다. 위처럼 스크립트로 돌리거나 JupyterLab에서 셀 단위로 엽니다.
+
+```bash
+docker run --rm --gpus all -p 8888:8888 \
+  -v "$(pwd):/work" \
+  -v wapul-hf:/root/.cache/huggingface \
+  wapul-ml jupyter lab --ip 0.0.0.0 --no-browser --allow-root
+```
+
+- 출력된 주소(`http://127.0.0.1:8888/lab?token=...`)로 들어가, `.py` 파일을 오른쪽 클릭해 Open With → Notebook으로 엽니다.
+- 저장하면 같은 이름의 `.ipynb`가 옆에 생겨 출력을 담습니다. `.ipynb`는 git에서 무시되고, `.py`만 커밋합니다.
+- 새 실험은 `notebooks/`에 같은 형식으로 추가합니다. 여러 실험이 함께 쓰는 코드는 `wapul_ml/`의 역할별 폴더(`data`, `features`, `models`, `evaluation`)에 둡니다.
+- 인자는 명령줄로만 받습니다. Jupyter에서는 기본값으로 시작하므로, 바꾸려면 셀에서 `args.variant = "mlp"`처럼 고칩니다.
 
 ### 최종 모델
 
 ```bash
-python -m wapul_ml.model train                    # 라벨 전체로 학습해 models/segmenter-v1/에 저장
-python -m wapul_ml.model predict FILE LANGUAGE    # 파일 하나의 문장 라벨을 JSON으로 출력
-python -m wapul_ml.model review [N]               # 라벨 없는 corpus 풀이 N개를 cache/review.html로
+python -m wapul_ml train                    # 라벨 전체로 학습해 models/segmenter-v1/에 저장
+python -m wapul_ml predict FILE LANGUAGE    # 파일 하나의 문장 라벨을 JSON으로 출력
+python -m wapul_ml review [N]               # 라벨 없는 corpus 풀이 N개를 cache/review.html로
 ```
 
-- 학습한 모델은 `models/segmenter-vN/`에 저장됩니다(git에서 무시). 다시 학습할 때는 `model.py`의 버전을 올립니다. 이미 모델이 있는 폴더에는 `train`이 저장하지 않습니다.
-- `models/` 아래의 학습된 모델은 지우지 않고 옮깁니다. git에서 무시되어 지우면 되돌릴 수 없습니다.
+- 학습한 모델은 `models/segmenter-vN/`에 저장됩니다(git에서 무시). 다시 학습할 때는 `wapul_ml/models/segmenter.py`의 `OUT` 버전을 올립니다. 이미 모델이 있는 폴더에는 `train`이 저장하지 않습니다.
+- `models/` 아래의 학습된 모델은 지우지 않고 옮깁니다. git에서 무시되어 지우면 되돌릴 수 없고, 다시 학습해도 같은 모델이 나오지 않습니다. 블럭 점수기는 똑같이 나오지만, 종류 분류기는 GPU 연산이 실행마다 조금씩 달라 같은 코드의 재학습에서 문장 종류 예측의 약 1%가 달라졌습니다.
 - `predict`는 `labels.jsonl`과 같은 형식으로, 문장마다 `start` / `end`(줄은 1부터, 열은 0부터 글자 단위, 끝은 포함하지 않음), `kind`, logic이면 `block`(1부터)을 냅니다. 같은 블럭 번호가 떨어져 있을 수 있습니다.
 - `cache/review.html`은 비공개 데이터를 담으므로 로컬에서만 엽니다(예: `cd cache && python -m http.server 8765 --bind 127.0.0.1`).
 - Windows Git Bash에서는 `/work` 같은 경로가 Windows 경로로 바뀌어 마운트가 깨집니다. 명령 앞에 `MSYS_NO_PATHCONV=1`을 붙입니다. PowerShell에서는 `-v "${PWD}:/work"`로 씁니다.

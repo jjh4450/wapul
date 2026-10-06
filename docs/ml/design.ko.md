@@ -10,7 +10,7 @@
 - **잘못 자르기와 잘못 합치기를 같은 무게로 봅니다.** 고르는 값은 같은 블럭 쌍 F1로 정합니다([실험 12](experiments.md)).
 - **완벽한 분할이 목표가 아닙니다.** 사용자가 블럭을 고칠 수 있습니다.
 - **추론은 CPU에서 돕니다.** 풀이 길이에 따라 비용이 제곱으로 늘어나는 구성은 쓰지 않습니다.
-- 경계 질문(조건, 비교)과 구조 질문(재귀, 반복)을 붙일 블럭은 모델이 아니라 정적 분석이 고릅니다. `ast_features.py`의 AST 정보를 함께 쓸 수 있습니다.
+- 경계 질문(조건, 비교)과 구조 질문(재귀, 반복)을 붙일 블럭은 모델이 아니라 정적 분석이 고릅니다. `features/unit_ast.py`의 AST 정보를 함께 쓸 수 있습니다.
 
 ## 문제를 두 개의 알려진 문제로 본다
 
@@ -26,18 +26,18 @@
 | 구성 요소 | 근거 | 상태 |
 |-----------|------|------|
 | 정규화 + tree-sitter 문장 단위 | 라벨이 이 단위로 만들어짐 | 적용 (`normalize.py`, `units.py`) |
-| 종류 분류: 앞뒤 3문장 맥락을 붙인 입력으로 CodeBERT 미세조정 | CodeSeg | 적용 (`codeseg.py`, `context_text`) |
-| 블럭 특징: 데이터 흐름 사슬, 제어문 덩어리, 같은 문법 유형 + 거리, 깊이 | SEGMENT | 적용 (`ast_features.py`, `baseline.segment_features`) |
-| 블럭 묶기: logic 문장마다 지금까지 만든 블럭 중 하나 또는 새 블럭을 고름 | 대화 분리, 군집 순위(cluster ranking) | 적용 (`disentangle_ast.py`, 블럭 단위) |
+| 종류 분류: 앞뒤 3문장 맥락을 붙인 입력으로 CodeBERT 미세조정 | CodeSeg | 적용 (`models/kind_classifier.py`, `context_text`) |
+| 블럭 특징: 데이터 흐름 사슬, 제어문 덩어리, 같은 문법 유형 + 거리, 깊이 | SEGMENT | 적용 (`features/unit_ast.py`) |
+| 블럭 묶기: logic 문장마다 지금까지 만든 블럭 중 하나 또는 새 블럭을 고름 | 대화 분리, 군집 순위(cluster ranking) | 적용 (`features/candidates.py`, `models/block_ranker.py`, 블럭 단위) |
 | 블럭 점수기: 작은 MLP(softmax, 정답 후보 확률 합 최대화) + LightGBM LambdaRank의 확률 평균 | Lee 외 2017, LambdaRank | 적용 |
-| 최종 모델 묶음과 예측 | — | 적용 (`model.py`, `models/segmenter-v1/`) |
-| 쌍 "같은 블럭?" 분류(RBF SVM) + α 임계값 + 순서대로 붙이기 | 상호참조 점진적 군집 | 비교 기준으로 남김 (`baseline.py`) |
+| 최종 모델 묶음과 예측 | — | 적용 (`wapul_ml/models/segmenter.py`, 저장은 `models/segmenter-v1/`) |
+| 쌍 "같은 블럭?" 분류(RBF SVM) + α 임계값 + 순서대로 붙이기 | 상호참조 점진적 군집 | 비교 기준으로 남김 (`models/baseline.py`, `notebooks/baseline_cv.py`) |
 | 문장 임베딩(E5 등) | SetFit의 linear probe | 제외: 블럭 묶기에 기여 없음, 종류 분류는 CodeBERT 미세조정이 더 높음 |
 | 임베딩 미세조정(SetFit, TSDAE, E5 쌍 점수기) | SetFit, TSDAE | 제외: 블럭 묶기가 오르지 않거나 떨어짐 |
 | CodeBERT로 문장 쌍을 함께 읽는 블럭 점수기 | 대화 분리의 BERT 쌍 점수기 | 제외: AST MLP보다 높지 않고 CPU 비용이 logic 문장 수의 제곱 |
 | 이어진 구간 경계 찍기 | CodeSeg의 범위 묶기, 텍스트 분할 | 제외: 떨어진 블럭 19%를 표현 못 함 |
 | 스코프를 구분한 def-use 연결 (가장 최근 정의 → 사용) | SEGMENT의 데이터 흐름 사슬 | 미적용. 지금은 변수를 이름으로만 비교해서 반복문마다 다시 쓰는 `i`, `j`가 같은 변수로 잡힘 |
-| 평가: B³, CEAF-e | 상호참조 평가 | 적용 (`metrics.py`) |
+| 평가: B³, CEAF-e | 상호참조 평가 | 적용 (`evaluation/metrics.py`) |
 
 ## 현재 결과
 
@@ -60,7 +60,7 @@
 | 기준 | B³ | 쌍 F1 |
 |------|----|-------|
 | 전부 한 블럭 | 0.485 | 0.349 |
-| 쌍 + α 군집 (`baseline.py`) | 0.793 | 0.630 |
+| 쌍 + α 군집 (`notebooks/baseline_cv.py`) | 0.793 | 0.630 |
 | **최종 모델** | **0.816** | **0.678** |
 
 ## 근거
