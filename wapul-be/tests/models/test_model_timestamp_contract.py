@@ -16,9 +16,9 @@ import app.models
 from app.models.base import TimestampMixin, utc_now_naive
 
 
-TIMESTAMP_TABLE_NAMES: set[str] = set()
+TIMESTAMP_TABLE_NAMES: set[str] = {"records", "study_groups"}
 
-TIMESTAMPLESS_TABLE_NAMES: set[str] = set()
+TIMESTAMPLESS_TABLE_NAMES: set[str] = {"blocks", "questions", "group_members", "group_records"}
 
 
 def _iter_app_table_models() -> Iterator[type]:
