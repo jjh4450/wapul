@@ -1,0 +1,2 @@
+# The image copies nothing; keep the build context empty (data/, .venv/ and cache/ are large)
+*

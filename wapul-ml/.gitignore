@@ -314,3 +314,7 @@ pyrightconfig.json
 test-results/
 # Local dataset, never committed
 data/
+
+# Embedding cache and trained models
+cache/
+models/

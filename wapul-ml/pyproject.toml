@@ -1,0 +1,27 @@
+[project]
+name = "wapul-ml"
+version = "0.1.0"
+description = "Block-splitting model: statement kinds and logic block grouping"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "scikit-learn",
+    "sentence-transformers[train]",
+    "torch",
+    "tree-sitter==0.26.0",
+    "tree-sitter-cpp==0.23.4",
+    "tree-sitter-java==0.23.5",
+    "tree-sitter-python==0.25.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu130" }
+
+# RTX 50xx (Blackwell) needs CUDA 12.8+; the driver here supports up to 13.0
+[[tool.uv.index]]
+name = "pytorch-cu130"
+url = "https://download.pytorch.org/whl/cu130"
+explicit = true
