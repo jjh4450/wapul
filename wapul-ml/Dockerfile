@@ -10,7 +10,11 @@ ENV PIP_BREAK_SYSTEM_PACKAGES=1
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install "sentence-transformers[train]==6.1.0" scikit-learn==1.9.1 lightgbm==4.7.0 \
     tree-sitter==0.26.0 tree-sitter-cpp==0.23.4 tree-sitter-java==0.23.5 tree-sitter-python==0.25.0
+# Notebook tools in a layer of their own, so the packages the models were trained with stay as built
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install jupyterlab==4.6.4 jupytext==1.19.6
 
 ENV PYTHONUNBUFFERED=1
-# Code and data are mounted at run time, not copied
+# Code and data are mounted at run time, not copied; notebooks/ imports wapul_ml from the mount
+ENV PYTHONPATH=/work
 WORKDIR /work

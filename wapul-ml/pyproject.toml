@@ -32,6 +32,12 @@ name = "pytorch-cu130"
 url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
+# notebooks/*.py are the notebooks; Jupyter keeps their outputs in a git-ignored .ipynb beside each
+[tool.jupytext]
+formats = "ipynb,py:percent"
+notebook_metadata_filter = "-all"
+cell_metadata_filter = "-all"
+
 [tool.ruff]
 target-version = "py311"
 line-length = 120
