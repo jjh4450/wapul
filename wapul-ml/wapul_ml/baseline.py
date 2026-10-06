@@ -37,7 +37,6 @@ from wapul_ml.data import KINDS, Solution, context_text, load_solutions
 from wapul_ml.metrics import PartitionScore
 
 CACHE = Path(__file__).resolve().parent.parent / "cache"
-MODELS = Path(__file__).resolve().parent.parent / "models"
 LANGS = ("cpp", "java", "python")
 ALPHAS = np.round(np.arange(0.2, 0.86, 0.05), 2)
 PAIR_FEATURES = "all"  # "structural" drops every embedding-derived pair feature (ablation)
@@ -335,7 +334,6 @@ def main() -> None:
     ap.add_argument(
         "--sweep", action="store_true", help="also score every alpha on test, to see the merge/split trade-off"
     )
-    ap.add_argument("--setfit", action="store_true", help="contrastively fine-tune the model per fold on its fit part")
     ap.add_argument("--pair-features", choices=("all", "structural"), default="all")
     args = ap.parse_args()
     global PAIR_FEATURES
@@ -347,7 +345,7 @@ def main() -> None:
     from wapul_ml import codeseg
 
     sols = load_solutions()
-    feats = None if args.setfit else featurize(sols, args.model)
+    feats = featurize(sols, args.model)
     tok = AutoTokenizer.from_pretrained(codeseg.MODEL)
     kind_true, kind_pred = [], []
     scorers = ("closest-first", "block scoring")
@@ -363,11 +361,6 @@ def main() -> None:
     for fold, (train, test) in enumerate(KFold(5, shuffle=True, random_state=0).split(sols)):
         shuffled = [train[i] for i in np.random.default_rng(0).permutation(len(train))]
         fit_ids, dev_ids = shuffled[: len(train) * 4 // 5], shuffled[len(train) * 4 // 5 :]
-        if args.setfit:
-            from wapul_ml.contrastive import finetune
-
-            out = MODELS / f"setfit-{Path(args.model).name}-fold{fold}"
-            feats = featurize(sols, finetune(args.model, [sols[i] for i in fit_ids], out))
         fit_part, dev_part = [feats[i] for i in fit_ids], [feats[i] for i in dev_ids]
         kind_model = codeseg.train(codeseg.MODEL, tok, *codeseg.examples(sols, train), codeseg.EPOCHS, seed=fold)
         pair_clf = fit_pair_clf(fit_part)
@@ -409,10 +402,7 @@ def main() -> None:
                     end_to_end["chosen on dev"].add(gold_full, full)
         del kind_model
 
-    setfit = " + setfit per fold" if args.setfit else ""
-    print(
-        f"model: {args.model}{setfit}  solutions: {len(sols)}  scored (human): {sum(s.source == 'human' for s in sols)}"
-    )
+    print(f"model: {args.model}  solutions: {len(sols)}  scored (human): {sum(s.source == 'human' for s in sols)}")
     print(f"\nkinds  macro-F1 {f1_score(kind_true, kind_pred, average='macro'):.3f}")
     print(classification_report(kind_true, kind_pred, labels=list(KINDS), digits=3))
 

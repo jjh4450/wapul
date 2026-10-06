@@ -1,33 +1,32 @@
-"""disentangle.py's link-to-an-earlier-candidate-or-self, scored over AST features.
+"""Logic blocks the conversation-disentanglement way, scored over AST features.
 
     python -m wapul_ml.disentangle_ast [variant]
 
-The features are those of Kummerfeld et al. (2019): hand-made, here the SEGMENT rules, distance,
-depth change, and facts about the unit itself (which drive the self link). Variants:
-- scorer: mlp, a small net trained with a softmax over each unit's candidates, maximizing the
-  summed probability of the correct ones (Lee et al. 2017); lgbm, LightGBM LambdaRank, which also
-  ranks within each unit's candidates; rbf-svm, each candidate classified on its own; ensemble, the
-  mlp and lgbm candidate probabilities averaged
-- +relative: per candidate, whether it is the nearest one with each SEGMENT relation, so a
-  candidate is judged against the others as well
-- blocks-: candidates are the blocks built so far instead of earlier units, with block-level
-  features (Clark & Manning 2016), trained on gold blocks and decoded greedily; +offset shifts
-  the new-block score by an offset chosen on dev (pair F1), to trade cutting against merging
+Disentanglement (Kummerfeld et al. 2019) reads messages in order and, for each, picks the earlier
+message it replies to, or itself to start a new conversation. Here messages are logic units in
+code order and conversations are blocks, so blocks may be non-contiguous, and no threshold is
+needed: the new-block candidate competes with the real ones.
+
+Candidates are either every earlier logic unit (unit variants) or the blocks built so far
+(blocks- variants, cluster ranking as in Clark & Manning 2016: block-level features, trained on
+gold blocks, decoded greedily). Features are hand-made as in Kummerfeld et al.: the SEGMENT rules,
+distance, depth change, and facts about the unit itself, which drive the new-block choice.
+Scorers rank within each unit's candidates:
+- mlp: a small net trained with a softmax over the candidates, maximizing the summed probability
+  of the correct ones (Lee et al. 2017)
+- lgbm: LightGBM LambdaRank, each unit's candidates one query
+- ensemble: the two, each as probabilities over the candidates, averaged
 MLP variants repeat every fold over several seeds. Gold kinds, same 5 folds as baseline.py.
 """
 
 import argparse
-from functools import partial
 
+import lightgbm
 import numpy as np
 import torch
 import torch.nn.functional as F
-import lightgbm
 from lightgbm import LGBMRanker
 from sklearn.model_selection import KFold
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVC
 
 from wapul_ml.ast_features import CATEGORIES, UnitAst, analyze
 from wapul_ml.baseline import segment_features
@@ -37,9 +36,6 @@ from wapul_ml.metrics import PartitionScore
 EPOCHS = 30
 SEEDS = 5
 N_PAIR = 14  # 11 SEGMENT rules + adjacent, log distance, depth change
-# Relations whose nearest holder among the candidates gets a flag: flow, back flow, same control,
-# same loop, same parent (indices into segment_features)
-NEAREST = (0, 1, 5, 6, 8)
 
 
 def unit_features(a: UnitAst) -> list[float]:
@@ -79,23 +75,14 @@ class Candidates:
     """For each logic unit t: one feature row per candidate (every earlier logic unit, then t
     itself) and which candidates are correct."""
 
-    def __init__(self, s: Solution, relative: bool = False):
+    def __init__(self, s: Solution):
         u = Units(s)
         self.blocks = u.blocks
         self.rows: list[torch.Tensor] = []
         self.gold: list[torch.Tensor] = []
         for t in range(len(u)):
-            pair = u.pairs[t]
-            if relative:
-                flags = np.zeros((t, len(NEAREST)), dtype=np.float32)
-                for k, col in enumerate(NEAREST):
-                    holders = np.nonzero(pair[:, col] > 0)[0]
-                    if len(holders):
-                        flags[holders.max(), k] = 1.0
-                pair = np.hstack([pair, flags])
-            n = pair.shape[1]
-            rows = [[0.0, *p, *u.own[t]] for p in pair]
-            rows.append([1.0, *[0.0] * n, *u.own[t]])  # self link: a new block starts here
+            rows = [[0.0, *p, *u.own[t]] for p in u.pairs[t]]
+            rows.append([1.0, *[0.0] * N_PAIR, *u.own[t]])  # self link: a new block starts here
             gold = [u.blocks[c] == u.blocks[t] for c in range(t)]
             self.rows.append(torch.tensor(rows, dtype=torch.float32))
             self.gold.append(torch.tensor([*gold, not any(gold)]))
@@ -209,12 +196,19 @@ def train_lgbm(data, seed: int) -> LgbmScorer:
     return LgbmScorer(ranker.booster_)
 
 
-def train_svm(data, seed: int):
-    """RBF SVM on each candidate row, correct link or not."""
-    X = torch.cat([r for d in data for r in d.rows]).numpy()
-    y = torch.cat([g for d in data for g in d.gold]).numpy()
-    svm = make_pipeline(StandardScaler(), SVC(random_state=seed)).fit(X, y)
-    return lambda r: svm.decision_function(r.numpy())
+def ensemble(*scorers):
+    """Scorers each turned into probabilities over the candidates, averaged."""
+
+    def score(r: torch.Tensor) -> np.ndarray:
+        p = [torch.softmax(torch.tensor(f(r), dtype=torch.float32), 0).numpy() for f in scorers]
+        return np.mean(p, axis=0)
+
+    return score
+
+
+def train_ensemble(data, seed: int):
+    """The MLP and LightGBM scorers, averaged."""
+    return ensemble(train_mlp(data, seed), train_lgbm(data, seed))
 
 
 def predict(score, d: Candidates) -> list[int]:
@@ -226,15 +220,12 @@ def predict(score, d: Candidates) -> list[int]:
     return out
 
 
-def predict_blocks(score, d: BlockCandidates, offset: float = 0.0) -> list[int]:
-    """Block id per logic unit, joining the best block built so far or opening a new one.
-    offset is added to the new-block score: below 0 merges more, above 0 cuts more."""
+def predict_blocks(score, d: BlockCandidates) -> list[int]:
+    """Block id per logic unit, joining the best block built so far or opening a new one."""
     groups: list[list[int]] = []
     out: list[int] = []
     for t in range(len(d)):
-        s = score(d.block_rows(t, groups))
-        s[-1] += offset
-        best = int(np.argmax(s))
+        best = int(np.argmax(score(d.block_rows(t, groups))))
         if best == len(groups):
             groups.append([])
         groups[best].append(t)
@@ -242,79 +233,31 @@ def predict_blocks(score, d: BlockCandidates, offset: float = 0.0) -> list[int]:
     return out
 
 
-def ensemble(*scorers):
-    """Scorers each turned into probabilities over the candidates, averaged (as log, so the
-    new-block offset stays additive)."""
-
-    def score(r: torch.Tensor) -> np.ndarray:
-        p = [torch.softmax(torch.tensor(f(r), dtype=torch.float32), 0).numpy() for f in scorers]
-        return np.log(np.mean(p, axis=0))
-
-    return score
-
-
-def train_ensemble(data, seed: int):
-    """The MLP and LightGBM scorers, averaged."""
-    return ensemble(train_mlp(data, seed), train_lgbm(data, seed))
-
-
 SCORERS = {
     "mlp": (train_mlp, SEEDS),
-    "lgbm": (train_lgbm, 1),  # deterministic
-    "rbf-svm": (train_svm, 1),  # deterministic
+    "lgbm": (train_lgbm, 1),
     "ensemble": (train_ensemble, SEEDS),
-}
-VARIANTS = [
-    *SCORERS,
-    "mlp+relative",
-    "lgbm+relative",
-    "blocks-mlp",
-    "blocks-lgbm",
-    "blocks-lgbm+offset",
-    "blocks-ensemble",
-]
-OFFSETS = np.arange(-3, 3.01, 0.25)
-
-
-def offset_on_dev(score, dev: list[BlockCandidates]) -> float:
-    """The new-block offset with the best same-block pair F1 on dev, as baseline.py picks alpha."""
-
-    def f1(offset: float) -> float:
-        s = PartitionScore()
-        for d in dev:
-            s.add(d.blocks, predict_blocks(score, d, offset))
-        return s.result()["pairF1"]
-
-    return float(max(OFFSETS, key=f1))
+}  # lgbm: deterministic
+VARIANTS = [*SCORERS, *(f"blocks-{s}" for s in SCORERS)]
 
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("variant", nargs="?", choices=VARIANTS, default="mlp")
+    ap.add_argument("variant", nargs="?", choices=VARIANTS, default="blocks-ensemble")
     args = ap.parse_args()
     blocks = args.variant.startswith("blocks-")
-    tune = args.variant.endswith("+offset")
-    fit, seeds = SCORERS[args.variant.removeprefix("blocks-").removesuffix("+relative").removesuffix("+offset")]
+    fit, seeds = SCORERS[args.variant.removeprefix("blocks-")]
 
     sols = load_solutions()
     if blocks:
         data, decode = [BlockCandidates(s) for s in sols], predict_blocks
     else:
-        data, decode = [Candidates(s, relative=args.variant.endswith("+relative")) for s in sols], predict
+        data, decode = [Candidates(s) for s in sols], predict
     results = []
     for seed in range(seeds):
         grouping = PartitionScore()
         for fold, (train_ids, test_ids) in enumerate(KFold(5, shuffle=True, random_state=0).split(sols)):
-            if tune:
-                # The same fit/dev split of the training solutions as baseline.py
-                shuffled = [train_ids[i] for i in np.random.default_rng(0).permutation(len(train_ids))]
-                cut = len(train_ids) * 4 // 5
-                score = fit([data[i] for i in shuffled[:cut]], seed=seed * 5 + fold)
-                offset = offset_on_dev(score, [data[i] for i in shuffled[cut:] if len(data[i])])
-                print(f"  fold {fold}: new-block offset {offset:+.2f}", flush=True)
-                decode = partial(predict_blocks, offset=offset)
-            else:
-                score = fit([data[i] for i in train_ids], seed=seed * 5 + fold)
+            score = fit([data[i] for i in train_ids], seed=seed * 5 + fold)
             for i in test_ids:
                 if len(data[i]):
                     grouping.add(data[i].blocks, decode(score, data[i]))
