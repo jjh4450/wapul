@@ -6,7 +6,8 @@
 
 """코드를 입력/출력/로직 블럭으로 나누는 분할기
 
-실제 분할은 줄 단위 분류 모델(wapul-seg)이 맡는다. 모델이 붙기 전까지는 빈 줄 기준 규칙 분할기를 쓴다.
+실제 분할은 줄 단위 분류 모델(wapul-seg)이 맡는다. 모델이 붙기 전까지는 빈 줄 기준 규칙 분할기를 쓰고,
+SEGMENTER=llm이면 Claude API 분할기(llm_segmenter)를 쓴다.
 모델로 바꿀 때는 Segmenter를 구현한 클래스를 get_segmenter()에서 돌려주면 된다.
 """
 
@@ -14,6 +15,7 @@ import re
 from dataclasses import dataclass
 from typing import Protocol
 
+from app.core.config import settings
 from app.models.study import BlockKind, Language
 
 
@@ -83,4 +85,9 @@ class RuleSegmenter:
 
 
 def get_segmenter() -> Segmenter:
+    if settings.SEGMENTER == "llm":
+        # 순환 import를 피하려고 여기서 가져온다 (llm_segmenter가 BlockDraft를 쓴다)
+        from app.services.llm_segmenter import LLMSegmenter
+
+        return LLMSegmenter()
     return RuleSegmenter()

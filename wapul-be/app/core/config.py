@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     RATE_LIMIT_DEFAULT_WINDOW: int = 60  # 기본 윈도우 크기 (초)
     RATE_LIMIT_DEFAULT_REQUESTS: int = 60  # 기본 최대 요청 수
 
+    # 코드 블럭 분할: rule은 규칙 분할기, llm은 Claude API 호출 (ANTHROPIC_API_KEY 필요)
+    SEGMENTER: Literal["rule", "llm"] = "rule"
+    ANTHROPIC_API_KEY: str = ""
+    LLM_MODEL: str = "claude-opus-5-5"
+    LLM_EFFORT: Literal["low", "medium", "high", "xhigh", "max"] = "high"
+
     # WebSocket Rate Limit 설정
     WS_RATE_LIMIT_ENABLED: bool = True  # WebSocket 레이트 리밋 활성화
     WS_CONNECT_WINDOW: int = 60  # 연결 제한 윈도우 (초)
