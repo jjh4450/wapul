@@ -1,24 +1,17 @@
 """Statement kinds the CodeSeg way: fine-tune a code encoder to classify each unit with context.
 
-    python -m wapul_ml.codeseg [--model microsoft/codebert-base] [--epochs 3]
-
 CodeSeg (DocEng 2026) classifies each line with K lines of context on each side and found
-fine-tuned CodeBERT / CodeT5+ encoders beat LLMs. Here the input is data.context_text and the
-labels are the four kinds. Same 5 folds as baseline.py, trained on each fold's training
-solutions only; compare its macro-F1 with the baseline's frozen-embedding classifier.
+fine-tuned CodeBERT / CodeT5+ encoders beat LLMs. Here the input is solutions.context_text and
+the labels are the four kinds.
 """
 
-import argparse
 import random
-import time
 
 import torch
 import torch.nn.functional as F
-from sklearn.metrics import classification_report, f1_score
-from sklearn.model_selection import KFold
-from transformers import AutoModelForSequenceClassification, AutoTokenizer, get_linear_schedule_with_warmup
+from transformers import AutoModelForSequenceClassification, get_linear_schedule_with_warmup
 
-from wapul_ml.data import KINDS, context_text, load_solutions
+from wapul_ml.data.solutions import KINDS, context_text
 
 MODEL = "microsoft/codebert-base"
 EPOCHS = 3
@@ -73,31 +66,3 @@ def predict(model, tok, texts) -> list[int]:
         with torch.autocast("cuda", dtype=torch.bfloat16):
             out += model(**enc).logits.argmax(-1).tolist()
     return out
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default=MODEL)
-    ap.add_argument("--epochs", type=int, default=EPOCHS)
-    args = ap.parse_args()
-
-    sols = load_solutions()
-    tok = AutoTokenizer.from_pretrained(args.model)
-    y_true, y_pred = [], []
-    for fold, (train_ids, test_ids) in enumerate(KFold(5, shuffle=True, random_state=0).split(sols)):
-        t = time.time()
-        model = train(args.model, tok, *examples(sols, train_ids), args.epochs, seed=fold)
-        texts, labels = examples(sols, [i for i in test_ids if sols[i].source == "human"])
-        y_true += labels
-        y_pred += predict(model, tok, texts)
-        print(f"  fold {fold} done ({time.time() - t:.0f}s)", flush=True)
-        del model
-        torch.cuda.empty_cache()
-    names = [KINDS[i] for i in y_true], [KINDS[i] for i in y_pred]
-    print(f"model: {args.model} fine-tuned, {args.epochs} epochs")
-    print(f"kinds  macro-F1 {f1_score(*names, average='macro'):.3f}")
-    print(classification_report(*names, labels=list(KINDS), digits=3))
-
-
-if __name__ == "__main__":
-    main()

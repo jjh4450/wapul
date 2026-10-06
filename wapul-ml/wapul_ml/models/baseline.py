@@ -1,10 +1,4 @@
-"""Baseline: kind classifier + AST-feature block grouping, 5-fold CV scored on human-reviewed solutions.
-
-    python -m wapul_ml.baseline [--model intfloat/e5-base-v2]
-
-Kinds: CodeBERT fine-tuned per fold on each unit with K units of context on each side
-(line-by-line with context, CodeSeg, DocEng 2026; codeseg.py). --model is the frozen
-embedding the block grouping reads.
+"""Baseline block grouping: pair classifier + alpha clustering over AST and embedding features.
 
 Logic blocks, as incremental coreference clustering (Xia et al. 2020; Grenander et al. 2022):
 logic units are read in code order and each joins an earlier block or opens a new one when
@@ -13,30 +7,22 @@ no block scores above alpha. Two scorers are compared:
 - block scoring: a second classifier scores the unit against the block as a whole
 Pair probabilities come from a "same block?" RBF SVM over the SEGMENT block rules (data
 flow, shared control statement, same syntactic category) and position features.
-
-Each training fold is split into fit and dev parts: the pair classifier learns on fit;
-the block scorer, alpha, and which scorer to use are chosen on dev, so test solutions
-never steer a choice.
 """
 
-import argparse
 import hashlib
 from itertools import combinations
-from pathlib import Path
 
 import numpy as np
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, f1_score
-from sklearn.model_selection import KFold
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import FunctionTransformer, StandardScaler
 from sklearn.svm import SVC
 
-from wapul_ml.ast_features import CATEGORIES, UnitAst, analyze
-from wapul_ml.data import KINDS, Solution, context_text, load_solutions
-from wapul_ml.metrics import PartitionScore
+from wapul_ml.data.solutions import Solution, context_text
+from wapul_ml.evaluation.metrics import PartitionScore
+from wapul_ml.features.unit_ast import CATEGORIES, UnitAst, analyze, segment_features
+from wapul_ml.paths import CACHE
 
-CACHE = Path(__file__).resolve().parent.parent / "cache"
 LANGS = ("cpp", "java", "python")
 ALPHAS = np.round(np.arange(0.2, 0.86, 0.05), 2)
 PAIR_FEATURES = "all"  # "structural" drops every embedding-derived pair feature (ablation)
@@ -160,26 +146,6 @@ def featurize(sols: list[Solution], model_name: str) -> list[Featurized]:
         out.append(Featurized(s, vecs, np.hstack([ctx_vecs[at : at + n], vecs, extra]), asts))
         at += n
     return out
-
-
-def segment_features(x: UnitAst, y: UnitAst) -> list[float]:
-    """The SEGMENT block rules for unit x before unit y."""
-    return [
-        # data-flow chain
-        bool(x.writes & y.reads),
-        bool(y.writes & x.reads),
-        bool(x.writes & y.writes),
-        len(x.reads & y.reads) / (len(x.reads | y.reads) or 1),
-        # control block
-        x.is_header and x.span[0] <= y.span[0] and y.span[1] <= x.span[1],
-        x.control == y.control,
-        x.loop == y.loop,
-        x.function == y.function,
-        x.parent == y.parent,
-        # same syntactic category
-        x.category == y.category,
-        x.node_type == y.node_type,
-    ]
 
 
 def pair_features(f: Featurized, idx: list[int]):
@@ -326,103 +292,3 @@ def full_partition(kinds, idx, blocks) -> list:
     for i, b in zip(idx, blocks, strict=True):
         label[i] = ("logic", b)
     return label
-
-
-def main() -> None:
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--model", default="intfloat/e5-base-v2")
-    ap.add_argument(
-        "--sweep", action="store_true", help="also score every alpha on test, to see the merge/split trade-off"
-    )
-    ap.add_argument("--pair-features", choices=("all", "structural"), default="all")
-    args = ap.parse_args()
-    global PAIR_FEATURES
-    PAIR_FEATURES = args.pair_features
-
-    # Imports torch and transformers, which the classical parts here do not need
-    from transformers import AutoTokenizer
-
-    from wapul_ml import codeseg
-
-    sols = load_solutions()
-    feats = featurize(sols, args.model)
-    tok = AutoTokenizer.from_pretrained(codeseg.MODEL)
-    kind_true, kind_pred = [], []
-    scorers = ("closest-first", "block scoring")
-    # "chosen on dev": per fold, the scorer whose best alpha scores higher on dev
-    grouping = {s: PartitionScore() for s in (*scorers, "chosen on dev")}
-    end_to_end = {s: PartitionScore() for s in (*scorers, "chosen on dev")}
-    singletons, one_block = PartitionScore(), PartitionScore()
-    alphas = {s: [] for s in scorers}
-    chosen_per_fold = []
-    # Analysis only: alpha -> (score, predicted block count, gold block count) with block scoring
-    sweep = {a: [PartitionScore(), 0, 0] for a in ALPHAS}
-
-    for fold, (train, test) in enumerate(KFold(5, shuffle=True, random_state=0).split(sols)):
-        shuffled = [train[i] for i in np.random.default_rng(0).permutation(len(train))]
-        fit_ids, dev_ids = shuffled[: len(train) * 4 // 5], shuffled[len(train) * 4 // 5 :]
-        fit_part, dev_part = [feats[i] for i in fit_ids], [feats[i] for i in dev_ids]
-        kind_model = codeseg.train(codeseg.MODEL, tok, *codeseg.examples(sols, train), codeseg.EPOCHS, seed=fold)
-        pair_clf = fit_pair_clf(fit_part)
-        block_clfs = {"closest-first": None, "block scoring": fit_block_clf(dev_part, pair_clf)}
-        best = {s: best_alpha(dev_part, pair_clf, block_clfs[s]) for s in scorers}
-        alpha = {s: best[s][0] for s in scorers}
-        for s in scorers:
-            alphas[s].append(float(alpha[s]))
-        chosen = max(scorers, key=lambda s: best[s][1])
-        chosen_per_fold.append(chosen)
-
-        for i in test:
-            f = feats[i]
-            if f.sol.source != "human":
-                continue
-            gold = gold_kinds(f)
-            texts = [context_text(f.sol.units, j) for j in range(len(f.sol.units))]
-            pred = [KINDS[k] for k in codeseg.predict(kind_model, tok, texts)]
-            kind_true += gold
-            kind_pred += pred
-            gold_idx, pred_idx = logic_idx(gold), logic_idx(pred)
-            gold_blocks = [f.sol.units[j].block for j in gold_idx]
-            singletons.add(gold_blocks, list(range(len(gold_idx))))
-            one_block.add(gold_blocks, [0] * len(gold_idx))
-            gold_full = full_partition(gold, gold_idx, gold_blocks)
-            if args.sweep:
-                for a in ALPHAS:
-                    blocks = predict_blocks(f, gold_idx, pair_clf, block_clfs["block scoring"], a)
-                    sweep[a][0].add(gold_blocks, blocks)
-                    sweep[a][1] += len(set(blocks))
-                    sweep[a][2] += len(set(gold_blocks))
-            for s in scorers:
-                given = predict_blocks(f, gold_idx, pair_clf, block_clfs[s], alpha[s])
-                full = full_partition(pred, pred_idx, predict_blocks(f, pred_idx, pair_clf, block_clfs[s], alpha[s]))
-                grouping[s].add(gold_blocks, given)
-                end_to_end[s].add(gold_full, full)
-                if s == chosen:
-                    grouping["chosen on dev"].add(gold_blocks, given)
-                    end_to_end["chosen on dev"].add(gold_full, full)
-        del kind_model
-
-    print(f"model: {args.model}  solutions: {len(sols)}  scored (human): {sum(s.source == 'human' for s in sols)}")
-    print(f"\nkinds  macro-F1 {f1_score(kind_true, kind_pred, average='macro'):.3f}")
-    print(classification_report(kind_true, kind_pred, labels=list(KINDS), digits=3))
-
-    def show(name, r):
-        print(f"  {name:<24} " + "  ".join(f"{k} {v:.3f}" for k, v in r.items()))
-
-    print("logic grouping, given gold kinds")
-    show("each alone", singletons.result())
-    show("all one block", one_block.result())
-    for s in scorers:
-        show(f"{s} (alpha {alphas[s]})", grouping[s].result())
-    show(f"chosen on dev {chosen_per_fold}", grouping["chosen on dev"].result())
-    print("end to end (predicted kinds, then grouping)")
-    for s in (*scorers, "chosen on dev"):
-        show(s, end_to_end[s].result())
-    if args.sweep:
-        print("alpha sweep, block scoring, given gold kinds (blocks = predicted / gold logic blocks)")
-        for a, (score, n_pred, n_gold) in sweep.items():
-            show(f"alpha {a}  blocks {n_pred / n_gold:.2f}x", score.result())
-
-
-if __name__ == "__main__":
-    main()

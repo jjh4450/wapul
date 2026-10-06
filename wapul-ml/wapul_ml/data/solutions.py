@@ -2,9 +2,9 @@
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
 
-DATA = Path(__file__).resolve().parent.parent / "data"
+from wapul_ml.paths import DATA
+
 KINDS = ("input", "output", "logic", "none")
 K = 3  # context units on each side of the target
 

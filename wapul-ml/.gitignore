@@ -312,9 +312,12 @@ pyrightconfig.json
 
 # Python version compatibility test results
 test-results/
-# Local dataset, never committed
-data/
+# Local dataset, never committed (root only: wapul_ml/data/ is source)
+/data/
 
-# Embedding cache and trained models
-cache/
-models/
+# Embedding cache and trained models (root only: wapul_ml/models/ is source)
+/cache/
+/models/
+
+# Paired notebooks: the .py in notebooks/ is the source, the .ipynb holds local outputs
+/notebooks/*.ipynb

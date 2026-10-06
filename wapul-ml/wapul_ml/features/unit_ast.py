@@ -179,3 +179,23 @@ def analyze(code: str, language: str, spans: list[tuple[tuple[int, int], tuple[i
             )
         )
     return out
+
+
+def segment_features(x: UnitAst, y: UnitAst) -> list[float]:
+    """The SEGMENT block rules for unit x before unit y."""
+    return [
+        # data-flow chain
+        bool(x.writes & y.reads),
+        bool(y.writes & x.reads),
+        bool(x.writes & y.writes),
+        len(x.reads & y.reads) / (len(x.reads | y.reads) or 1),
+        # control block
+        x.is_header and x.span[0] <= y.span[0] and y.span[1] <= x.span[1],
+        x.control == y.control,
+        x.loop == y.loop,
+        x.function == y.function,
+        x.parent == y.parent,
+        # same syntactic category
+        x.category == y.category,
+        x.node_type == y.node_type,
+    ]
