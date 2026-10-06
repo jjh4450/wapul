@@ -29,7 +29,7 @@ from app.schemas.study import (
 )
 from app.services.analysis import analyze
 from app.services.layouts import build_layouts
-from app.services.questions import EXAMPLES, BlockInfo, build_questions
+from app.services.questions import BlockInfo, build_questions, shuffled_examples
 from app.services.segmenter import get_segmenter
 
 router = APIRouter(prefix="/records", tags=["Records"])
@@ -153,7 +153,7 @@ def _to_out(db: Session, record: Record, user: CurrentUser) -> RecordOut:
                 kind=q.kind,
                 text=q.text,
                 answer=q.answer,
-                examples=EXAMPLES.get(q.kind, []),
+                examples=shuffled_examples(q.kind),
             )
             for q in _questions(db, record.id)
         ],
