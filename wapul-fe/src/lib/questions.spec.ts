@@ -19,6 +19,7 @@ const facts = (kind: BlockFacts['kind'], tags: Partial<BlockFacts> = {}): BlockF
   condition: false,
   loop: false,
   recursion: false,
+  wrong: false,
   ...tags
 });
 
@@ -26,7 +27,7 @@ const blocks = [facts('input'), facts('logic', { condition: true }), facts('outp
 
 describe('buildQuestions', () => {
   it('follows the block kinds and adds a boundary question to blocks with a condition', () => {
-    const kinds = buildQuestions(blocks, false, seeded(1))
+    const kinds = buildQuestions(blocks, seeded(1))
       .map((q) => q.kind)
       .filter((k) => k !== 'varying');
 
@@ -42,21 +43,32 @@ describe('buildQuestions', () => {
   });
 
   it('adds exactly one varying question', () => {
-    const questions = buildQuestions(blocks, false, seeded(2));
+    const questions = buildQuestions(blocks, seeded(2));
 
     expect(questions.filter((q) => q.kind === 'varying')).toHaveLength(1);
   });
 
-  it('asks the revision question last, only when the first submission was wrong', () => {
-    expect(buildQuestions(blocks, false).some((q) => q.kind === 'revision')).toBe(false);
-    expect(buildQuestions(blocks, true).at(-1)?.kind).toBe('revision');
+  it('asks the revision question after the questions of each block marked wrong', () => {
+    expect(buildQuestions(blocks).some((q) => q.kind === 'revision')).toBe(false);
+
+    const marked = [
+      facts('input'),
+      facts('logic', { condition: true, wrong: true }),
+      facts('output')
+    ];
+
+    const kinds = buildQuestions(marked, seeded(4))
+      .filter((q) => q.block === 1 && q.kind !== 'varying')
+      .map((q) => q.kind);
+
+    expect(kinds).toEqual(['logic', 'boundary', 'revision']);
   });
 
   it('puts a structure question only on a block with that structure', () => {
     const recursive = [facts('logic', { recursion: true }), facts('logic')];
     const random = seeded(3);
 
-    const structural = Array.from({ length: 300 }, () => buildQuestions(recursive, false, random))
+    const structural = Array.from({ length: 300 }, () => buildQuestions(recursive, random))
       .flat()
       .filter((q) => q.kind === 'varying' && /재귀|반복/.test(q.text));
 
@@ -81,9 +93,9 @@ describe('blockFacts', () => {
     expect(
       blockFacts(units, [
         { kind: 'logic', units: [0, 1] },
-        { kind: 'output', units: [2] }
+        { kind: 'output', units: [2], wrong: true }
       ])
-    ).toEqual([facts('logic', { condition: true, loop: true }), facts('output')]);
+    ).toEqual([facts('logic', { condition: true, loop: true }), facts('output', { wrong: true })]);
   });
 });
 
@@ -105,7 +117,7 @@ describe('keepQuestions', () => {
   it('carries text and answer for unchanged blocks only', () => {
     // 입력 블럭은 그대로, 로직 블럭은 문장이 바뀌었다
     const kept = keepQuestions(
-      buildQuestions([facts('input'), facts('logic')], false),
+      buildQuestions([facts('input'), facts('logic')]),
       [
         { kind: 'input', units: [0] },
         { kind: 'logic', units: [1] }
@@ -130,7 +142,7 @@ describe('keepQuestions', () => {
 
   it('draws a new varying question when its block is gone', () => {
     const kept = keepQuestions(
-      buildQuestions([facts('logic')], false),
+      buildQuestions([facts('logic')]),
       [{ kind: 'logic', units: [0, 1, 2] }],
       old
     );

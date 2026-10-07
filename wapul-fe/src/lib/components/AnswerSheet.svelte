@@ -3,11 +3,13 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { IconChevronDown, IconChevronRight } from '@tabler/icons-svelte';
   import { resolve } from '$app/paths';
-  import { api, type QuestionOut, type RecordOut } from '#lib/api/client.js';
+  import { api, type QuestionIn, type QuestionOut, type RecordOut } from '#lib/api/client.js';
   import AnswerField from '#lib/components/AnswerField.svelte';
   import CodeView from '#lib/components/CodeView.svelte';
   import { Button } from '#lib/components/ui/button/index.js';
-  import { pickExample } from '#lib/questions.js';
+  import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+  import { Label } from '#lib/components/ui/label/index.js';
+  import { pickExample, revisionQuestion } from '#lib/questions.js';
   import { blockColors, blockLabels, lastLine } from '#lib/study.js';
   import { cn } from '#lib/utils.js';
 
@@ -137,6 +139,85 @@
     (fields.find((f) => f.value === '') ?? fields[0])?.focus({ preventScroll: true });
   }
 
+  /** 처음 제출에서 틀렸다는 표시를 바꾸는 중. 그동안 다시 누르지 못한다 */
+  let marking = $state(false);
+
+  /**
+   * 블럭에 처음 제출에서 틀렸다는 표시를 켜거나 끈다. 표시는 그 블럭의 달라진 점 질문이라, 질문을
+   * 넣거나 빼고 블럭과 질문을 통째로 다시 저장한다. 아직 저장하지 않은 답도 함께 보낸다
+   */
+  async function markWrong(block: number, wrong: boolean) {
+    if (!record) return;
+
+    const { blocks, questions } = record;
+
+    const revision = questions.find(
+      (q) => q.kind === 'revision' && q.block_id === blocks[block].id
+    );
+
+    if (!wrong && revision?.answer.trim() && !confirm('쓴 답이 지워져요. 표시를 끌까요?')) return;
+
+    const position = new Map(blocks.map((b, i) => [b.id, i]));
+
+    // 질문과 그 질문의 예제 답을 같이 들고 가서, 새 id에 예제를 그대로 옮긴다
+    const next = questions.flatMap((q): { question: QuestionIn; example: string }[] =>
+      q === revision
+        ? []
+        : [
+            {
+              question: {
+                kind: q.kind,
+                text: q.text,
+                answer: q.answer,
+                block: q.block_id === null ? null : (position.get(q.block_id) ?? null)
+              },
+              example: examples[q.id] ?? ''
+            }
+          ]
+    );
+
+    // 달라진 점 질문은 그 블럭 질문의 맨 뒤에 붙는다
+    if (wrong) {
+      const after = next.findLastIndex((n) => n.question.block === block);
+
+      next.splice(after + 1, 0, {
+        question: revisionQuestion(block),
+        example: pickExample('revision')
+      });
+    }
+
+    marking = true;
+
+    const result = await api.updateBlocks(
+      id,
+      blocks.map(({ kind, units }) => ({ kind, units })),
+      next.map((n) => n.question)
+    );
+
+    marking = false;
+
+    if (!result.ok) {
+      status = result.message;
+
+      return;
+    }
+
+    // 블럭과 질문을 다시 만들어 id가 모두 바뀐다. 펼친 묶음, 저장한 답, 예제를 새 id로 옮긴다
+    const opened = blocks.findIndex((b) => b.id === current);
+
+    record = result.data;
+    examples = Object.fromEntries(
+      result.data.questions.map((q, i) => [q.id, next[i]?.example ?? pickExample(q.kind)])
+    );
+    saved.clear();
+
+    for (const q of result.data.questions) saved.set(q.id, q.answer);
+
+    if (opened !== -1) current = result.data.blocks[opened].id;
+
+    status = '저장했어요.';
+  }
+
   async function commit(question: QuestionOut): Promise<boolean> {
     if (saved.get(question.id) === question.answer) return true;
     const result = await api.saveAnswer(id, question.id, question.answer);
@@ -204,6 +285,17 @@
         {#each t.questions as question (question.id)}
           {@render field(question)}
         {/each}
+        {#if t.block !== null}
+          {@const block = t.block}
+          <Label class="font-normal">
+            <Checkbox
+              checked={t.questions.some((q) => q.kind === 'revision')}
+              disabled={marking}
+              onCheckedChange={(on) => markWrong(block, on)}
+            />
+            이 부분은 처음 제출에서 틀렸어요
+          </Label>
+        {/if}
         {#if next}
           <Button
             variant="outline"

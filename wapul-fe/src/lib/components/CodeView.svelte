@@ -30,6 +30,7 @@
     selected = [],
     onselect,
     onkind,
+    onwrong,
     onremove,
     after,
     class: className
@@ -40,7 +41,8 @@
     /** 문장 위치 [줄, 칸]. 칸은 글자(코드 포인트) 단위, end는 포함하지 않는다 */
     units?: Span[];
     /** 블럭마다 종류와 문장 번호. 블럭마다 색을 칠하고, 첫 문장이 있는 줄에 이름을 단다 */
-    blocks?: { kind: BlockKind; units: number[] }[];
+    /** wrong은 처음 제출에서 틀렸다고 표시한 블럭. 범례에 함께 적는다 */
+    blocks?: { kind: BlockKind; units: number[]; wrong?: boolean }[];
     /** 이 블럭의 문장만 칠한다. null이면 모든 블럭을 칠한다 */
     focus?: number | null;
     /** 고른 문장. 테두리를 두른다 */
@@ -49,6 +51,8 @@
     onselect?: (units: number[]) => void;
     /** 주면 범례의 블럭 이름을 눌러 종류를 바꿀 수 있다 */
     onkind?: (block: number, kind: BlockKind) => void;
+    /** 주면 범례의 블럭 이름 메뉴에서 처음 제출에서 틀렸는지 표시할 수 있다 */
+    onwrong?: (block: number, wrong: boolean) => void;
     /** 주면 범례에서 블럭을 뺄 수 있다 */
     onremove?: (block: number) => void;
     /** 줄 아래에 끼울 내용 (질문 스레드, 블럭 고르는 창). 줄 번호를 받는다 */
@@ -337,10 +341,21 @@
                     {/each}
                   </DropdownMenu.RadioGroup>
                 </DropdownMenu.Group>
+                {#if onwrong}
+                  <DropdownMenu.Separator />
+                  <DropdownMenu.CheckboxItem
+                    checked={blocks[i].wrong ?? false}
+                    onCheckedChange={(on) => onwrong(i, on)}
+                    closeOnSelect>처음 제출에서 틀렸어요</DropdownMenu.CheckboxItem
+                  >
+                {/if}
               </DropdownMenu.Content>
             </DropdownMenu.Root>
           {:else}
             {label}
+          {/if}
+          {#if blocks[i].wrong}
+            <span class="text-muted-foreground">· 처음엔 틀림</span>
           {/if}
           {#if onremove}
             <button

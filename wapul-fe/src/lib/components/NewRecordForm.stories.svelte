@@ -38,6 +38,8 @@
 
     await expect(await canvas.findByLabelText(/맞은 풀이 코드/)).toBeInTheDocument();
     await expect(canvas.getByText('틀렸던 제출 코드는 받지 않아요.')).toBeInTheDocument();
+    // 처음 제출에서 틀렸는지는 여기서 묻지 않는다 (블럭마다 표시한다)
+    await expect(canvas.queryByRole('checkbox')).not.toBeInTheDocument();
     await expect(submit).toBeDisabled();
   }}
 />
@@ -53,7 +55,6 @@
       'a, b = map(int, input().split())  \nprint(a + b)'
     );
     await userEvent.selectOptions(canvas.getByLabelText('언어'), 'python');
-    await userEvent.click(canvas.getByRole('checkbox', { name: /처음 제출은 틀렸어요/ }));
     await userEvent.click(canvas.getByRole('button', { name: '블럭 나누기' }));
 
     // 브라우저에서 실제 모델로 나눈다. 처음에는 모델과 문법 파일을 받는다
@@ -71,7 +72,7 @@
       key_idea: '두 수를 더한다',
       code: 'a, b = map(int, input().split())\nprint(a + b)\n',
       language: 'python',
-      initially_wrong: true,
+      initially_wrong: false,
       units: [
         { start: [1, 0], end: [1, 32], condition: false, loop: false, recursion: false },
         { start: [2, 0], end: [2, 12], condition: false, loop: false, recursion: false }
@@ -82,15 +83,14 @@
       ]
     });
 
-    // 질문도 브라우저가 블럭을 보고 만든다. 처음에 틀렸으니 달라진 점 질문이 끝에 붙는다
+    // 질문도 브라우저가 블럭을 보고 만든다. 처음 제출에서 틀렸는지는 여기서 묻지 않고 블럭마다 표시한다
     await expect(questions.map((q: { kind: string }) => q.kind)).toEqual([
       'problem',
       'input_meaning',
       'input_condition',
       'output_meaning',
       'output_format',
-      'varying',
-      'revision'
+      'varying'
     ]);
   }}
 />

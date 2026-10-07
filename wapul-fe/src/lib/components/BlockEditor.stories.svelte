@@ -91,25 +91,28 @@
       { kind: 'logic', units: [9, 10, 11, 12, 13] }
     ]);
 
-    // 질문을 다시 만든다. 조건 문장이 든 로직 블럭에만 경계 질문이 붙고,
+    // 질문을 다시 만든다. 조건 문장이 든 로직 블럭에만 경계 질문이 붙고, 처음 제출에서 틀렸다는
+    // 표시는 원래 로직 블럭을 따라가 그 블럭 질문 뒤에 달라진 점 질문이 붙는다.
     // 그대로 남은 입력 블럭과 기록 단위 질문은 이전 문구와 답을 이어 쓴다
-    await expect(questions.map((q: { kind: string }) => q.kind)).toEqual([
-      'problem',
-      'input_meaning',
-      'input_condition',
-      'logic',
-      'logic',
-      'boundary',
-      'varying',
-      'revision'
-    ]);
+    await expect(questions.map((q: { kind: string; block?: number }) => [q.kind, q.block])).toEqual(
+      [
+        ['problem', undefined],
+        ['input_meaning', 0],
+        ['input_condition', 0],
+        ['logic', 1],
+        ['logic', 2],
+        ['boundary', 2],
+        ['revision', 2],
+        ['varying', undefined]
+      ]
+    );
     await expect(questions[1]).toEqual({
       kind: 'input_meaning',
       text: record.questions[1].text,
       answer: record.questions[1].answer,
       block: 0
     });
-    await expect(questions[6].text).toBe(record.questions[7].text);
+    await expect(questions[7].text).toBe(record.questions.find((q) => q.kind === 'varying')?.text);
   }}
 />
 
@@ -172,6 +175,40 @@
       { kind: 'input', units: [3, 4, 5, 6, 7] },
       { kind: 'output', units: [8, 9, 10, 11, 12, 13, 14] }
     ]);
+  }}
+/>
+
+<Story
+  name="MarkWrong"
+  beforeEach={() => editing.install()}
+  play={async ({ canvas, userEvent, args }) => {
+    const body = within(document.body);
+
+    // 처음 제출에서 틀렸다는 표시는 블럭 이름 메뉴에서 켜고 끈다. 범례에도 적힌다
+    await expect(await canvas.findByText('· 처음엔 틀림')).toBeInTheDocument();
+    await userEvent.click(canvas.getByRole('button', { name: '로직 1 종류 바꾸기' }));
+    await userEvent.click(
+      await body.findByRole('menuitemcheckbox', { name: '처음 제출에서 틀렸어요', checked: true })
+    );
+    await menuClosed();
+    await expect(canvas.queryByText('· 처음엔 틀림')).not.toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole('button', { name: '입력 종류 바꾸기' }));
+    await userEvent.click(
+      await body.findByRole('menuitemcheckbox', { name: '처음 제출에서 틀렸어요' })
+    );
+    await menuClosed();
+
+    await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
+    await waitFor(() => expect(args.onsaved).toHaveBeenCalledOnce());
+
+    const [call] = editing.callsTo('PUT', '/v1/records/record-1/blocks');
+
+    const revisions = JSON.parse(call.body).questions.filter(
+      (q: { kind: string }) => q.kind === 'revision'
+    );
+
+    await expect(revisions.map((q: { block: number }) => q.block)).toEqual([0]);
   }}
 />
 

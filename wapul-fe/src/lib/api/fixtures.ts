@@ -107,6 +107,14 @@ export const record: RecordOut = {
       text: '이 설명이 통하지 않는 입력은 뭘까요?',
       answer: ''
     },
+    // 로직 블럭을 처음 제출에서 틀렸다고 표시했다
+    {
+      id: 'q-revision',
+      block_id: 'block-logic',
+      kind: 'revision',
+      text: '처음 제출에서 무엇이 달라졌고, 왜 그게 필요했나요?',
+      answer: ''
+    },
     {
       id: 'q-output-meaning',
       block_id: 'block-output',
@@ -126,13 +134,6 @@ export const record: RecordOut = {
       block_id: null,
       kind: 'varying',
       text: '만약 입력이 하나뿐이라면 이 풀이는 어떻게 될까요?',
-      answer: ''
-    },
-    {
-      id: 'q-revision',
-      block_id: null,
-      kind: 'revision',
-      text: '처음 제출에서 무엇이 달라졌고, 왜 그게 필요했나요?',
       answer: ''
     }
   ]

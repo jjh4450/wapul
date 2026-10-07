@@ -1,7 +1,8 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import { expect, fn, waitFor, within } from 'storybook/test';
-  import { FakeApi, empty, reply } from '#lib/api/fake.js';
+  import { FakeApi, empty, reply, type FakeHandler } from '#lib/api/fake.js';
+  import type { QuestionIn, RecordOut } from '#lib/api/client.js';
   import { record, sharedRecord } from '#lib/api/fixtures.js';
   import { EXAMPLES } from '#lib/questions.js';
   import { truncate } from '#lib/study.js';
@@ -38,6 +39,31 @@
 
   const viewer = new FakeApi([['GET /v1/records/:id', reply(sharedRecord)]]);
 
+  /** 블럭 수정을 받은 대로 저장한 것처럼 돌려준다. 백엔드처럼 블럭과 질문에 새 id를 붙인다 */
+  const echoBlocks: FakeHandler = (call) => {
+    const body: { blocks: RecordOut['blocks']; questions: QuestionIn[] } = JSON.parse(call.body);
+
+    const saved: RecordOut = {
+      ...record,
+      blocks: body.blocks.map((b, i) => ({ ...b, id: `new-block-${i}` })),
+      questions: body.questions.map((q, i) => ({
+        id: `new-q-${i}`,
+        block_id: q.block == null ? null : `new-block-${q.block}`,
+        kind: q.kind,
+        text: q.text,
+        answer: q.answer
+      }))
+    };
+
+    return reply(saved)(call);
+  };
+
+  const marking = new FakeApi([
+    ['GET /v1/records/:id', reply(record)],
+    ['PUT /v1/records/:id/blocks', echoBlocks],
+    ['PATCH /v1/records/:id/answers', empty()]
+  ]);
+
   const problemQuestion = record.questions[0].text;
 
   /** 질문 묶음 바로 위에 있는 코드 줄의 번호 */
@@ -62,7 +88,7 @@
     // 처음에는 빈 칸이 있는 첫 묶음(문제)만 펼친다
     await expect(canvas.getAllByRole('textbox')).toHaveLength(1);
     await expect(within(logic).getByRole('button', { expanded: false })).toHaveTextContent(
-      '질문 2개 · 0개 답함'
+      '질문 3개 · 0개 답함'
     );
 
     // 빈 칸에는 다른 문제에서 가져온 예제가 회색 안내문으로 뜬다
@@ -106,12 +132,46 @@
     await expect(logic.getByLabelText('이 설명이 통하지 않는 입력은 뭘까요?')).toBeInTheDocument();
     await expect(input.queryByRole('textbox')).not.toBeInTheDocument();
 
-    // 기록 단위의 나머지 질문은 코드 아래 마무리에 있고, 처음 제출과 달라진 점은 건너뛸 수 있다
+    // 처음 제출에서 틀렸다고 표시한 블럭에는 건너뛸 수 있는 달라진 점 질문이 붙는다
+    await expect(logic.getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ })).toBeChecked();
+    await expect(logic.getByText('건너뛸 수 있어요.')).toBeInTheDocument();
+
+    // 기록 단위의 나머지 질문은 코드 아래 마무리에 있다. 블럭이 아니라 틀렸다는 표시는 없다
     const closing = within(canvas.getByRole('region', { name: '마무리' }));
 
     await userEvent.click(closing.getByRole('button', { expanded: false }));
-    await expect(closing.getByText('건너뛸 수 있어요.')).toBeInTheDocument();
+    await expect(closing.getByLabelText(/입력이 하나뿐이라면/)).toBeInTheDocument();
+    await expect(closing.queryByRole('checkbox')).not.toBeInTheDocument();
     await expect(closing.queryByRole('button', { name: '다음 질문' })).not.toBeInTheDocument();
+  }}
+/>
+
+<Story
+  name="MarkWrongInThread"
+  beforeEach={() => marking.install()}
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '다음 질문' }));
+
+    const input = () => within(canvas.getByRole('region', { name: '입력' }));
+
+    await userEvent.type(input().getByLabelText(/입력 조건/), 'N은 10만 이하');
+
+    // 답 쓰다가 틀렸던 블럭이라고 켜면 그 묶음 끝에 달라진 점 질문이 붙는다. 쓰던 답도 함께 저장된다
+    await userEvent.click(input().getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
+
+    // 저장하면 블럭과 질문의 id가 바뀌어 묶음을 새로 그리므로 매번 다시 찾는다
+    await waitFor(() => expect(input().getByText('건너뛸 수 있어요.')).toBeInTheDocument());
+    await expect(input().getByLabelText(/입력 조건/)).toHaveValue('N은 10만 이하');
+
+    const [call] = marking.callsTo('PUT', '/v1/records/record-1/blocks');
+
+    const sent = JSON.parse(call.body).questions.map((q: QuestionIn) => [q.kind, q.block]);
+
+    await expect(sent.slice(1, 4)).toEqual([
+      ['input_meaning', 0],
+      ['input_condition', 0],
+      ['revision', 0]
+    ]);
   }}
 />
 

@@ -3,7 +3,6 @@
   import BlockEditor from '#lib/components/BlockEditor.svelte';
   import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
-  import { Checkbox } from '#lib/components/ui/checkbox/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
   import * as NativeSelect from '#lib/components/ui/native-select/index.js';
@@ -29,8 +28,6 @@
   let code = $state('');
 
   let language = $state<Language>('cpp');
-
-  let initiallyWrong = $state(false);
 
   let error = $state('');
 
@@ -80,7 +77,8 @@
       problem: problem.trim(),
       key_idea: keyIdea.trim(),
       language,
-      initially_wrong: initiallyWrong,
+      // 처음 제출에서 틀렸는지는 블럭마다 표시한다(그 블럭의 달라진 점 질문). 기록 단위 값은 쓰지 않는다
+      initially_wrong: false,
       code: segmented.code,
       units: segmented.units
     };
@@ -97,7 +95,7 @@
     const result = await api.createRecord({
       ...record,
       blocks: segmented.blocks,
-      questions: buildQuestions(blockFacts(segmented.units, segmented.blocks), initiallyWrong)
+      questions: buildQuestions(blockFacts(segmented.units, segmented.blocks))
     });
 
     submitting = false;
@@ -160,10 +158,6 @@
               <NativeSelect.Option value={lang}>{LANGUAGE_LABEL[lang]}</NativeSelect.Option>
             {/each}
           </NativeSelect.Root>
-          <Label class="font-normal">
-            <Checkbox bind:checked={initiallyWrong} />
-            처음 제출은 틀렸어요
-          </Label>
         </div>
         <Textarea id="code" bind:value={code} rows={16} class="font-mono" spellcheck={false} />
       </div>

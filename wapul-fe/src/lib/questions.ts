@@ -157,10 +157,19 @@ const BLOCK_QUESTIONS = {
   logic: ['logic']
 } satisfies { [K in BlockKind]: QuestionKind[] };
 
-/** 블럭과, 그 블럭의 문장 중 하나라도 켜진 표시 */
-export type BlockFacts = { kind: BlockKind; condition: boolean; loop: boolean; recursion: boolean };
+/** 블럭과, 처음 제출에서 틀렸다고 표시했는지(wrong). 표시는 그 블럭의 달라진 점 질문으로 저장된다 */
+export type MarkedBlock = BlockIn & { wrong: boolean };
 
-export function blockFacts(units: Unit[], blocks: BlockIn[]): BlockFacts[] {
+/** 블럭과, 그 블럭의 문장 중 하나라도 켜진 표시, 처음 제출에서 틀렸는지 */
+export type BlockFacts = {
+  kind: BlockKind;
+  condition: boolean;
+  loop: boolean;
+  recursion: boolean;
+  wrong: boolean;
+};
+
+export function blockFacts(units: Unit[], blocks: (BlockIn & { wrong?: boolean })[]): BlockFacts[] {
   return blocks.map((b) => {
     const us = b.units.map((i) => units[i]);
 
@@ -168,7 +177,8 @@ export function blockFacts(units: Unit[], blocks: BlockIn[]): BlockFacts[] {
       kind: b.kind,
       condition: us.some((u) => u.condition),
       loop: us.some((u) => u.loop),
-      recursion: us.some((u) => u.recursion)
+      recursion: us.some((u) => u.recursion),
+      wrong: b.wrong ?? false
     };
   });
 }
@@ -180,6 +190,11 @@ function choice<T>(items: T[], random: () => number): T {
 /** 새 질문. 답은 빈 칸에서 시작한다 */
 function ask(kind: QuestionKind, text: string, block?: number): QuestionIn {
   return block === undefined ? { kind, text, answer: '' } : { kind, text, answer: '', block };
+}
+
+/** 처음 제출에서 틀렸다고 표시한 블럭에 붙는 달라진 점 질문 */
+export function revisionQuestion(block: number, random: () => number = Math.random): QuestionIn {
+  return ask('revision', choice(PHRASES.revision, random), block);
 }
 
 /** 세 갈래 중 이 코드에 붙을 수 있는 갈래에서 하나를 뽑는다 */
@@ -208,10 +223,12 @@ function pickVarying(blocks: BlockFacts[], random: () => number): QuestionIn {
   return choice(options, random);
 }
 
-/** 기록에 붙을 질문을 표시 순서대로 만든다. block은 blocks의 번호다 */
+/**
+ * 기록에 붙을 질문을 표시 순서대로 만든다. block은 blocks의 번호다. 처음 제출에서 틀렸다고 표시한
+ * 블럭에는 그 블럭 질문 뒤에 달라진 점 질문이 붙는다
+ */
 export function buildQuestions(
   blocks: BlockFacts[],
-  initiallyWrong: boolean,
   random: () => number = Math.random
 ): QuestionIn[] {
   const varying = pickVarying(blocks, random);
@@ -227,11 +244,11 @@ export function buildQuestions(
     }
 
     if (varying.block === i) questions.push(varying);
+
+    if (b.wrong) questions.push(revisionQuestion(i, random));
   });
 
   if (varying.block === undefined) questions.push(varying);
-
-  if (initiallyWrong) questions.push(ask('revision', choice(PHRASES.revision, random)));
 
   return questions;
 }
@@ -267,13 +284,13 @@ export function keepQuestions(
 
   if (block === undefined) return kept;
 
-  // 이전 질문을 그 블럭의 질문 뒤에, 기록 단위면 블럭 질문들 뒤(달라진 점 질문 앞)에 둔다
+  // 이전 질문을 그 블럭의 질문 뒤(달라진 점 질문 앞)에, 기록 단위면 맨 뒤에 둔다
   const rest = kept.filter((q) => q.kind !== 'varying');
 
   const after =
     block === null
-      ? rest.findLastIndex((q) => q.kind !== 'revision')
-      : rest.findLastIndex((q) => q.block === block);
+      ? rest.length - 1
+      : rest.findLastIndex((q) => q.block === block && q.kind !== 'revision');
 
   rest.splice(after + 1, 0, {
     ...ask('varying', oldVarying.text, block ?? undefined),

@@ -10,12 +10,16 @@
   } from '#lib/api/client.js';
   import CodeView from '#lib/components/CodeView.svelte';
   import { Button } from '#lib/components/ui/button/index.js';
-  import { blockFacts, buildQuestions, keepQuestions } from '#lib/questions.js';
+  import { blockFacts, buildQuestions, keepQuestions, type MarkedBlock } from '#lib/questions.js';
   import { BLOCK_KIND_LABEL, blockColors, blockLabels, lastLine } from '#lib/study.js';
   import { cn } from '#lib/utils.js';
 
   /** 고른 문장을 넣을 곳. into는 고른 문장을 원래 블럭에서 뺀 블럭 목록에 문장을 넣는다 */
-  type Choice = { label: string; bar?: string; into: (next: BlockIn[], picked: number[]) => void };
+  type Choice = {
+    label: string;
+    bar?: string;
+    into: (next: MarkedBlock[], picked: number[]) => void;
+  };
 
   let {
     id,
@@ -35,15 +39,15 @@
   /** 고치는 기록. 새 기록이면 null */
   let old = $state.raw<RecordOut | null>(null);
 
-  let blocks = $state<BlockIn[]>([]);
+  let blocks = $state<MarkedBlock[]>([]);
 
   /** 끌어서 고른 문장. 넣을 블럭을 고르면 비운다 */
   let selected = $state<number[]>([]);
 
   // 되돌리기와 다시 하기. 바꾸기 전 블럭 목록을 통째로 쌓는다
-  let past = $state.raw<BlockIn[][]>([]);
+  let past = $state.raw<MarkedBlock[][]>([]);
 
-  let future = $state.raw<BlockIn[][]>([]);
+  let future = $state.raw<MarkedBlock[][]>([]);
 
   let error = $state('');
 
@@ -64,7 +68,7 @@
   const choices = $derived.by(() => {
     const newLogic: Choice = {
       label: `+ ${BLOCK_KIND_LABEL.logic}`,
-      into: (next, picked) => next.push({ kind: 'logic', units: picked })
+      into: (next, picked) => next.push({ kind: 'logic', units: picked, wrong: false })
     };
 
     const list: Choice[] = [];
@@ -72,7 +76,7 @@
     if (blocks[0]?.kind !== 'input') {
       list.push({
         label: `+ ${BLOCK_KIND_LABEL.input}`,
-        into: (next, picked) => next.push({ kind: 'input', units: picked })
+        into: (next, picked) => next.push({ kind: 'input', units: picked, wrong: false })
       });
     }
 
@@ -88,7 +92,7 @@
     if (blocks.at(-1)?.kind !== 'output') {
       list.push(newLogic, {
         label: `+ ${BLOCK_KIND_LABEL.output}`,
-        into: (next, picked) => next.push({ kind: 'output', units: picked })
+        into: (next, picked) => next.push({ kind: 'output', units: picked, wrong: false })
       });
     }
 
@@ -114,25 +118,32 @@
 
     record = result.data;
     old = result.data;
-    blocks = arrange(result.data.blocks.map((b) => ({ kind: b.kind, units: [...b.units] })));
+    // 처음 제출에서 틀렸다는 표시는 그 블럭에 붙은 달라진 점 질문으로 남아 있다
+    blocks = arrange(
+      result.data.blocks.map((b) => ({
+        kind: b.kind,
+        units: [...b.units],
+        wrong: result.data.questions.some((q) => q.kind === 'revision' && q.block_id === b.id)
+      }))
+    );
   });
 
   /**
    * 빈 블럭을 지우고 입력을 맨 앞, 출력을 맨 뒤에 둔다. 로직 블럭은 첫 문장 순이라
    * 로직 번호와 색이 코드에 나오는 순서를 따른다
    */
-  function arrange(next: BlockIn[]): BlockIn[] {
+  function arrange(next: MarkedBlock[]): MarkedBlock[] {
     const rank = (b: BlockIn) =>
       b.kind === 'input' ? -1 : b.kind === 'output' ? Number.MAX_SAFE_INTEGER : b.units[0];
 
     return next
       .flatMap((b) =>
-        b.units.length > 0 ? [{ kind: b.kind, units: b.units.toSorted((x, y) => x - y) }] : []
+        b.units.length > 0 ? [{ ...b, units: b.units.toSorted((x, y) => x - y) }] : []
       )
       .sort((a, b) => rank(a) - rank(b));
   }
 
-  function change(next: BlockIn[]) {
+  function change(next: MarkedBlock[]) {
     past = [...past, $state.snapshot(blocks)];
     future = [];
     blocks = arrange(next);
@@ -167,7 +178,7 @@
 
     const next = $state
       .snapshot(blocks)
-      .map((b) => ({ kind: b.kind, units: b.units.filter((u) => !picked.includes(u)) }));
+      .map((b) => ({ ...b, units: b.units.filter((u) => !picked.includes(u)) }));
 
     into?.(next, picked);
     change(next);
@@ -178,9 +189,23 @@
     const next = $state.snapshot(blocks);
     const into = kind === 'logic' ? -1 : next.findIndex((b) => b.kind === kind);
 
-    if (into === -1) next[i] = { kind, units: next[i].units };
-    else next[into].units.push(...next.splice(i, 1)[0].units);
+    if (into === -1) {
+      next[i].kind = kind;
+    } else {
+      const target = next[into];
+      const [moved] = next.splice(i, 1);
 
+      target.units.push(...moved.units);
+      target.wrong ||= moved.wrong;
+    }
+
+    change(next);
+  }
+
+  function setWrong(i: number, wrong: boolean) {
+    const next = $state.snapshot(blocks);
+
+    next[i].wrong = wrong;
     change(next);
   }
 
@@ -213,7 +238,8 @@
       return;
     }
 
-    const questions = buildQuestions(blockFacts(record.units, blocks), record.initially_wrong);
+    const questions = buildQuestions(blockFacts(record.units, blocks));
+    const sent = blocks.map(({ kind, units }) => ({ kind, units }));
 
     saving = true;
 
@@ -221,8 +247,8 @@
     // 질문은 문구와 답을 이어 쓴다
     const result =
       old === null
-        ? await api.createRecord({ ...$state.snapshot(record), blocks, questions })
-        : await api.updateBlocks(old.id, blocks, keepQuestions(questions, blocks, old));
+        ? await api.createRecord({ ...$state.snapshot(record), blocks: sent, questions })
+        : await api.updateBlocks(old.id, sent, keepQuestions(questions, sent, old));
 
     saving = false;
 
@@ -260,7 +286,7 @@
   <p class="mt-1 mb-6 text-sm text-muted-foreground">
     코드를 끌어서 문장을 고른 뒤 넣을 블럭을 고르세요. 어디서 끌든 끈 범위에 온전히 든 문장만
     골라요. 줄 번호를 끌면 그 줄의 문장을 모두 골라요. 한 블럭의 문장이 떨어져 있어도 괜찮아요.
-    블럭의 종류는 위의 블럭 이름을 눌러 바꿔요.
+    블럭의 종류와 처음 제출에서 틀렸는지는 위의 블럭 이름을 눌러 바꿔요.
   </p>
 
   <div class="grid max-w-4xl gap-3">
@@ -285,6 +311,7 @@
       {selected}
       onselect={(picked) => (selected = picked)}
       onkind={setKind}
+      onwrong={setWrong}
       onremove={removeBlock}
       after={picker}
     />

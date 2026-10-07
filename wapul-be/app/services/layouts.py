@@ -111,8 +111,13 @@ class _Parts:
         parts = [_qa(q) for q in self.loose]
         if self.revision:
             parts.append("### 처음 제출과 달라진 점")
-            parts += [_qa(q) for q in self.revision]
+            parts += [self._revision(q) for q in self.revision]
         return parts
+
+    def _revision(self, question: Question) -> str:
+        # 달라진 점은 처음 제출에서 틀렸다고 표시한 블럭에 붙으므로 어느 블럭인지 함께 적는다
+        label = self.labels.get(question.block_id) if question.block_id else None
+        return _qa(question) if label is None else f"#### {label}\n\n{_qa(question)}"
 
 
 def build_layouts(record: Record, blocks: list[Block], questions: list[Question]) -> list[Layout]:

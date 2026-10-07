@@ -76,3 +76,28 @@ class TestLayouts:
         interleaved = build_layouts(record, blocks, [])[1].markdown
         assert "### 입력 (2~3줄)" in interleaved
         assert "### 로직 1 (1, 4줄)\n\n```cpp\nint s = 0;\n...\ns += n;\n```" in interleaved
+
+    def test_revision_names_the_block_marked_wrong(self):
+        record = Record(
+            owner_id="u",
+            owner_name="u",
+            problem="p",
+            key_idea="k",
+            code="int n;\ncin >> n;\n",
+            language=Language.CPP,
+            units=[_unit(1, 0, 6), _unit(2, 0, 9)],
+        )
+        blocks = [
+            Block(record_id=record.id, position=0, kind=BlockKind.INPUT, units=[0]),
+            Block(record_id=record.id, position=1, kind=BlockKind.LOGIC, units=[1]),
+        ]
+        revision = Question(
+            record_id=record.id,
+            block_id=blocks[1].id,
+            position=0,
+            kind=QuestionKind.REVISION,
+            text="R?",
+            answer="고쳤다",
+        )
+        for lay in build_layouts(record, blocks, [revision]):
+            assert "### 처음 제출과 달라진 점\n\n#### 로직 1\n\n**R?**\n\n고쳤다" in lay.markdown
