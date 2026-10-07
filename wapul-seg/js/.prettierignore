@@ -1,0 +1,5 @@
+# Package Managers
+pnpm-lock.yaml
+
+# Vendored lint plugin
+/tools/oxlint/anti-slop/
