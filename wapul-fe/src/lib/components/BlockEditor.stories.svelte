@@ -65,18 +65,19 @@
 
     await expect(picker.getByText('문장 1개를')).toBeInTheDocument();
 
-    // sort 문장을 새 로직 블럭으로. 로직 번호는 코드에 나오는 순서라 새 블럭이 로직 1이 된다
-    await userEvent.click(picker.getByRole('button', { name: '+ 로직' }));
+    // sort 문장을 새 로직 블럭으로. 새 블럭은 있던 로직 뒤에 로직 2로 붙는다
+    await userEvent.click(picker.getByRole('button', { name: '+ 로직 2' }));
     await expect(canvas.queryByRole('group')).not.toBeInTheDocument();
     await expect(canvas.getByRole('button', { name: '로직 2 블럭 빼기' })).toBeInTheDocument();
 
-    // 출력 문장을 끌어서 고르고 어느 블럭에도 넣지 않는다. 빈 출력 블럭은 사라진다
+    // 출력 문장을 끌어서 고르고 어느 블럭에도 넣지 않는다. 빈 출력 블럭은 번호가 밀리지 않게
+    // 남아 있다가 저장할 때 빠진다
     await userEvent.pointer([
       { keys: '[MouseLeft>]', target: canvas.getByRole('button', { name: '15줄 문장' }) },
       { keys: '[/MouseLeft]' }
     ]);
     await userEvent.click(canvas.getByRole('button', { name: '블럭에서 빼기' }));
-    await expect(canvas.queryByRole('button', { name: '출력 블럭 빼기' })).not.toBeInTheDocument();
+    await expect(canvas.getByText('· 비어 있음')).toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
     await waitFor(() => expect(args.onsaved).toHaveBeenCalledOnce());
@@ -87,8 +88,8 @@
 
     await expect(blocks).toEqual([
       { kind: 'input', units: [3, 4, 5, 6, 7] },
-      { kind: 'logic', units: [8] },
-      { kind: 'logic', units: [9, 10, 11, 12, 13] }
+      { kind: 'logic', units: [9, 10, 11, 12, 13] },
+      { kind: 'logic', units: [8] }
     ]);
 
     // 질문을 다시 만든다. 조건 문장이 든 로직 블럭에만 경계 질문이 붙고, 처음 제출에서 틀렸다는
@@ -100,9 +101,9 @@
         ['input_meaning', 0],
         ['input_condition', 0],
         ['logic', 1],
+        ['boundary', 1],
+        ['revision', 1],
         ['logic', 2],
-        ['boundary', 2],
-        ['revision', 2],
         ['varying', undefined]
       ]
     );
@@ -113,6 +114,58 @@
       block: 0
     });
     await expect(questions[7].text).toBe(record.questions.find((q) => q.kind === 'varying')?.text);
+  }}
+/>
+
+<Story
+  name="StableNumbers"
+  beforeEach={() => editing.install()}
+  play={async ({ canvas, userEvent }) => {
+    const blockNames = () =>
+      canvas
+        .getAllByRole('button', { name: /블럭 빼기$/ })
+        .map((b) => b.getAttribute('aria-label'));
+    const pick = async (line: string, block: string) => {
+      await userEvent.click(canvas.getByRole('button', { name: line }));
+      await userEvent.click(
+        within(canvas.getByRole('group', { name: '고른 문장을 넣을 블럭' })).getByRole('button', {
+          name: block
+        })
+      );
+    };
+
+    // 9줄로 로직 2를 만든다. 선택창에는 있는 로직만 있고 새 블럭은 + 로직 n+1이다
+    await userEvent.click(await canvas.findByRole('button', { name: '9줄' }));
+
+    const picker = within(canvas.getByRole('group', { name: '고른 문장을 넣을 블럭' }));
+
+    await expect(picker.getAllByRole('button').map((b) => b.textContent?.trim())).toEqual([
+      '입력',
+      '로직 1',
+      '+ 로직 2',
+      '출력',
+      '블럭에서 빼기',
+      '취소'
+    ]);
+    await userEvent.click(picker.getByRole('button', { name: '+ 로직 2' }));
+
+    // 로직 1보다 앞에 있는 문장을 로직 2에 계속 넣어도 번호가 바뀌지 않고 같은 블럭에 쌓인다
+    await pick('5줄', '로직 2');
+    await pick('12줄', '로직 2');
+    await expect(blockNames()).toEqual([
+      '입력 블럭 빼기',
+      '로직 1 블럭 빼기',
+      '로직 2 블럭 빼기',
+      '출력 블럭 빼기'
+    ]);
+
+    const fill = (unit: number) =>
+      canvas.getAllByRole('button', { name: /줄 문장$/ })[unit].className;
+
+    await expect(fill(3)).toContain('bg-emerald-500');
+    await expect(fill(8)).toContain('bg-emerald-500');
+    await expect(fill(13)).toContain('bg-emerald-500');
+    await expect(fill(9)).toContain('bg-amber-500');
   }}
 />
 

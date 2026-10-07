@@ -1,13 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { IconArrowBackUp, IconArrowForwardUp } from '@tabler/icons-svelte';
-  import {
-    api,
-    type BlockIn,
-    type BlockKind,
-    type RecordDraft,
-    type RecordOut
-  } from '#lib/api/client.js';
+  import { api, type BlockKind, type RecordDraft, type RecordOut } from '#lib/api/client.js';
   import CodeView from '#lib/components/CodeView.svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { blockFacts, buildQuestions, keepQuestions, type MarkedBlock } from '#lib/questions.js';
@@ -65,9 +59,10 @@
   );
 
   // 입력, 로직들, 새 로직, 출력 순. 입력과 출력은 블럭이 없을 때만 새로 만든다
+  // 입력, 지금 있는 로직들, 새 로직(로직 n+1), 출력 순. 입력과 출력은 블럭이 없을 때만 새로 만든다
   const choices = $derived.by(() => {
     const newLogic: Choice = {
-      label: `+ ${BLOCK_KIND_LABEL.logic}`,
+      label: `+ ${BLOCK_KIND_LABEL.logic} ${blocks.filter((b) => b.kind === 'logic').length + 1}`,
       into: (next, picked) => next.push({ kind: 'logic', units: picked, wrong: false })
     };
 
@@ -128,19 +123,16 @@
     );
   });
 
+  const RANK = { input: 0, logic: 1, output: 2 } satisfies { [K in BlockKind]: number };
+
   /**
-   * 빈 블럭을 지우고 입력을 맨 앞, 출력을 맨 뒤에 둔다. 로직 블럭은 첫 문장 순이라
-   * 로직 번호와 색이 코드에 나오는 순서를 따른다
+   * 입력을 맨 앞, 출력을 맨 뒤에 둔다. 로직 블럭은 만든 순서 그대로 두고, 문장이 다 빠진 블럭도
+   * 남겨 둔다(저장할 때 뺀다). 그래야 고치는 동안 블럭 번호와 색이 바뀌지 않는다
    */
   function arrange(next: MarkedBlock[]): MarkedBlock[] {
-    const rank = (b: BlockIn) =>
-      b.kind === 'input' ? -1 : b.kind === 'output' ? Number.MAX_SAFE_INTEGER : b.units[0];
-
     return next
-      .flatMap((b) =>
-        b.units.length > 0 ? [{ ...b, units: b.units.toSorted((x, y) => x - y) }] : []
-      )
-      .sort((a, b) => rank(a) - rank(b));
+      .map((b) => ({ ...b, units: b.units.toSorted((x, y) => x - y) }))
+      .sort((a, b) => RANK[a.kind] - RANK[b.kind]);
   }
 
   function change(next: MarkedBlock[]) {
@@ -189,7 +181,12 @@
     const next = $state.snapshot(blocks);
     const into = kind === 'logic' ? -1 : next.findIndex((b) => b.kind === kind);
 
-    if (into === -1) {
+    if (kind === 'logic') {
+      // 로직으로 바꾼 블럭은 새 로직(로직 n+1)처럼 맨 뒤에 붙어서, 있던 로직의 번호가 밀리지 않는다
+      const [moved] = next.splice(i, 1);
+
+      next.push({ ...moved, kind });
+    } else if (into === -1) {
       next[i].kind = kind;
     } else {
       const target = next[into];
@@ -232,14 +229,17 @@
   }
 
   async function save() {
-    if (!record || blocks.length === 0) {
+    // 문장이 다 빠진 블럭은 저장하지 않는다
+    const kept = blocks.filter((b) => b.units.length > 0);
+
+    if (!record || kept.length === 0) {
       error = '문장이 든 블럭이 하나는 있어야 해요.';
 
       return;
     }
 
-    const questions = buildQuestions(blockFacts(record.units, blocks));
-    const sent = blocks.map(({ kind, units }) => ({ kind, units }));
+    const questions = buildQuestions(blockFacts(record.units, kept));
+    const sent = kept.map(({ kind, units }) => ({ kind, units }));
 
     saving = true;
 
@@ -325,7 +325,7 @@
       <p class="text-xs text-muted-foreground">
         {old === null
           ? '아직 저장하지 않았어요. 블럭을 하나 이상 만들고 누르면 기록이 만들어져요.'
-          : '이미 쓴 답은 문장과 종류가 그대로인 블럭에서만 남아요.'}
+          : '이미 쓴 답은 문장과 종류가 그대로인 블럭에서만 남아요. 빈 블럭은 저장하지 않아요.'}
       </p>
     </div>
   </div>

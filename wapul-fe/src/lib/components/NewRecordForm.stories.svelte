@@ -120,7 +120,7 @@
     await expect(canvas.getByText('문장이 든 블럭이 하나는 있어야 해요.')).toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole('button', { name: '1줄' }));
-    await userEvent.click(canvas.getByRole('button', { name: '+ 로직' }));
+    await userEvent.click(canvas.getByRole('button', { name: '+ 로직 1' }));
     await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
 
     // 블럭이 생긴 뒤에야 기록을 만들고, 바로 답을 쓰러 간다

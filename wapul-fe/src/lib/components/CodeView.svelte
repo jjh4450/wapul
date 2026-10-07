@@ -354,6 +354,9 @@
           {:else}
             {label}
           {/if}
+          {#if blocks[i].units.length === 0}
+            <span class="text-muted-foreground">· 비어 있음</span>
+          {/if}
           {#if blocks[i].wrong}
             <span class="text-muted-foreground">· 처음엔 틀림</span>
           {/if}
