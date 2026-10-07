@@ -61,7 +61,6 @@ class Record(UUIDBase, TimestampMixin, table=True):
     key_idea: str  # 코드보다 먼저 쓰는 핵심 아이디어 한 줄
     code: str  # 분할 모델의 normalize를 거친 코드. 문장 위치는 이 문자열 기준이다
     language: Language
-    initially_wrong: bool = False
     # 코드의 모든 문장: schemas.study.Unit을 dict로
     units: list[dict] = Field(sa_column=Column(JSON, nullable=False))
 

@@ -48,7 +48,6 @@ class RecordCreate(CustomModel):
     key_idea: str = Field(min_length=1, max_length=500)
     code: str = Field(min_length=1, max_length=100_000)  # normalize(code)
     language: Language
-    initially_wrong: bool = False
     units: list[Unit] = Field(min_length=1, max_length=20_000)
     blocks: list[BlockIn] = Field(min_length=1)
     questions: list[QuestionIn] = Field(min_length=1)
@@ -98,7 +97,6 @@ class RecordSummary(CustomModel):
 
 class RecordOut(RecordSummary):
     code: str
-    initially_wrong: bool
     units: list[Unit]
     is_owner: bool
     group_ids: list[uuid.UUID]  # 작성자에게만 채워진다

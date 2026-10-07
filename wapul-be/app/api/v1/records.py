@@ -137,7 +137,6 @@ def _to_out(db: Session, record: Record, user: CurrentUser) -> RecordOut:
     return RecordOut(
         **_to_summary(record).model_dump(),
         code=record.code,
-        initially_wrong=record.initially_wrong,
         units=[Unit.model_validate(u) for u in record.units],
         is_owner=is_owner,
         group_ids=sorted(_shared_group_ids(db, record.id)) if is_owner else [],

@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "wapul-be",
-    "version": "2445a57194e9"
+    "version": "69b2d193a160"
   },
   "paths": {
     "/v1/records": {
@@ -1005,11 +1005,6 @@
           "language": {
             "$ref": "#/components/schemas/Language"
           },
-          "initially_wrong": {
-            "type": "boolean",
-            "title": "Initially Wrong",
-            "default": false
-          },
           "units": {
             "items": {
               "$ref": "#/components/schemas/Unit"
@@ -1085,10 +1080,6 @@
             "type": "string",
             "title": "Code"
           },
-          "initially_wrong": {
-            "type": "boolean",
-            "title": "Initially Wrong"
-          },
           "units": {
             "items": {
               "$ref": "#/components/schemas/Unit"
@@ -1133,7 +1124,6 @@
           "created_at",
           "updated_at",
           "code",
-          "initially_wrong",
           "units",
           "is_owner",
           "group_ids",
