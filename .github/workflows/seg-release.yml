@@ -101,9 +101,22 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: wapul-seg/js
         run: |
+          # 재실행이면 이미 올라가 있다 (태그만 못 단 경우)
+          if npm view "wapul-seg@$VERSION" version >/dev/null 2>&1; then
+            echo "wapul-seg@$VERSION is already on npm"
+            exit 0
+          fi
           npm version "$VERSION" --no-git-tag-version
           npm publish --provenance --access public
-          npm view "wapul-seg@$VERSION" version
+          # 레지스트리 반영은 비동기라 1분쯤 걸린다. 끝내 안 보이면 승인 대기(staged)로 멈춘 것
+          for i in $(seq 1 18); do
+            if npm view "wapul-seg@$VERSION" version >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::wapul-seg@$VERSION is not on the registry after 3 minutes; check staged versions on npmjs.com"
+          exit 1
 
       # 태그는 빌드한 커밋에 붙이고, 메시지에 모델 해시를 남겨 다음 릴리스의 Y 판정에 쓴다
       - name: Create tag and GitHub Release
