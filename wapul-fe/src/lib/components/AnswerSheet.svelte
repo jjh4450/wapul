@@ -6,6 +6,7 @@
   import { api, type QuestionIn, type QuestionOut, type RecordOut } from '#lib/api/client.js';
   import AnswerField from '#lib/components/AnswerField.svelte';
   import CodeView from '#lib/components/CodeView.svelte';
+  import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Checkbox } from '#lib/components/ui/checkbox/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
@@ -124,21 +125,94 @@
       (threads.find((t) => t.questions.some((q) => q.answer === '')) ?? threads[0])?.key ?? '';
   });
 
+  // 답하지 않고 묶음을 닫으려 할 때 띄우는 모달의 제목
+  const PLEAS = [
+    '대답을 안... 하고 넘어가실 거예요?',
+    '정말요? 한 줄만 적어도 괜찮은데...',
+    '이 블럭은 아직 할 말이 남은 것 같아요...'
+  ];
+
+  /** 펼친 묶음에서 답하지 않고 닫기를 누른 횟수. 두 번 누르면 닫기가 풀린다 */
+  let closeTries = $state(0);
+
+  let shaking = $state(false);
+
+  // 흔들림 길이 (layout.css의 --animate-shake와 같다). 애니메이션이 끝나는 이벤트에 기대지 않고
+  // 시간으로 풀어서, 이벤트를 놓쳐도 닫기가 막힌 채로 남지 않는다
+  const SHAKE_MS = 400;
+
+  /** 호소 모달의 제목. 빈 문자열이면 닫혀 있다 */
+  let plea = $state('');
+
+  /** 답하지 않은 칸이 있는지. 건너뛸 수 있는 달라진 점 질문은 세지 않는다 */
+  function blank(t: Thread): boolean {
+    return t.questions.some((q) => q.kind !== 'revision' && q.answer.trim() === '');
+  }
+
+  /** 펼친 묶음의 첫 빈 칸에 커서를 둔다 */
+  function focusBlank(scroll: boolean) {
+    const fields = [
+      ...(document.getElementById(`thread-${current}`)?.querySelectorAll('textarea') ?? [])
+    ];
+
+    (fields.find((f) => f.value === '') ?? fields[0])?.focus({ preventScroll: !scroll });
+  }
+
   /**
    * 묶음을 펼치고 첫 빈 칸에 커서를 둔다. 다음 질문으로 넘어갈 때(jump)는 펼친 묶음을 화면 위쪽으로
    * 올려 그 위에 블럭 코드가 보이게 하고, 묶음 머리를 눌렀을 때는 화면 밖으로 밀린 만큼만 움직인다
    */
   async function open(key: string, jump: boolean) {
-    if (key !== current) markError = '';
+    if (key !== current) {
+      closeTries = 0;
+      shaking = false;
+      markError = '';
+    }
 
     current = key;
     await tick();
 
-    const thread = document.getElementById(`thread-${key}`);
-    const fields = [...(thread?.querySelectorAll('textarea') ?? [])];
+    document
+      .getElementById(`thread-${key}`)
+      ?.scrollIntoView({ block: jump ? 'start' : 'nearest', behavior: 'smooth' });
+    focusBlank(false);
+  }
 
-    thread?.scrollIntoView({ block: jump ? 'start' : 'nearest', behavior: 'smooth' });
-    (fields.find((f) => f.value === '') ?? fields[0])?.focus({ preventScroll: true });
+  /**
+   * 펼친 묶음을 닫는다. 묶음 머리로는 닫히지 않아서, 생각 없이 열고 닫는 대신 답하게 한다. 빈 칸이
+   * 있으면 처음 누를 때 묶음을 흔들고 빈 칸을 강조하며 모달로 묻고, 한 번 더 누르면 흔든 뒤에야
+   * 닫기가 풀린다
+   */
+  function close(t: Thread) {
+    if (!blank(t) || (closeTries >= 2 && !shaking)) {
+      current = '';
+      closeTries = 0;
+
+      return;
+    }
+
+    // 닫기가 풀리기 전(마지막 흔들림 중)에 누른 것은 세지 않는다
+    if (closeTries >= 2) return;
+
+    closeTries += 1;
+
+    if (closeTries === 1) plea = PLEAS[Math.floor(Math.random() * PLEAS.length)];
+
+    shake();
+  }
+
+  let shakeTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** 펼친 묶음을 흔든다. 흔드는 중에 또 흔들면 처음부터 다시 흔든다 */
+  async function shake() {
+    // 동작 줄이기를 켠 사용자에게는 흔들지 않고 바로 다음 단계로 간다
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+    clearTimeout(shakeTimer);
+    shaking = false;
+    await tick();
+    shaking = true;
+    shakeTimer = setTimeout(() => (shaking = false), SHAKE_MS);
   }
 
   /** 처음 제출에서 틀렸다는 표시를 바꾸는 중. 그동안 다시 누르지 못한다 */
@@ -256,6 +330,7 @@
     question={question.text}
     example={examples[question.id] ?? ''}
     note={question.kind === 'revision' ? '건너뛸 수 있어요.' : undefined}
+    invalid={closeTries > 0 && question.kind !== 'revision' && question.answer.trim() === ''}
     bind:value={question.answer}
     oncommit={() => commit(question)}
   />
@@ -265,10 +340,15 @@
   {@const expanded = t.key === current}
   {@const answered = t.questions.filter((q) => q.answer.trim() !== '').length}
   {@const next = threads[threads.indexOf(t) + 1]}
+  {@const closable = !blank(t) || (closeTries >= 2 && !shaking)}
   <section
     id="thread-{t.key}"
     aria-label={t.label}
-    class="scroll-mt-[25vh] scroll-mb-4 rounded-xl border bg-background font-sans text-sm"
+    class={cn(
+      'scroll-mt-[25vh] scroll-mb-4 rounded-xl border bg-background font-sans text-sm',
+      expanded && closeTries > 0 && blank(t) && 'ring-2 ring-destructive',
+      expanded && shaking && 'animate-shake'
+    )}
   >
     <button
       type="button"
@@ -308,14 +388,21 @@
             <p class="text-xs text-destructive">{markError}</p>
           {/if}
         {/if}
-        {#if next}
+        <div class="flex flex-wrap gap-2">
+          {#if next}
+            <Button variant="outline" size="sm" onclick={() => open(next.key, true)}
+              >다음 질문</Button
+            >
+          {/if}
+          <!-- 막힌 것처럼 보이지만 눌러야 다음 단계로 가므로 disabled가 아니라 aria-disabled다 -->
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
-            class="justify-self-start"
-            onclick={() => open(next.key, true)}>다음 질문</Button
+            aria-disabled={!closable}
+            class={cn(!closable && 'opacity-50')}
+            onclick={() => close(t)}>닫기</Button
           >
-        {/if}
+        </div>
       </div>
     {/if}
   </section>
@@ -326,6 +413,30 @@
     <div class="my-2 mr-3 ml-11">{@render thread(t)}</div>
   {/each}
 {/snippet}
+
+<AlertDialog.Root
+  open={plea !== ''}
+  onOpenChange={(open) => {
+    if (!open) plea = '';
+  }}
+>
+  <AlertDialog.Content
+    onCloseAutoFocus={(event) => {
+      event.preventDefault();
+      focusBlank(true);
+    }}
+  >
+    <AlertDialog.Header>
+      <AlertDialog.Title>{plea}</AlertDialog.Title>
+      <AlertDialog.Description>
+        한 줄이라도 적어 두면 나중에 다시 볼 때 큰 도움이 돼요.
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Action onclick={() => (plea = '')}>답하러 가기</AlertDialog.Action>
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
 {#if record}
   <div class="mb-6 grid gap-1">

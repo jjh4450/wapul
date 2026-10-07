@@ -67,6 +67,13 @@
 
   const problemQuestion = record.questions[0].text;
 
+  /** 모달이 닫히고 페이지가 다시 눌릴 때까지. bits-ui는 모달이 닫히고도 잠깐 body의 클릭을 막는다 */
+  const modalClosed = () =>
+    waitFor(() => {
+      expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+      expect(document.body).not.toHaveStyle({ pointerEvents: 'none' });
+    });
+
   /** 질문 묶음 바로 위에 있는 코드 줄의 번호 */
   const lineAbove = (thread: HTMLElement) =>
     thread.parentElement?.previousElementSibling?.getAttribute('data-line');
@@ -190,6 +197,62 @@
     await expect(await input.findByText(/표시를 바꾸지 못했어요/)).toBeInTheDocument();
     await expect(mark).not.toBeChecked();
     await expect(input.queryByText('건너뛸 수 있어요.')).not.toBeInTheDocument();
+  }}
+/>
+
+<Story
+  name="CloseTakesThreeTries"
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, userEvent }) => {
+    const body = within(document.body);
+    const problem = within(await canvas.findByRole('region', { name: '문제' }));
+    const close = problem.getByRole('button', { name: '닫기' });
+
+    // 빈 칸이 있으면 닫기는 막힌 것처럼 보인다. 묶음 머리를 눌러도 닫히지 않는다
+    await expect(close).toHaveAttribute('aria-disabled', 'true');
+    await userEvent.click(problem.getByRole('button', { expanded: true }));
+    await expect(problem.getByRole('button', { expanded: true })).toBeInTheDocument();
+
+    // 1번: 묶음이 흔들리고 빈 칸이 필수 칸처럼 강조되며 모달이 뜬다
+    await userEvent.click(close);
+
+    const dialog = await body.findByRole('alertdialog');
+
+    await expect(dialog).toHaveTextContent(/넘어가실|한 줄만|할 말이/);
+    await expect(problem.getByLabelText(problemQuestion)).toHaveAttribute('aria-invalid', 'true');
+    await userEvent.click(within(dialog).getByRole('button', { name: '답하러 가기' }));
+    await modalClosed();
+    await expect(problem.getByLabelText(problemQuestion)).toHaveFocus();
+
+    // 2번: 흔들린 뒤에 닫기가 풀린다
+    await userEvent.click(close);
+    await waitFor(() => expect(close).toHaveAttribute('aria-disabled', 'false'));
+    await expect(body.queryByRole('alertdialog')).not.toBeInTheDocument();
+
+    // 3번: 닫힌다
+    await userEvent.click(close);
+    await expect(problem.getByRole('button', { expanded: false })).toBeInTheDocument();
+    await expect(canvas.queryByRole('textbox')).not.toBeInTheDocument();
+  }}
+/>
+
+<Story
+  name="CloseRightAwayWhenAnswered"
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, userEvent }) => {
+    const logic = within(await canvas.findByRole('region', { name: '로직 1' }));
+
+    await userEvent.click(logic.getByRole('button', { expanded: false }));
+    await userEvent.type(logic.getByLabelText(/무엇이 보장되고/), '끝나는 시간 순서로 놓인다');
+    await userEvent.type(logic.getByLabelText(/통하지 않는 입력/), '끝나는 시간이 같을 때');
+
+    // 건너뛸 수 있는 달라진 점 질문은 비어 있어도 바로 닫힌다
+    const close = logic.getByRole('button', { name: '닫기' });
+
+    await expect(close).toHaveAttribute('aria-disabled', 'false');
+    await userEvent.click(close);
+    await expect(logic.getByRole('button', { expanded: false })).toBeInTheDocument();
+    await expect(within(document.body).queryByRole('alertdialog')).not.toBeInTheDocument();
   }}
 />
 

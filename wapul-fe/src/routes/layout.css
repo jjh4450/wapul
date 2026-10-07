@@ -89,6 +89,26 @@
   --code-type: oklch(0.799 0.141 60.1);
 }
 
+/* 답하지 않고 질문 묶음을 닫으려 할 때 묶음을 좌우로 한 번 흔든다 */
+@theme {
+  --animate-shake: shake 0.4s ease-in-out;
+
+  @keyframes shake {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    20%,
+    60% {
+      transform: translateX(-6px);
+    }
+    40%,
+    80% {
+      transform: translateX(6px);
+    }
+  }
+}
+
 @theme inline {
   --font-sans: 'Noto Sans Variable', sans-serif;
   --font-heading: 'Noto Sans Variable', sans-serif;

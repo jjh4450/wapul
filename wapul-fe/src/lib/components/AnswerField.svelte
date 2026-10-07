@@ -9,6 +9,7 @@
     example,
     value = $bindable(''),
     note,
+    invalid = false,
     oncommit
   }: {
     id: string;
@@ -18,6 +19,8 @@
     value?: string;
     /** 질문 아래 덧붙이는 짧은 안내 (예: 건너뛸 수 있어요) */
     note?: string;
+    /** 답해 달라고 강조한다 (설문의 필수 칸처럼) */
+    invalid?: boolean;
     /** 칸을 벗어날 때 저장한다 */
     oncommit?: () => void;
   } = $props();
@@ -30,5 +33,12 @@
   {#if note}
     <p class="text-xs text-muted-foreground">{note}</p>
   {/if}
-  <Textarea {id} bind:value {placeholder} rows={3} onblur={() => oncommit?.()} />
+  <Textarea
+    {id}
+    bind:value
+    {placeholder}
+    rows={3}
+    aria-invalid={invalid || undefined}
+    onblur={() => oncommit?.()}
+  />
 </div>
