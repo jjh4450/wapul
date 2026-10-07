@@ -1,14 +1,4 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! The block model packaged for other systems: statement kinds and logic blocks, built to WASM.
+//! Decisions and layout: `docs/ml/deploy.ko.md`.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+pub mod lgbm;
