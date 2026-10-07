@@ -12,7 +12,7 @@ wapul/
 ├── wapul-seg/
 │   ├── js/                     # TS (vite 라이브러리): segment(), 파싱, 문장 나누기, 특징
 │   └── src/                    # Rust → WASM: 특징을 받아 종류와 블럭을 돌려줌
-└── wapul-fe/SEGMENTER_VERSION  # 프론트엔드가 쓰는 릴리즈 버전 (seg-vX.Y.Z)
+└── wapul-fe/package.json       # 프론트엔드가 쓰는 버전: 의존성 wapul-seg@X.Y.Z
 ```
 
 ```mermaid
@@ -41,17 +41,18 @@ flowchart TB
 ## 쓰기
 
 ```ts
-// 릴리즈 폴더(아래)를 정적 파일 /seg/ 아래에 두었을 때
-import { segment, fetchAssets } from './wapul-seg.js';
+// pnpm add wapul-seg. 패키지의 dist/(아래)를 정적 파일 /seg/ 아래에 복사해 두었을 때
+import { segment, fetchAssets } from 'wapul-seg';
 
 const labeled = await segment(code, 'cpp', fetchAssets('/seg/'));
 // [{ start: [1, 0], end: [1, 19], kind: 'none' }, ..., { start: [7, 4], end: [7, 25], kind: 'logic', block: 2 }, ...]
 ```
 
-- `assets`는 릴리즈 파일이 있는 곳입니다. 생략하면 모듈 파일과 같은 폴더를 씁니다. 처음 부를 때 WASM, 모델 파일, web-tree-sitter 런타임을 받고, 문법 `.wasm`은 언어마다 처음 쓸 때 받습니다.
+- 패키지는 npm의 `wapul-seg`입니다. 모듈과 타입 선언 외에 WASM, 문법 `.wasm`, 모델 파일이 `dist/`에 그대로 들어 있고 `wapul-seg/grammars/tree-sitter-cpp.wasm`처럼 경로로 import할 수 있습니다. 이 파일들은 번들에 못 들어가므로 프론트엔드 빌드가 정적 파일로 복사해야 합니다.
+- `assets`는 그 파일들이 있는 곳입니다. 생략하면 모듈 파일과 같은 폴더를 씁니다(번들러를 거치면 맞지 않으므로 보통 넘깁니다). 처음 부를 때 WASM, 모델 파일, web-tree-sitter 런타임을 받고, 문법 `.wasm`은 언어마다 처음 쓸 때 받습니다.
 - 위치는 `normalize(code)` 기준입니다. 줄은 1부터, 칸은 0부터 문자(코드 포인트) 단위, 끝은 포함하지 않습니다. `normalize`도 내보내므로 프론트엔드가 같은 문자열을 보여줄 수 있습니다.
 
-릴리즈 폴더(`js/dist/`)의 모양:
+패키지 `dist/`의 모양:
 
 ```
 wapul-seg.js            # 모듈 (web-tree-sitter와 WASM 글루 포함)
@@ -103,7 +104,7 @@ model/kinds-lgbm.txt, kinds-features.txt, blocks-lgbm.txt, model.json
 
 - 출시할 모델은 루트 `model/`에 둡니다(`kinds-lgbm.txt`, `kinds-features.txt`, `blocks-lgbm.txt`, `model.json`). `openapi/`처럼 패키지 밖의 계약 파일이고, wapul-ml의 `models/segmenter-vN/`에서 사람이 복사해 커밋합니다. 학습에는 비공개 데이터가 필요해서 CI는 학습하지 않고, 모델은 자주 바뀌지 않습니다.
 - WASM에 넣지 않고 문법 `.wasm`처럼 릴리즈의 별도 파일로 둡니다. TS가 처음 `segment`를 부를 때 세 파일을 받아 `new Model(...)`에 텍스트로 넘깁니다.
-- 모델 파일은 릴리즈와 함께 버전이 갑니다. 프론트엔드는 `SEGMENTER_VERSION`의 릴리즈에서 WASM, 문법, 모델을 한 벌로 받으므로 짝이 어긋나지 않습니다.
+- 모델 파일은 패키지와 함께 버전이 갑니다. 프론트엔드는 `wapul-seg@X.Y.Z` 하나로 WASM, 문법, 모델을 한 벌로 받으므로 짝이 어긋나지 않습니다.
 - wapul-seg의 Rust 테스트는 루트 `model/`의 모델을 읽습니다.
 
 ## WASM 호출
@@ -166,9 +167,10 @@ cd js && pnpm build        # tsc, vite 라이브러리 빌드, 릴리즈 파일�
 | 문법 파일 | 그 문법의 npm 패키지에 들어 있는 `.wasm` | 직접 빌드하면 emscripten이 필요하고 버전이 어긋날 수 있음. 언어별 파일이라 고른 언어만 받음 |
 | LightGBM 추론 | [bosk](https://github.com/stanwarp/bosk)(Apache-2.0 / MIT)의 순수 Rust 텍스트 모델 파서를 가져와 다중 클래스와 희소 입력을 더함 | LightGBM과 예측이 같도록 검증된 구현. 원본은 다중 클래스를 거부하고 밀집 입력만 받음. 만든 사람이 한 명이라 의존성 대신 저장소로 가져옴 |
 | 종류 특징 | 글자 n-gram 추가 | 학습하지 않은 언어(Rust)에서 macro-F1 0.663 → 0.870 ([실험 23](experiments.md)) |
-| 배포물 | GitHub Release `seg-vX.Y.Z`에 `wapul-seg-X.Y.Z.tar.gz` 하나: `js/dist/` 그대로(JS 모듈, `wapul-seg` WASM, web-tree-sitter 런타임, 언어별 문법 `.wasm`, 모델 파일, `VERSION`) | 바이너리를 git 기록에 쌓지 않고, 프론트엔드가 버전을 고정할 수 있음 |
+| 배포물 | npm 패키지 `wapul-seg@X.Y.Z`: `js/dist/` 그대로(JS 모듈과 타입 선언, `wapul-seg` WASM, web-tree-sitter 런타임, 언어별 문법 `.wasm`, 모델 파일). 모노레포의 `wapul-seg/js`에서 냄 | 바이너리를 git 기록에 쌓지 않고, 프론트엔드가 package.json에서 버전을 고정함. 저장소를 따로 두지 않아도 되고, 루트 `model/`과 파이썬 원본 옆에 있어야 사본 규칙을 지킬 수 있음 |
 | 버전 | CI(`seg-release.yml`)가 계산. Y는 `model/`의 모델 파일이 바뀌면, Z는 그 외 릴리스마다, X는 수동 `major`. 손으로 올리지 않음 | 백엔드, 프론트엔드와 같은 규칙. 모델이 바뀌면 결과가 달라지므로 Y로 드러냄 |
-| 프론트엔드가 받는 시점 | 빌드할 때, `SEGMENTER_VERSION`에 적힌 릴리즈 | 릴리즈 파일 주소는 다른 도메인으로 리다이렉트되어 브라우저 `fetch`가 CORS에 막힐 수 있고, 실행 중 GitHub 의존을 피함 |
+| npm 인증 | trusted publishing(OIDC). npmjs.com 패키지 설정에 저장소 `jjh4450/wapul`과 워크플로 `seg-release.yml` 등록 | 토큰을 시크릿에 두지 않음. 첫 버전만 사람이 `npm publish`로 올려 패키지를 만든 뒤 설정 |
+| 프론트엔드가 받는 시점 | `pnpm install` 때, package.json에 고정한 버전 | 실행 중 외부 의존이 없고, 버전 갱신이 PR로 드러남 |
 | 학습 | wapul-ml의 파이썬 그대로 | `wapul-seg`는 파이썬 구현과 같은 결과를 내는 배포용 사본. 일치는 "검증"으로 보장 |
 
 ## 하지 않는 것
@@ -184,7 +186,8 @@ cd js && pnpm build        # tsc, vite 라이브러리 빌드, 릴리즈 파일�
 | ONNX | LightGBM 트리를 실행할 수 있는 브라우저 런타임은 ONNX Runtime Web(13.6MB)뿐이고, tract는 ONNX-ML 트리를 실행하지 못함 | 신경망 모델을 다시 쓰게 될 때 |
 | Pyodide 등 파이썬을 브라우저에서 실행 | GC 런타임째 받아야 하고, Pyodide의 tree-sitter는 0.23.2에 C++·Rust 문법이 없음 | 없음 |
 | 모델 파일을 WASM 안에 넣기 (`include_bytes!`) | 모델이 바뀔 때마다 WASM을 다시 빌드해야 하고, 7MB 모델이 바이너리에 들어가 WASM을 받는 순간부터 무거움. 따로 두면 문법처럼 지연 로드할 수 있음 | 없음 |
-| 실행 중에 릴리즈에서 받기 | 위 "프론트엔드가 받는 시점" 참고 | 없음 |
+| 실행 중에 npm이나 GitHub에서 받기 | 위 "프론트엔드가 받는 시점" 참고 | 없음 |
+| GitHub Release의 tar.gz로 배포 | 프론트엔드가 빌드 때 내려받는 단계와 버전 파일이 따로 필요함. npm이면 의존성 하나 | 없음 |
 | 파이썬에서 wasmtime으로 WASM 실행 | wasm-bindgen 출력은 JS 연결 코드를 전제로 해 다른 호스트에서 바로 부르기 어려움. 검증은 Node로 함 | 백엔드가 서버에서 모델을 돌려야 할 때. 이때는 WASM에 JS 없이 부를 수 있는 함수를 따로 내보냄 |
 
 ## 정하지 않은 것

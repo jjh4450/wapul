@@ -1,4 +1,5 @@
 import { type Plugin } from 'vite';
+import dts from 'vite-plugin-dts';
 import { defineConfig } from 'vitest/config';
 
 // In library mode Vite inlines every `new URL(file, import.meta.url)` asset as base64, which
@@ -18,7 +19,8 @@ function noRuntimeWasmUrl(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [noRuntimeWasmUrl()],
+  // One bundled declaration file next to the module, for the package's `types`
+  plugins: [noRuntimeWasmUrl(), dts({ bundleTypes: true, include: ['src'] })],
   build: {
     lib: {
       entry: 'src/index.ts',

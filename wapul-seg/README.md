@@ -20,5 +20,5 @@ pnpm build      # dist/: 모듈, WASM, 문법 .wasm 13개, 모델 파일
 ```
 
 - `tests/cases.json`은 `tests/make_cases.py`가 wapul-ml 이미지에서 파이썬 모델을 돌려 만든 기대값입니다. 파이썬 원본(`normalize.py`, `units.py`, `features/`)이 바뀌면 다시 만듭니다.
-- 릴리스 `seg-vX.Y.Z`는 CI(`seg-release.yml`)가 main에서 만듭니다. 손으로 태그를 만들지 않습니다.
+- 릴리스는 CI(`seg-release.yml`)가 main에서 npm 패키지 `wapul-seg@X.Y.Z`로 올리고 `seg-vX.Y.Z` 태그를 답니다. 손으로 publish하거나 태그를 만들지 않습니다.
 - Windows에서는 cargo가 막혀 있을 수 있습니다. 그때는 `rust:1-slim` 컨테이너에서 Rust 쪽을 돌립니다.

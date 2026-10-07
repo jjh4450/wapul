@@ -1,8 +1,28 @@
 {
   "name": "wapul-seg",
-  "private": true,
   "version": "0.0.0",
+  "description": "wapul block-splitting model for the browser: statement kinds and logic blocks for solution code via web-tree-sitter and a LightGBM WASM",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jjh4450/wapul.git",
+    "directory": "wapul-seg/js"
+  },
   "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/wapul-seg.d.ts",
+      "default": "./dist/wapul-seg.js"
+    },
+    "./*": "./dist/*"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc --noEmit && vite build && node tools/bundle.ts",
     "check": "tsc --noEmit",
@@ -13,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@microsoft/api-extractor": "^7.59.4",
     "@oxlint/plugins": "1.86.0",
     "@tree-sitter-grammars/tree-sitter-kotlin": "1.1.0",
     "@types/node": "^24",
@@ -35,6 +56,7 @@
     "typescript": "~6.0.2",
     "typescript-eslint": "^8.60.1",
     "vite": "^8.3.0",
+    "vite-plugin-dts": "5.1.2",
     "vitest": "^4.1.8"
   },
   "dependencies": {

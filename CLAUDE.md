@@ -11,7 +11,7 @@ Monorepo.
 - UI components: shadcn-svelte MCP is registered in `.mcp.json`. Add components with `pnpm ui:add <name>` (auto-scaffolds a story); every component needs a story (`pnpm ui:check`, part of `pnpm lint`). See the `ui-component` skill.
 - API contract: root `openapi/openapi.json` is generated from the backend (`wapul-be/scripts/export_openapi.py`) and committed by CI (`openapi.yml`) on main; don't hand-edit. Frontend types: `pnpm api:gen` → `wapul-fe/src/lib/api/schema.ts` (gitignored).
 - Backend versioning: `vX.Y.Z` computed by CI (`be-docker.yml`); Y bumps on API contract change, Z otherwise, X via manual `major` dispatch. Never bump or tag versions by hand. Details: `CONTRIBUTING.md`.
-- Segmenter versioning: `seg-vX.Y.Z` computed by CI (`seg-release.yml`); Y bumps when `model/` changes, Z otherwise, X via manual `major` dispatch. The release is one `wapul-seg-X.Y.Z.tar.gz` (the `js/dist/` folder). Never tag by hand.
+- Segmenter versioning: `seg-vX.Y.Z` computed by CI (`seg-release.yml`); Y bumps when `model/` changes, Z otherwise, X via manual `major` dispatch. The release is the npm package `wapul-seg@X.Y.Z` (the `js/dist/` folder), published by CI via npm trusted publishing. Never tag or publish by hand.
 - Frontend versioning: `fe-vX.Y.Z` computed by CI (`fe-deploy.yml`, same rules); it force-pushes `deploy/fe` (main + `wapul-fe/VERSION`), which the host (Vercel) builds. Never push `deploy/fe` by hand.
 - CI lives in root `.github/workflows/` (`be-*`, `fe-*`, `docs.yml`), path-filtered per package.
 
