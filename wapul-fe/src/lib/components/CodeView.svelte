@@ -13,7 +13,10 @@
   /** 조각을 다시 문법 색 경계로 자른 글자들. color는 글자색 클래스 */
   type Run = { text: string; color?: string };
 
-  /** 끌어서 고르는 중. 문장에서 시작하면 걸친 문장만, 줄 번호에서 시작하면 그 줄들의 문장을 모두 고른다 */
+  /**
+   * 끌어서 고르는 중. 줄 번호에서 시작하면(line) 걸친 줄의 문장을 모두, 코드에서 시작하면(unit) 두 지점
+   * 사이의 문장을 고른다. unit의 from, to는 위치(position)다
+   */
   type Drag = { by: 'unit' | 'line'; from: number; to: number };
 
   const kinds: BlockKind[] = ['input', 'logic', 'output'];
@@ -42,7 +45,7 @@
     focus?: number | null;
     /** 고른 문장. 테두리를 두른다 */
     selected?: number[];
-    /** 주면 문장이나 줄 번호를 끌어서(키보드로는 문장을 눌러서) 문장을 고를 수 있다 */
+    /** 주면 코드 줄 어디서든 끌어서(키보드로는 문장을 눌러서) 문장을 고를 수 있다 */
     onselect?: (units: number[]) => void;
     /** 주면 범례의 블럭 이름을 눌러 종류를 바꿀 수 있다 */
     onkind?: (block: number, kind: BlockKind) => void;
@@ -120,9 +123,39 @@
   function dragged({ by, from, to }: Drag): number[] {
     const [lo, hi] = from < to ? [from, to] : [to, from];
 
-    if (by === 'unit') return Array.from({ length: hi - lo + 1 }, (_, k) => lo + k);
+    if (by === 'line')
+      return units.flatMap((u, i) => (u.start[0] <= hi && u.end[0] >= lo ? [i] : []));
 
-    return units.flatMap((u, i) => (u.start[0] <= hi && u.end[0] >= lo ? [i] : []));
+    // 빈 곳의 위치는 반 칸이라, 문장을 쪼개지 않고 두 지점 사이에 온전히 든 문장만 남는다
+    const first = Math.ceil(lo);
+    const last = Math.floor(hi);
+
+    return first > last ? [] : Array.from({ length: last - first + 1 }, (_, k) => first + k);
+  }
+
+  /**
+   * 코드 위 한 지점의 위치. 문장 위면 그 문장 번호, 빈 곳(들여쓰기, 괄호, 줄 끝 뒤, 빈 줄)이면 그 자리
+   * 다음에 오는 첫 문장의 번호 - 0.5. 코드 줄 밖이면 null
+   */
+  function position(target: Element): number | null {
+    const unit = target.closest('[data-unit]')?.getAttribute('data-unit');
+
+    if (unit != null) return Number(unit);
+
+    const line = target.closest('[data-line]')?.getAttribute('data-line');
+
+    if (line == null) return null;
+
+    const col = target.closest('[data-col]')?.getAttribute('data-col');
+
+    // 칸을 모르는 빈 곳(줄 끝 뒤, 빈 줄)은 그 줄의 끝으로 친다
+    const [atLine, atCol] = col == null ? [Number(line) + 1, 0] : [Number(line), Number(col)];
+
+    const next = units.findIndex(
+      (u) => u.start[0] > atLine || (u.start[0] === atLine && u.start[1] >= atCol)
+    );
+
+    return (next === -1 ? units.length : next) - 0.5;
   }
 
   function pieces(number: number): Piece[] {
@@ -187,24 +220,32 @@
     return cn(colors[block].bar, focus !== null && block !== focus && 'opacity-30');
   }
 
-  function start(event: PointerEvent, by: Drag['by'], at: number) {
-    if (event.button !== 0) return;
+  function start(event: PointerEvent) {
+    const { target } = event;
+
+    if (!onselect || event.button !== 0 || !(target instanceof Element)) return;
+
+    if (!root?.contains(target)) return;
+
+    const gutter = target.closest('[data-gutter]')?.getAttribute('data-gutter');
+    const at = gutter == null ? position(target) : Number(gutter);
+
+    // 코드 줄 밖(범례, 블럭 고르는 창, 질문 묶음)에서 누른 것은 끌기가 아니다
+    if (at === null) return;
 
     // 터치는 누른 요소가 포인터를 붙잡아 두므로, 놓아 줘야 끄는 동안 지나는 줄과 문장이 잡힌다
-    if (event.target instanceof Element && event.target.hasPointerCapture(event.pointerId)) {
-      event.target.releasePointerCapture(event.pointerId);
-    }
+    if (target.hasPointerCapture(event.pointerId)) target.releasePointerCapture(event.pointerId);
 
-    drag = { by, from: at, to: at };
+    drag = { by: gutter == null ? 'unit' : 'line', from: at, to: at };
   }
 
   function move(event: PointerEvent) {
     if (drag === null || !(event.target instanceof Element)) return;
 
-    const attribute = drag.by === 'unit' ? 'data-unit' : 'data-line';
-    const at = event.target.closest(`[${attribute}]`)?.getAttribute(attribute);
+    const line = event.target.closest('[data-line]')?.getAttribute('data-line');
+    const at = drag.by === 'line' ? (line == null ? null : Number(line)) : position(event.target);
 
-    if (at != null) drag.to = Number(at);
+    if (at !== null) drag.to = at;
   }
 
   function end() {
@@ -253,6 +294,7 @@
       >{:else}{run.text}{/if}{/each}{/snippet}
 
 <svelte:window
+  onpointerdown={start}
   onpointerover={hover}
   onpointermove={move}
   onpointerup={end}
@@ -324,7 +366,7 @@
             tabindex="-1"
             class="w-10 shrink-0 cursor-pointer touch-none pr-3 text-right text-muted-foreground hover:text-foreground"
             aria-label="{number}줄"
-            onpointerdown={(e) => start(e, 'line', number)}>{number}</button
+            data-gutter={number}>{number}</button
           >
         {:else}
           <span class="w-10 shrink-0 pr-3 text-right text-muted-foreground select-none"
@@ -343,7 +385,6 @@
                 data-unit={unit}
                 aria-label="{number}줄 문장"
                 aria-pressed={highlighted.has(unit)}
-                onpointerdown={(e) => start(e, 'unit', unit)}
                 onclick={(e) => press(e, unit)}>{@render colored(number, piece)}</button
               >{:else}<span
                 class={cn(
@@ -351,7 +392,8 @@
                   fill(unit),
                   unit !== null && highlighted.has(unit) && 'ring-2 ring-primary'
                 )}
-                data-unit={unit}>{@render colored(number, piece)}</span
+                data-unit={unit}
+                data-col={unit === null ? piece.from : null}>{@render colored(number, piece)}</span
               >{/if}{/each}</span
         >
         {#each startsAt[number] ?? [] as block (block)}

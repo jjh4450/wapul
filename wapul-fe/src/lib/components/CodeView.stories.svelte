@@ -149,6 +149,37 @@ print(count)
 />
 
 <Story
+  name="DragFromBlankSpace"
+  args={{ units, blocks, onselect: fn() }}
+  play={async ({ canvasElement, userEvent, args }) => {
+    // 문장 밖(빈 줄, 들여쓰기, 줄 끝 뒤)에서 시작해도 끌린다. 빈 곳은 가장 가까운 문장 경계로 맞춘다
+    const row = (line: number) => canvasElement.querySelector(`[data-line="${line}"]`) ?? undefined;
+    const indent = (line: number) =>
+      canvasElement.querySelector(`[data-line="${line}"] [data-col="0"]`) ?? undefined;
+
+    // 빈 3줄부터 6줄 끝 뒤까지: 4, 5, 6줄 문장
+    await userEvent.pointer([
+      { keys: '[MouseLeft>]', target: row(3) },
+      { target: row(6) },
+      { keys: '[/MouseLeft]' }
+    ]);
+    await expect(args.onselect).toHaveBeenLastCalledWith([2, 3, 4]);
+
+    // 7줄 들여쓰기부터 위로 6줄 문장까지: 6줄 문장만 (7줄 문장은 시작점 뒤에 있다)
+    await userEvent.pointer([
+      { keys: '[MouseLeft>]', target: indent(7) },
+      { target: canvasElement.querySelector('[data-unit="4"]') ?? undefined },
+      { keys: '[/MouseLeft]' }
+    ]);
+    await expect(args.onselect).toHaveBeenLastCalledWith([4]);
+
+    // 빈 곳을 누르기만 하면 아무것도 고르지 않는다 (블럭 고르는 창이 닫힌다)
+    await userEvent.click(row(8) ?? document.body);
+    await expect(args.onselect).toHaveBeenLastCalledWith([]);
+  }}
+/>
+
+<Story
   name="KeyboardPick"
   args={{ units, blocks, onselect: fn(), selected: [6] }}
   play={async ({ canvas, userEvent, args }) => {
