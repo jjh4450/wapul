@@ -8,6 +8,7 @@ import { type Language, LANGUAGES } from './languages.ts';
 import { model } from './model.ts';
 import { normalize } from './normalize.ts';
 import { parse } from './parser.ts';
+import { type Tags, unitTags } from './tags.ts';
 import { type Point, units } from './units.ts';
 
 export { type Assets, fetchAssets } from './assets.ts';
@@ -16,12 +17,15 @@ export { type Language, LANGUAGES } from './languages.ts';
 
 export { normalize } from './normalize.ts';
 
+export { type Tags } from './tags.ts';
+
 export const KINDS = ['input', 'output', 'logic', 'none'] as const;
 
 export type Kind = (typeof KINDS)[number];
 
-/** One statement unit, as wapul-ml's labels.jsonl holds it. */
-export interface Labeled {
+/** One statement unit, as wapul-ml's labels.jsonl holds it, with the questions it raises
+ * (Tags: a condition or comparison, a loop header, a recursive call). */
+export interface Labeled extends Tags {
   /** [line, col]: line from 1, col from 0 in characters of the normalized code. */
   start: Point;
   /** Exclusive. */
@@ -57,11 +61,12 @@ export async function segment(
     const logic = asts.filter((_, j) => KINDS[kinds[j]] === 'logic');
     const f = blockFeatures(logic);
     const blocks = m.blocks(f.own, f.facts, f.readsOffsets, f.reads, f.writesOffsets, f.writes);
+    const tags = unitTags(tree, us, asts);
     let next = 0;
 
     return us.map((u, j) => {
       const kind = KINDS[kinds[j]];
-      const labeled: Labeled = { start: u.start, end: u.end, kind };
+      const labeled: Labeled = { start: u.start, end: u.end, kind, ...tags[j] };
 
       if (kind === 'logic') {
         labeled.block = blocks[next++] + 1;
@@ -72,4 +77,24 @@ export async function segment(
   } finally {
     tree.delete();
   }
+}
+
+/** Each logic block's tags: a tag is on when any unit of the block has it. */
+export function blockTags(labeled: Labeled[]): Map<number, Tags> {
+  const out = new Map<number, Tags>();
+
+  for (const u of labeled) {
+    if (u.block === undefined) {
+      continue;
+    }
+
+    const t = out.get(u.block) ?? { condition: false, loop: false, recursion: false };
+    out.set(u.block, {
+      condition: t.condition || u.condition,
+      loop: t.loop || u.loop,
+      recursion: t.recursion || u.recursion
+    });
+  }
+
+  return out;
 }

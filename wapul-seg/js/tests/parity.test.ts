@@ -2,50 +2,22 @@
 // expected outputs tests/make_cases.py writes to cases.json (docs/ml/deploy.ko.md, "검증").
 
 import { readFile } from 'node:fs/promises';
-import { createRequire } from 'node:module';
 import path from 'node:path';
 
 import { describe, expect, test } from 'vitest';
 
 import { analyze } from '../src/ast.ts';
-import { type Assets } from '../src/assets.ts';
 import { blockFeatures } from '../src/blocks.ts';
 import { KINDS, segment } from '../src/index.ts';
 import { featureText, literalSpans, unitFeatures, withNgrams } from '../src/kinds.ts';
-import { grammarFile, type Language, LANGUAGES } from '../src/languages.ts';
+import { type Language } from '../src/languages.ts';
 import { model } from '../src/model.ts';
 import { normalize } from '../src/normalize.ts';
 import { parse } from '../src/parser.ts';
 import { units } from '../src/units.ts';
-import { grammarPath } from '../tools/grammars.ts';
-
-const require = createRequire(import.meta.url);
+import { assets } from './assets.ts';
 
 const root = path.resolve(import.meta.dirname, '..');
-
-/** The release files as the development checkout holds them. */
-async function file(name: string): Promise<string> {
-  const grammar = LANGUAGES.find((language) => grammarFile(language) === name);
-
-  if (name === 'web-tree-sitter.wasm') {
-    return require.resolve('web-tree-sitter/web-tree-sitter.wasm');
-  }
-
-  if (grammar !== undefined) {
-    return grammarPath(grammar);
-  }
-
-  if (name === 'wapul_seg_bg.wasm' || name === 'wapul-seg.model') {
-    return path.join(root, '..', 'pkg', name);
-  }
-
-  throw new Error(`unknown asset ${name}`);
-}
-
-const assets: Assets = {
-  text: async (name) => readFile(await file(name), 'utf8'),
-  bytes: async (name) => readFile(await file(name))
-};
 
 interface Case {
   id: string;

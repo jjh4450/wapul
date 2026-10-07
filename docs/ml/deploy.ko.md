@@ -31,7 +31,7 @@ flowchart TB
         b["blocks(own, facts, reads, writes) → 로직 문장마다 블럭 번호<br/>쌍 특징 → 후보 행 → LightGBM 점수 → 묶기"]
     end
     model[("wapul-seg.model<br/>model/의 묶은 바이너리, 처음 쓸 때 받아 WASM에 넘김")]
-    out["문장마다 {start, end, kind, block?}<br/>labels.jsonl과 같은 형식"]
+    out["문장마다 {start, end, kind, block?, condition, loop, recursion}<br/>labels.jsonl 형식 + 질문 표시"]
 
     call --> n --> p --> u --> k --> f --> b --> out
     model -.-> k
@@ -72,6 +72,7 @@ wapul-seg.model         # 모델: 트리 두 벌과 특징 이름 해시 (2MB)
 | 특징 이름 → 열 번호, LightGBM 추론, 블럭 후보 행과 묶기 | WASM (`wapul-seg/src/`) | 모델에 속한 것: 특징 어휘는 모델 파일과 같이 움직이고, 후보 행 형식은 랭커가 학습된 형식 그 자체. 숫자 배열만 쓰고 트리를 보지 않음 |
 | 모델 파일 | 루트 `model/`의 묶은 바이너리 하나를 패키지에 넣고, TS가 처음 쓸 때 받음 | 아래 "모델" 참고 |
 
+- 문장마다 질문을 고를 표시가 붙습니다. `condition`은 분기 머리이거나 비교 연산(`<`, `==` 등)·삼항식이 있을 때, `loop`은 반복문 머리일 때, `recursion`은 감싼 함수를 다시 부를 때 켜집니다. 모델이 아니라 트리에서 정하고(`js/src/tags.ts`), `blockTags(labeled)`가 로직 블럭마다 하나라도 켜진 표시를 모읍니다.
 - 프론트엔드는 `segment(code, language)` 하나만 부릅니다. TS 코드는 문법 버전, WASM과 짝이 맞아야 하므로 프론트엔드가 아니라 `wapul-seg/js/`에 두고 같은 릴리즈로 배포합니다.
 - 입력 형식의 원본은 여전히 wapul-ml의 `normalize.py`, `units.py`, `features/`, `models/block_ranker.py`입니다. TS와 Rust는 사본이고, 아래 "검증"을 통과해야 합니다. 원본을 고치면 사본도 같이 고칩니다.
 - 언어별 노드 규칙(문장 단위를 이루는 노드, 문장 범주, 쓰기 대상 노드)은 파이썬 원본의 표를 TS로 옮긴 것입니다. 언어를 더할 때 늘어나는 것은 이 표뿐입니다.

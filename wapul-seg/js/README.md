@@ -30,11 +30,14 @@ pnpm add wapul-seg
 ```
 
 ```ts
-import { segment, fetchAssets, LANGUAGES, type Language } from 'wapul-seg';
+import { segment, blockTags, fetchAssets, LANGUAGES, type Language } from 'wapul-seg';
 
 // 패키지의 dist/ 파일(WASM, 문법 .wasm, 모델)을 정적 경로 /seg/ 아래에 복사해 두었을 때
 const labeled = await segment(code, 'cpp', fetchAssets('/seg/'));
-// [{ start: [1, 0], end: [1, 19], kind: 'none' }, ..., { start: [7, 4], end: [7, 25], kind: 'logic', block: 2 }, ...]
+// [{ start: [1, 0], end: [1, 19], kind: 'none', condition: false, loop: false, recursion: false }, ...,
+//  { start: [7, 4], end: [7, 25], kind: 'logic', block: 2, condition: true, loop: false, recursion: false }, ...]
+
+blockTags(labeled); // Map { 1 => { condition: false, loop: true, recursion: false }, 2 => { condition: true, ... } }
 
 LANGUAGES; // ['cpp', 'java', 'python', 'rust', 'c', 'kotlin', 'javascript', 'go', 'csharp', 'swift', 'ruby', 'scala', 'php']
 ```
@@ -42,6 +45,7 @@ LANGUAGES; // ['cpp', 'java', 'python', 'rust', 'c', 'kotlin', 'javascript', 'go
 - 패키지는 모듈과 타입 선언 외에 WASM, 언어별 문법 `.wasm`, 모델(`wapul-seg.model`, 2MB)을 담고 있습니다. 이 파일들은 번들에 들어가지 않으므로 빌드가 정적 파일로 복사해야 하고, `fetchAssets`에 그 위치를 넘깁니다. `wapul-seg/grammars/tree-sitter-cpp.wasm`처럼 경로로 import할 수도 있습니다.
 - 처음 부를 때 WASM, 런타임, 모델을 받고, 문법은 그 언어를 처음 쓸 때만 받습니다(C++ 3.4MB, C# 5.4MB). 페이지를 열 때는 아무것도 받지 않습니다.
 - 위치는 `normalize(code)` 기준입니다. 줄은 1부터, 칸은 0부터 문자 단위, 끝은 포함하지 않습니다. `normalize`도 내보냅니다.
+- `condition`(분기 머리, 비교 연산, 삼항식), `loop`(반복문 머리), `recursion`(감싼 함수를 다시 부름)은 모델이 아니라 트리에서 정합니다. 경계 질문과 구조 질문을 붙일 블럭을 고를 때 `blockTags`로 블럭 단위로 모아 씁니다.
 
 ## 구조
 
