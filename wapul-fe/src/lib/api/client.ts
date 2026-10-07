@@ -24,6 +24,9 @@ export type QuestionOut = Schemas['QuestionOut'];
 
 export type RecordCreate = Schemas['RecordCreate'];
 
+/** 아직 저장하지 않은 새 기록. 블럭과 질문은 블럭 편집에서 정한다 */
+export type RecordDraft = Omit<RecordCreate, 'blocks' | 'questions'>;
+
 export type RecordOut = Schemas['RecordOut'];
 
 export type RecordSummary = Schemas['RecordSummary'];

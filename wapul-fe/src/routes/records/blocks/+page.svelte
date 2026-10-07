@@ -7,4 +7,4 @@
   const id = page.url.searchParams.get('id') ?? '';
 </script>
 
-<BlockEditor {id} onsaved={() => goto(resolve(`/records/write?id=${id}`))} />
+<BlockEditor {id} onsaved={(saved) => goto(resolve(`/records/write?id=${saved}`))} />

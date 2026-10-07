@@ -27,6 +27,13 @@
 
   const missing = new FakeApi([['GET /v1/records/:id', reply({ detail: 'x' }, 404)]]);
 
+  const creating = new FakeApi([['POST /v1/records', reply(record, 201)]]);
+
+  const { problem, key_idea, language, code, units } = record;
+
+  /** 저장하지 않은 새 기록 */
+  const draft = { problem, key_idea, language, code, units, initially_wrong: false };
+
   /** 메뉴를 고른 뒤 페이지가 다시 눌릴 때까지. bits-ui는 메뉴가 닫히고도 잠깐 body의 클릭을 막는다 */
   const menuClosed = () =>
     waitFor(() => expect(document.body).not.toHaveStyle({ pointerEvents: 'none' }));
@@ -192,6 +199,29 @@
 
     await expect(canvas.getByText('문장이 든 블럭이 하나는 있어야 해요.')).toBeInTheDocument();
     await expect(args.onsaved).not.toHaveBeenCalled();
+  }}
+/>
+
+<Story
+  name="Draft"
+  args={{ id: undefined, draft }}
+  beforeEach={() => creating.install()}
+  play={async ({ canvas, userEvent, args }) => {
+    // 블럭 없이 시작하고, 블럭을 하나 이상 만들어 저장할 때 기록을 만든다
+    await expect(canvas.queryByRole('button', { name: /블럭 빼기$/ })).not.toBeInTheDocument();
+    await expect(canvas.getByText(/아직 저장하지 않았어요/)).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole('button', { name: '15줄' }));
+    await userEvent.click(canvas.getByRole('button', { name: '+ 출력' }));
+    await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
+
+    await waitFor(() => expect(args.onsaved).toHaveBeenCalledWith('record-1'));
+
+    const [call] = creating.callsTo('POST', '/v1/records');
+
+    const sent = JSON.parse(call.body);
+
+    await expect(sent).toMatchObject({ ...draft, blocks: [{ kind: 'output', units: [14] }] });
   }}
 />
 

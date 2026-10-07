@@ -1,7 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { IconArrowBackUp, IconArrowForwardUp } from '@tabler/icons-svelte';
-  import { api, type BlockIn, type BlockKind, type RecordOut } from '#lib/api/client.js';
+  import {
+    api,
+    type BlockIn,
+    type BlockKind,
+    type RecordDraft,
+    type RecordOut
+  } from '#lib/api/client.js';
   import CodeView from '#lib/components/CodeView.svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { blockFacts, buildQuestions, keepQuestions } from '#lib/questions.js';
@@ -11,9 +17,23 @@
   /** 고른 문장을 넣을 곳. into는 고른 문장을 원래 블럭에서 뺀 블럭 목록에 문장을 넣는다 */
   type Choice = { label: string; bar?: string; into: (next: BlockIn[], picked: number[]) => void };
 
-  let { id, onsaved }: { id: string; onsaved: () => void } = $props();
+  let {
+    id,
+    draft,
+    onsaved
+  }: {
+    /** 블럭을 고칠 기록 */
+    id?: string;
+    /** 아직 저장하지 않은 새 기록. id 대신 준다. 블럭을 하나 이상 만들고 저장할 때 기록을 만든다 */
+    draft?: RecordDraft;
+    /** 저장한 기록의 id를 받는다 */
+    onsaved: (id: string) => void;
+  } = $props();
 
-  let record = $state<RecordOut | null>(null);
+  let record = $state<RecordDraft | null>(null);
+
+  /** 고치는 기록. 새 기록이면 null */
+  let old = $state.raw<RecordOut | null>(null);
 
   let blocks = $state<BlockIn[]>([]);
 
@@ -76,6 +96,14 @@
   });
 
   onMount(async () => {
+    if (draft !== undefined) {
+      record = draft;
+
+      return;
+    }
+
+    if (id === undefined) return;
+
     const result = await api.getRecord(id);
 
     if (!result.ok) {
@@ -85,6 +113,7 @@
     }
 
     record = result.data;
+    old = result.data;
     blocks = arrange(result.data.blocks.map((b) => ({ kind: b.kind, units: [...b.units] })));
   });
 
@@ -184,18 +213,20 @@
       return;
     }
 
-    // 질문을 새 블럭으로 다시 만들고, 그대로 남은 블럭의 질문은 문구와 답을 이어 쓴다
-    const questions = keepQuestions(
-      buildQuestions(blockFacts(record.units, blocks), record.initially_wrong),
-      blocks,
-      record
-    );
+    const questions = buildQuestions(blockFacts(record.units, blocks), record.initially_wrong);
 
     saving = true;
-    const result = await api.updateBlocks(id, blocks, questions);
+
+    // 새 기록은 이제 만든다. 고치는 기록은 질문을 새 블럭으로 다시 만들고, 그대로 남은 블럭의
+    // 질문은 문구와 답을 이어 쓴다
+    const result =
+      old === null
+        ? await api.createRecord({ ...$state.snapshot(record), blocks, questions })
+        : await api.updateBlocks(old.id, blocks, keepQuestions(questions, blocks, old));
+
     saving = false;
 
-    if (result.ok) onsaved();
+    if (result.ok) onsaved(result.data.id);
     else error = result.message;
   }
 </script>
@@ -265,7 +296,9 @@
     <div class="flex flex-wrap items-center gap-4">
       <Button disabled={saving} onclick={save}>이대로 질문 받기</Button>
       <p class="text-xs text-muted-foreground">
-        이미 쓴 답은 문장과 종류가 그대로인 블럭에서만 남아요.
+        {old === null
+          ? '아직 저장하지 않았어요. 블럭을 하나 이상 만들고 누르면 기록이 만들어져요.'
+          : '이미 쓴 답은 문장과 종류가 그대로인 블럭에서만 남아요.'}
       </p>
     </div>
   </div>

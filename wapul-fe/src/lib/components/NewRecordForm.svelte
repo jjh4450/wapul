@@ -1,5 +1,7 @@
 <script lang="ts">
-  import { api, type Language } from '#lib/api/client.js';
+  import { api, type Language, type RecordDraft } from '#lib/api/client.js';
+  import BlockEditor from '#lib/components/BlockEditor.svelte';
+  import * as AlertDialog from '#lib/components/ui/alert-dialog/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Checkbox } from '#lib/components/ui/checkbox/index.js';
   import { Input } from '#lib/components/ui/input/index.js';
@@ -10,7 +12,15 @@
   import { segmentCode } from '#lib/segment.js';
   import { LANGUAGE_LABEL } from '#lib/study.js';
 
-  let { oncreated }: { oncreated: (id: string) => void } = $props();
+  let {
+    oncreated,
+    onsaved
+  }: {
+    /** 모델이 나눈 블럭으로 기록을 만든 뒤. 블럭을 확인하러 간다 */
+    oncreated: (id: string) => void;
+    /** 모델이 못 나눠 블럭을 직접 만들고 기록을 만든 뒤. 바로 답을 쓰러 간다 */
+    onsaved: (id: string) => void;
+  } = $props();
 
   let problem = $state('');
 
@@ -25,6 +35,14 @@
   let error = $state('');
 
   let submitting = $state(false);
+
+  /** 모델이 블럭을 못 찾은 코드. 모달에서 직접 나누기를 고르면 draft가 된다 */
+  let unsplit = $state<RecordDraft | null>(null);
+
+  let unsplitTitle = $state('');
+
+  /** 블럭을 직접 나누는 중인 새 기록 (아직 저장하지 않음) */
+  let draft = $state<RecordDraft | null>(null);
 
   // 핵심 아이디어를 코드보다 먼저 쓰게 한다
   const ideaWritten = $derived(keyIdea.trim() !== '');
@@ -58,19 +76,27 @@
       return;
     }
 
+    const record = {
+      problem: problem.trim(),
+      key_idea: keyIdea.trim(),
+      language,
+      initially_wrong: initiallyWrong,
+      code: segmented.code,
+      units: segmented.units
+    };
+
+    // 기록은 블럭이 하나 이상 있어야 만들 수 있다. 블럭을 직접 만들 때까지 저장하지 않는다
     if (segmented.blocks.length === 0) {
       submitting = false;
-      error = UNSPLITTABLE[Math.floor(Math.random() * UNSPLITTABLE.length)];
+      unsplitTitle = UNSPLITTABLE[Math.floor(Math.random() * UNSPLITTABLE.length)];
+      unsplit = record;
 
       return;
     }
 
     const result = await api.createRecord({
-      problem: problem.trim(),
-      key_idea: keyIdea.trim(),
-      language,
-      initially_wrong: initiallyWrong,
-      ...segmented,
+      ...record,
+      blocks: segmented.blocks,
       questions: buildQuestions(blockFacts(segmented.units, segmented.blocks), initiallyWrong)
     });
 
@@ -81,44 +107,74 @@
   }
 </script>
 
-<h1 class="mb-6 text-2xl font-semibold">새 기록</h1>
+<AlertDialog.Root
+  open={unsplit !== null}
+  onOpenChange={(open) => {
+    if (!open) unsplit = null;
+  }}
+>
+  <AlertDialog.Content>
+    <AlertDialog.Header>
+      <AlertDialog.Title>{unsplitTitle}</AlertDialog.Title>
+      <AlertDialog.Description>
+        블럭을 하나도 찾지 못했어요. 코드를 끌어서 블럭을 직접 만들 수 있어요.
+      </AlertDialog.Description>
+    </AlertDialog.Header>
+    <AlertDialog.Footer>
+      <AlertDialog.Cancel>코드 고치기</AlertDialog.Cancel>
+      <AlertDialog.Action
+        onclick={() => {
+          draft = unsplit;
+          unsplit = null;
+        }}>직접 나누기</AlertDialog.Action
+      >
+    </AlertDialog.Footer>
+  </AlertDialog.Content>
+</AlertDialog.Root>
 
-<form class="grid max-w-3xl gap-6" onsubmit={submit}>
-  <div class="grid gap-2">
-    <Label for="problem">1. 어떤 문제인가요?</Label>
-    <Input id="problem" bind:value={problem} placeholder="문제 제목이나 링크" />
-  </div>
+{#if draft}
+  <BlockEditor {draft} {onsaved} />
+{:else}
+  <h1 class="mb-6 text-2xl font-semibold">새 기록</h1>
 
-  <div class="grid gap-2">
-    <Label for="key-idea">2. 코드를 붙여넣기 전에, 풀이의 핵심 아이디어를 한 줄로 적어 주세요</Label
-    >
-    <Input id="key-idea" bind:value={keyIdea} />
-  </div>
-
-  {#if ideaWritten}
+  <form class="grid max-w-3xl gap-6" onsubmit={submit}>
     <div class="grid gap-2">
-      <Label for="code">3. 맞은 풀이 코드를 붙여넣어 주세요</Label>
-      <p class="text-xs text-muted-foreground">틀렸던 제출 코드는 받지 않아요.</p>
-      <div class="flex items-center gap-4">
-        <NativeSelect.Root size="sm" bind:value={language} aria-label="언어">
-          {#each languages as lang (lang)}
-            <NativeSelect.Option value={lang}>{LANGUAGE_LABEL[lang]}</NativeSelect.Option>
-          {/each}
-        </NativeSelect.Root>
-        <Label class="font-normal">
-          <Checkbox bind:checked={initiallyWrong} />
-          처음 제출은 틀렸어요
-        </Label>
-      </div>
-      <Textarea id="code" bind:value={code} rows={16} class="font-mono" spellcheck={false} />
+      <Label for="problem">1. 어떤 문제인가요?</Label>
+      <Input id="problem" bind:value={problem} placeholder="문제 제목이나 링크" />
     </div>
-  {/if}
 
-  {#if error}
-    <p class="text-destructive">{error}</p>
-  {/if}
+    <div class="grid gap-2">
+      <Label for="key-idea"
+        >2. 코드를 붙여넣기 전에, 풀이의 핵심 아이디어를 한 줄로 적어 주세요</Label
+      >
+      <Input id="key-idea" bind:value={keyIdea} />
+    </div>
 
-  <Button type="submit" class="justify-self-start" disabled={!ready || submitting}>
-    {submitting ? '블럭 나누는 중...' : '블럭 나누기'}
-  </Button>
-</form>
+    {#if ideaWritten}
+      <div class="grid gap-2">
+        <Label for="code">3. 맞은 풀이 코드를 붙여넣어 주세요</Label>
+        <p class="text-xs text-muted-foreground">틀렸던 제출 코드는 받지 않아요.</p>
+        <div class="flex items-center gap-4">
+          <NativeSelect.Root size="sm" bind:value={language} aria-label="언어">
+            {#each languages as lang (lang)}
+              <NativeSelect.Option value={lang}>{LANGUAGE_LABEL[lang]}</NativeSelect.Option>
+            {/each}
+          </NativeSelect.Root>
+          <Label class="font-normal">
+            <Checkbox bind:checked={initiallyWrong} />
+            처음 제출은 틀렸어요
+          </Label>
+        </div>
+        <Textarea id="code" bind:value={code} rows={16} class="font-mono" spellcheck={false} />
+      </div>
+    {/if}
+
+    {#if error}
+      <p class="text-destructive">{error}</p>
+    {/if}
+
+    <Button type="submit" class="justify-self-start" disabled={!ready || submitting}>
+      {submitting ? '블럭 나누는 중...' : '블럭 나누기'}
+    </Button>
+  </form>
+{/if}

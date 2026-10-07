@@ -1,6 +1,6 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
-  import { expect, fn, waitFor } from 'storybook/test';
+  import { expect, fn, waitFor, within } from 'storybook/test';
   import { FakeApi, reply } from '#lib/api/fake.js';
   import { record } from '#lib/api/fixtures.js';
   import NewRecordForm from './NewRecordForm.svelte';
@@ -8,12 +8,19 @@
   const { Story } = defineMeta({
     title: 'Components/NewRecordForm',
     component: NewRecordForm,
-    args: { oncreated: fn() }
+    args: { oncreated: fn(), onsaved: fn() }
   });
 
   const created = new FakeApi([['POST /v1/records', reply(record, 201)]]);
 
   const rejected = new FakeApi([['POST /v1/records', reply({ detail: [] }, 422)]]);
+
+  /** 모달이 닫히고 페이지가 다시 눌릴 때까지. bits-ui는 모달이 닫히고도 잠깐 body의 클릭을 막는다 */
+  const modalClosed = () =>
+    waitFor(() => {
+      expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+      expect(document.body).not.toHaveStyle({ pointerEvents: 'none' });
+    });
 </script>
 
 <Story
@@ -92,22 +99,67 @@
   name="Unsplittable"
   beforeEach={() => created.install()}
   play={async ({ canvas, userEvent, args }) => {
+    const body = within(document.body);
+
     await userEvent.type(canvas.getByLabelText(/어떤 문제인가요/), 'BOJ 2557');
     await userEvent.type(canvas.getByLabelText(/핵심 아이디어/), '출력한다');
     await userEvent.type(await canvas.findByLabelText(/맞은 풀이 코드/), 'print(1)');
     await userEvent.selectOptions(canvas.getByLabelText('언어'), 'python');
     await userEvent.click(canvas.getByRole('button', { name: '블럭 나누기' }));
 
-    // 모델이 문장을 모두 none으로 보면 기록을 만들지 않는다
-    await expect(
-      await canvas.findByText(
-        /나누지 못했어요|나눌 수 없었어요|나눌 수 없어요/,
-        {},
-        { timeout: 15000 }
-      )
-    ).toBeInTheDocument();
+    // 모델이 문장을 모두 none으로 보면 모달로 알리고, 아직 기록을 만들지 않는다
+    const dialog = await body.findByRole('alertdialog', {}, { timeout: 15000 });
+
+    await expect(dialog).toHaveTextContent(/나누지 못했어요|나눌 수 없었어요|나눌 수 없어요/);
+    await userEvent.click(within(dialog).getByRole('button', { name: '직접 나누기' }));
+    await modalClosed();
+
+    // 저장하지 않은 편집 화면에서 블럭을 직접 만든다
     await expect(created.callsTo('POST', '/v1/records')).toHaveLength(0);
+    await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
+    await expect(canvas.getByText('문장이 든 블럭이 하나는 있어야 해요.')).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByRole('button', { name: '1줄' }));
+    await userEvent.click(canvas.getByRole('button', { name: '+ 로직' }));
+    await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
+
+    // 블럭이 생긴 뒤에야 기록을 만들고, 바로 답을 쓰러 간다
+    await waitFor(() => expect(args.onsaved).toHaveBeenCalledWith('record-1'));
     await expect(args.oncreated).not.toHaveBeenCalled();
+
+    const [call] = created.callsTo('POST', '/v1/records');
+
+    const sent = JSON.parse(call.body);
+
+    await expect(sent.problem).toBe('BOJ 2557');
+    await expect(sent.blocks).toEqual([{ kind: 'logic', units: [0] }]);
+    await expect(sent.questions.map((q: { kind: string }) => q.kind)).toEqual([
+      'problem',
+      'logic',
+      'varying'
+    ]);
+  }}
+/>
+
+<Story
+  name="UnsplittableBack"
+  beforeEach={() => created.install()}
+  play={async ({ canvas, userEvent }) => {
+    const body = within(document.body);
+
+    await userEvent.type(canvas.getByLabelText(/어떤 문제인가요/), 'BOJ 2557');
+    await userEvent.type(canvas.getByLabelText(/핵심 아이디어/), '출력한다');
+    await userEvent.type(await canvas.findByLabelText(/맞은 풀이 코드/), 'print(1)');
+    await userEvent.selectOptions(canvas.getByLabelText('언어'), 'python');
+    await userEvent.click(canvas.getByRole('button', { name: '블럭 나누기' }));
+
+    // 코드 고치기를 고르면 쓴 내용 그대로 폼으로 돌아간다
+    const dialog = await body.findByRole('alertdialog', {}, { timeout: 15000 });
+
+    await userEvent.click(within(dialog).getByRole('button', { name: '코드 고치기' }));
+    await modalClosed();
+    await expect(canvas.getByLabelText(/맞은 풀이 코드/)).toHaveValue('print(1)');
+    await expect(created.callsTo('POST', '/v1/records')).toHaveLength(0);
   }}
 />
 
