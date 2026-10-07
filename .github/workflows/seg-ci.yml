@@ -1,0 +1,59 @@
+name: Segmenter CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'wapul-seg/**'
+      - 'model/**'
+      - '.github/actions/seg-build/**'
+      - '.github/workflows/seg-ci.yml'
+  pull_request:
+    paths:
+      - 'wapul-seg/**'
+      - 'model/**'
+      - '.github/actions/seg-build/**'
+      - '.github/workflows/seg-ci.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: ./.github/actions/seg-build
+
+      - name: Rust format
+        working-directory: wapul-seg
+        run: cargo fmt --check
+
+      - name: Rust lint
+        working-directory: wapul-seg
+        run: cargo clippy --release --target wasm32-unknown-unknown -- -D warnings
+
+      # 루트 model/의 출시 모델을 읽는다
+      - name: Rust test
+        working-directory: wapul-seg
+        run: cargo test --release
+
+      - name: Lint
+        working-directory: wapul-seg/js
+        run: pnpm lint
+
+      - name: Type check
+        working-directory: wapul-seg/js
+        run: pnpm check
+
+      # 파이썬 모델과의 단계별 일치 (tests/cases.json)
+      - name: Test
+        working-directory: wapul-seg/js
+        run: pnpm test

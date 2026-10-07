@@ -1,0 +1,50 @@
+name: Build wapul-seg
+description: Rust → WASM (wasm-bindgen at the version Cargo.lock pins), then the JS module and the release files under wapul-seg/js/dist
+
+runs:
+  using: composite
+  steps:
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        targets: wasm32-unknown-unknown
+        components: clippy, rustfmt
+
+    - uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: wapul-seg
+
+    # 프리빌드 바이너리: cargo install보다 몇 분 빠르다. 버전은 Cargo.lock의 wasm-bindgen과 같아야 한다
+    - name: Install wasm-bindgen-cli
+      shell: bash
+      working-directory: wapul-seg
+      run: |
+        V=$(grep -A1 '^name = "wasm-bindgen"$' Cargo.lock | sed -n 's/^version = "\(.*\)"$/\1/p')
+        mkdir -p "$RUNNER_TEMP/wasm-bindgen"
+        curl -sSL "https://github.com/wasm-bindgen/wasm-bindgen/releases/download/$V/wasm-bindgen-$V-x86_64-unknown-linux-musl.tar.gz" \
+          | tar xz -C "$RUNNER_TEMP/wasm-bindgen" --strip-components=1 --wildcards '*/wasm-bindgen'
+        echo "$RUNNER_TEMP/wasm-bindgen" >> "$GITHUB_PATH"
+        "$RUNNER_TEMP/wasm-bindgen/wasm-bindgen" --version
+
+    - name: Build WASM
+      shell: bash
+      run: sh wapul-seg/scripts/build-wasm.sh
+
+    - uses: pnpm/action-setup@v6
+      with:
+        version: 12
+
+    - uses: actions/setup-node@v7
+      with:
+        node-version: lts/*
+        cache: pnpm
+        cache-dependency-path: wapul-seg/js/pnpm-lock.yaml
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: wapul-seg/js
+      run: pnpm install --frozen-lockfile
+
+    - name: Build module and release files
+      shell: bash
+      working-directory: wapul-seg/js
+      run: pnpm build
