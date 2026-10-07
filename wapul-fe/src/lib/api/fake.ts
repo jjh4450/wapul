@@ -51,12 +51,19 @@ export class FakeApi {
     });
   }
 
-  /** globalThis.fetch를 이 가짜로 바꾸고 되돌리는 함수를 돌려준다. story의 beforeEach에서 그대로 반환한다 */
+  /** globalThis.fetch를 이 가짜로 바꾸고 되돌리는 함수를 돌려준다. story의 beforeEach에서 그대로 반환한다.
+   * API(/v1/) 요청만 가로채고, 분할 모델 파일 같은 그 밖의 요청은 원래 fetch로 보낸다 */
   install(): () => void {
     const original = globalThis.fetch;
 
     this.calls.length = 0;
-    globalThis.fetch = (input, init) => this.#handle(new Request(input, init));
+    globalThis.fetch = (input, init) => {
+      const request = new Request(input, init);
+
+      return new URL(request.url).pathname.startsWith('/v1/')
+        ? this.#handle(request)
+        : original(request);
+    };
 
     return () => {
       globalThis.fetch = original;
