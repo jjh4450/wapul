@@ -247,7 +247,7 @@ PR 템플릿을 사용하세요. 다음을 포함합니다:
 
 프론트엔드는 같은 규칙으로 `fe-vX.Y.Z`를 사용합니다 (Y는 새 API 계약 기준으로 배포될 때, X는 Frontend Deploy 워크플로의 `major` 입력으로). 프론트엔드 릴리스마다 CI가 `main` 커밋에 태그를 달고 `wapul-fe/VERSION` 파일을 담아 `deploy/fe` 브랜치를 강제 갱신하며, 호스팅(Vercel 등)은 `deploy/fe`를 빌드해 배포합니다. `deploy/fe`에 직접 push하거나 `fe-v*` 태그를 수동으로 만들지 마세요.
 
-세그먼터는 `seg-vX.Y.Z`를 사용합니다. Y는 `model/`의 모델 파일이 바뀔 때, Z는 그 외 릴리스마다, X는 Segmenter Release 워크플로의 `major` 입력으로(`segment()`의 결과 형식이나 호출 방식이 바뀔 때) 올라갑니다. 릴리스는 CI가 `wapul-seg/js`에서 npm 패키지 `wapul-seg@X.Y.Z`로 올리고(npm trusted publishing, 토큰 없음) `seg-vX.Y.Z` 태그를 답니다. 프론트엔드는 `package.json`에 버전을 고정합니다. `seg-v*` 태그를 만들거나 직접 publish하지 마세요. 새 모델을 배포하려면 `wapul-ml/models/segmenter-vN/`의 파일을 `model/`에 복사해 PR을 올립니다. 버전과 릴리스는 CI가 합니다.
+세그먼터는 `seg-vX.Y.Z`를 사용합니다. Y는 `model/`의 모델 파일이 바뀔 때, Z는 그 외 릴리스마다, X는 Segmenter Release 워크플로의 `major` 입력으로(`segment()`의 결과 형식이나 호출 방식이 바뀔 때) 올라갑니다. 릴리스는 CI가 `wapul-seg/js`에서 npm 패키지 `wapul-seg@X.Y.Z`로 올리고(npm이 이 저장소의 OIDC subject를 받게 되면 trusted publishing, 그때까지는 `NPM_TOKEN` 시크릿) `seg-vX.Y.Z` 태그를 답니다. 프론트엔드는 `package.json`에 버전을 고정합니다. `seg-v*` 태그를 만들거나 직접 publish하지 마세요. 새 모델을 배포하려면 `wapul-ml/models/segmenter-vN/`의 파일을 `model/`에 복사해 PR을 올립니다. 버전과 릴리스는 CI가 합니다.
 
 ### 동작 방식
 

@@ -169,7 +169,7 @@ cd js && pnpm build        # tsc, vite 라이브러리 빌드, 릴리즈 파일�
 | 종류 특징 | 글자 n-gram 추가 | 학습하지 않은 언어(Rust)에서 macro-F1 0.663 → 0.870 ([실험 23](experiments.md)) |
 | 배포물 | npm 패키지 `wapul-seg@X.Y.Z`: `js/dist/` 그대로(JS 모듈과 타입 선언, `wapul-seg` WASM, web-tree-sitter 런타임, 언어별 문법 `.wasm`, 모델 파일). 모노레포의 `wapul-seg/js`에서 냄 | 바이너리를 git 기록에 쌓지 않고, 프론트엔드가 package.json에서 버전을 고정함. 저장소를 따로 두지 않아도 되고, 루트 `model/`과 파이썬 원본 옆에 있어야 사본 규칙을 지킬 수 있음 |
 | 버전 | CI(`seg-release.yml`)가 계산. Y는 `model/`의 모델 파일이 바뀌면, Z는 그 외 릴리스마다, X는 수동 `major`. 손으로 올리지 않음 | 백엔드, 프론트엔드와 같은 규칙. 모델이 바뀌면 결과가 달라지므로 Y로 드러냄 |
-| npm 인증 | trusted publishing(OIDC). npmjs.com 패키지 설정에 저장소 `jjh4450/wapul`과 워크플로 `seg-release.yml` 등록 | 토큰을 시크릿에 두지 않음. 첫 버전만 사람이 `npm publish`로 올려 패키지를 만든 뒤 설정 |
+| npm 인증 | 워크플로는 trusted publishing(OIDC)을 먼저 시도하고, 실패하면 `NPM_TOKEN` 시크릿(granular token)으로 올림. 지금은 토큰이 쓰임 | 이 저장소는 2026-07-15 이후 생성이라 OIDC `sub`가 immutable 형식(`repo:owner@id/repo@id`)인데 npm이 아직 받지 않음([npm/cli#9969](https://github.com/npm/cli/issues/9969)). 고쳐지면 npmjs.com 패키지 설정에 저장소 `jjh4450/wapul`과 워크플로 `seg-release.yml`을 등록하고 시크릿을 지움 |
 | 프론트엔드가 받는 시점 | `pnpm install` 때, package.json에 고정한 버전 | 실행 중 외부 의존이 없고, 버전 갱신이 PR로 드러남 |
 | 학습 | wapul-ml의 파이썬 그대로 | `wapul-seg`는 파이썬 구현과 같은 결과를 내는 배포용 사본. 일치는 "검증"으로 보장 |
 

@@ -1,8 +1,10 @@
 name: Segmenter Release
 
 # 릴리즈 seg-vX.Y.Z: 모듈, WASM, 문법, 모델 파일을 한 벌로 담은 npm 패키지 wapul-seg@X.Y.Z.
-# npm 인증은 trusted publishing(OIDC, 토큰 없음): npmjs.com의 패키지 설정에 이 저장소와 이 워크플로
-# 파일 이름이 등록되어 있다 (docs/ml/deploy.ko.md).
+# npm 인증: trusted publishing(OIDC)을 먼저 시도하고, 안 되면 NPM_TOKEN 시크릿(granular token)을 쓴다.
+# 이 저장소는 2026-07-15 이후 생성이라 OIDC sub가 immutable 형식(repo:owner@id/repo@id)인데, npm이
+# 아직 이를 받지 않는다 (npm/cli#9969). 고쳐지면 npmjs.com 패키지 설정에 trusted publisher
+# (jjh4450/wapul, seg-release.yml)를 등록하고 시크릿을 지운다 (docs/ml/deploy.ko.md).
 on:
   push:
     branches: [ main ]
@@ -90,15 +92,18 @@ jobs:
           cargo test --release
           cd js && pnpm test
 
-      # package.json의 version은 0.0.0 자리표시자이고 커밋하지 않는다
+      # package.json의 version은 0.0.0 자리표시자이고 커밋하지 않는다.
+      # NODE_AUTH_TOKEN은 setup-node가 .npmrc에 넣는다; npm은 OIDC 교환이 실패하면 이 토큰으로 publish한다
       - name: Publish to npm
         if: steps.version.outputs.skip != 'true'
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         working-directory: wapul-seg/js
         run: |
           npm version "$VERSION" --no-git-tag-version
           npm publish --provenance --access public
+          npm view "wapul-seg@$VERSION" version
 
       # 태그는 빌드한 커밋에 붙이고, 메시지에 모델 해시를 남겨 다음 릴리스의 Y 판정에 쓴다
       - name: Create tag and GitHub Release

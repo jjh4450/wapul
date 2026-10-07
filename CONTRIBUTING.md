@@ -287,7 +287,7 @@ Don't make breaking changes under `/v1`. Add breaking changes under `/v2`.
 
 The frontend uses `fe-vX.Y.Z` with the same rules (Y bumps when the frontend ships against a new API contract; X via the Frontend Deploy workflow's `major` input). On each frontend release CI tags the `main` commit and force-updates the `deploy/fe` branch with a `wapul-fe/VERSION` file; the hosting provider builds and deploys from `deploy/fe`. Don't push to `deploy/fe` or create `fe-v*` tags by hand.
 
-The segmenter uses `seg-vX.Y.Z`: Y bumps when the model files in `model/` change, Z on every other release, X via the Segmenter Release workflow's `major` input (when `segment()`'s results or call shape change). Each release is the npm package `wapul-seg@X.Y.Z`, published from `wapul-seg/js` by CI through npm trusted publishing (no token), plus a `seg-vX.Y.Z` tag. The frontend pins it in `package.json`. Don't create `seg-v*` tags or publish by hand. To ship a new model, copy the files from `wapul-ml/models/segmenter-vN/` into `model/` in a PR; CI versions and releases it.
+The segmenter uses `seg-vX.Y.Z`: Y bumps when the model files in `model/` change, Z on every other release, X via the Segmenter Release workflow's `major` input (when `segment()`'s results or call shape change). Each release is the npm package `wapul-seg@X.Y.Z`, published from `wapul-seg/js` by CI (npm trusted publishing once npm accepts this repository's OIDC subject, the `NPM_TOKEN` secret until then), plus a `seg-vX.Y.Z` tag. The frontend pins it in `package.json`. Don't create `seg-v*` tags or publish by hand. To ship a new model, copy the files from `wapul-ml/models/segmenter-vN/` into `model/` in a PR; CI versions and releases it.
 
 ### How It Works
 
