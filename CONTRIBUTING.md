@@ -10,6 +10,9 @@ This repository is a monorepo:
 |-----------|-------------|
 | `wapul-be/` | Backend (FastAPI, uv) |
 | `wapul-fe/` | Frontend (SvelteKit, pnpm) |
+| `wapul-ml/` | Block-splitting model: training and experiments (Python, runs in Docker) |
+| `wapul-seg/` | The model packaged for the browser: TypeScript module + Rust WASM (pnpm, cargo) |
+| `model/` | The trained model files the segmenter ships, copied from `wapul-ml/models/` by hand |
 
 ## Table of Contents
 
@@ -70,6 +73,13 @@ cp .env.example .env
 ```
 
 The frontend (`wapul-fe/`) uses pnpm; run `pnpm format`, then make sure `pnpm lint`, `pnpm check` and `pnpm test` pass. See the [frontend docs](https://jjh4450.github.io/wapul/frontend/).
+
+The segmenter (`wapul-seg/`) has two parts, both checked in CI:
+
+- Rust (`src/`): `cargo fmt --check`, `cargo clippy --target wasm32-unknown-unknown`, `cargo test --release`. Building the WASM needs the `wasm32-unknown-unknown` target and `wasm-bindgen-cli` at the version in `Cargo.lock`; `scripts/build-wasm.sh` writes `pkg/`, which the TypeScript imports.
+- TypeScript (`js/`): `pnpm install`, `pnpm format`, then `pnpm lint`, `pnpm check`, `pnpm test`. `pnpm test` compares every stage with the Python model on `tests/cases.json`; regenerate that file with `tests/make_cases.py` whenever `wapul-ml`'s `normalize.py`, `units.py` or `features/` change.
+
+The TypeScript and Rust in `wapul-seg/` copy the Python in `wapul-ml/`, which stays the original: change the Python first, then the copies, then make the parity test pass. Node rules for the languages the Python side does not have live only in `js/src/languages.ts`. See [Deploy](https://jjh4450.github.io/wapul/ml/deploy/) for the decisions behind this layout.
 
 ### Lint and Format
 
@@ -276,6 +286,8 @@ The backend uses `vX.Y.Z` (starting at 1.0.0):
 Don't make breaking changes under `/v1`. Add breaking changes under `/v2`.
 
 The frontend uses `fe-vX.Y.Z` with the same rules (Y bumps when the frontend ships against a new API contract; X via the Frontend Deploy workflow's `major` input). On each frontend release CI tags the `main` commit and force-updates the `deploy/fe` branch with a `wapul-fe/VERSION` file; the hosting provider builds and deploys from `deploy/fe`. Don't push to `deploy/fe` or create `fe-v*` tags by hand.
+
+The segmenter uses `seg-vX.Y.Z`: Y bumps when the model files in `model/` change, Z on every other release, X via the Segmenter Release workflow's `major` input (when `segment()`'s results or call shape change). Each release is one `wapul-seg-X.Y.Z.tar.gz` on GitHub Releases, which the frontend downloads at build time. Don't create `seg-v*` tags by hand. To ship a new model, copy the files from `wapul-ml/models/segmenter-vN/` into `model/` in a PR; CI versions and releases it.
 
 ### How It Works
 

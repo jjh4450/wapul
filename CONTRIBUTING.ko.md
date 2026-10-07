@@ -10,6 +10,9 @@ wapul에 관심을 가져주셔서 감사합니다. 이 문서는 기여 절차�
 |----------|------|
 | `wapul-be/` | 백엔드 (FastAPI, uv) |
 | `wapul-fe/` | 프론트엔드 (SvelteKit, pnpm) |
+| `wapul-ml/` | 블럭 분할 모델: 학습과 실험 (Python, Docker에서 실행) |
+| `wapul-seg/` | 모델의 브라우저 배포 패키지: TypeScript 모듈 + Rust WASM (pnpm, cargo) |
+| `model/` | 세그먼터가 배포하는 학습된 모델 파일. `wapul-ml/models/`에서 사람이 복사 |
 
 ## 목차
 
@@ -70,6 +73,13 @@ cp .env.example .env
 ```
 
 프론트엔드(`wapul-fe/`)는 pnpm을 사용하며, 변경 시 `pnpm format` 후 `pnpm lint`, `pnpm check`, `pnpm test`를 통과해야 합니다. 자세한 내용은 [프론트엔드 문서](https://jjh4450.github.io/wapul/frontend/)를 참고하세요.
+
+세그먼터(`wapul-seg/`)는 두 부분이고, 둘 다 CI가 검사합니다.
+
+- Rust(`src/`): `cargo fmt --check`, `cargo clippy --target wasm32-unknown-unknown`, `cargo test --release`. WASM 빌드에는 `wasm32-unknown-unknown` 타깃과 `Cargo.lock`에 있는 버전의 `wasm-bindgen-cli`가 필요합니다. `scripts/build-wasm.sh`가 `pkg/`를 만들고, TypeScript가 이를 import합니다.
+- TypeScript(`js/`): `pnpm install`, `pnpm format` 후 `pnpm lint`, `pnpm check`, `pnpm test`. `pnpm test`는 `tests/cases.json`으로 파이썬 모델과 단계마다 비교합니다. `wapul-ml`의 `normalize.py`, `units.py`, `features/`가 바뀌면 `tests/make_cases.py`로 이 파일을 다시 만듭니다.
+
+`wapul-seg/`의 TypeScript와 Rust는 `wapul-ml/` 파이썬의 사본이고 파이썬이 원본입니다. 파이썬을 먼저 고치고, 사본을 고치고, parity 테스트를 통과시킵니다. 파이썬 쪽에 없는 언어의 노드 규칙은 `js/src/languages.ts`에만 있습니다. 이 구조의 결정은 [배포](https://jjh4450.github.io/wapul/ml/deploy/)에 있습니다.
 
 ### 린트와 포맷
 
@@ -236,6 +246,8 @@ PR 템플릿을 사용하세요. 다음을 포함합니다:
 `/v1` 아래에서는 호환을 깨는 변경을 하지 않습니다. 깨지는 변경은 `/v2`로 추가합니다.
 
 프론트엔드는 같은 규칙으로 `fe-vX.Y.Z`를 사용합니다 (Y는 새 API 계약 기준으로 배포될 때, X는 Frontend Deploy 워크플로의 `major` 입력으로). 프론트엔드 릴리스마다 CI가 `main` 커밋에 태그를 달고 `wapul-fe/VERSION` 파일을 담아 `deploy/fe` 브랜치를 강제 갱신하며, 호스팅(Vercel 등)은 `deploy/fe`를 빌드해 배포합니다. `deploy/fe`에 직접 push하거나 `fe-v*` 태그를 수동으로 만들지 마세요.
+
+세그먼터는 `seg-vX.Y.Z`를 사용합니다. Y는 `model/`의 모델 파일이 바뀔 때, Z는 그 외 릴리스마다, X는 Segmenter Release 워크플로의 `major` 입력으로(`segment()`의 결과 형식이나 호출 방식이 바뀔 때) 올라갑니다. 릴리스마다 GitHub Releases에 `wapul-seg-X.Y.Z.tar.gz` 하나가 올라가고, 프론트엔드는 빌드할 때 이를 받습니다. `seg-v*` 태그를 수동으로 만들지 마세요. 새 모델을 배포하려면 `wapul-ml/models/segmenter-vN/`의 파일을 `model/`에 복사해 PR을 올립니다. 버전과 릴리스는 CI가 합니다.
 
 ### 동작 방식
 
