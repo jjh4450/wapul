@@ -14,7 +14,7 @@ import re
 import uuid
 from dataclasses import dataclass
 
-from app.models.study import Block, Question, QuestionKind, Record
+from app.models.study import Block, BlockKind, Question, QuestionKind, Record
 
 
 @dataclass(frozen=True)
@@ -31,6 +31,17 @@ def _fence(code: str, language: str) -> str:
     return f"{fence}{language}\n{code.rstrip()}\n{fence}"
 
 
+def _runs(lines: list[int]) -> list[tuple[int, int]]:
+    """정렬된 줄 번호를 이어진 구간으로 묶는다"""
+    runs: list[tuple[int, int]] = []
+    for line in lines:
+        if runs and runs[-1][1] + 1 == line:
+            runs[-1] = (runs[-1][0], line)
+        else:
+            runs.append((line, line))
+    return runs
+
+
 def _qa(question: Question) -> str:
     return f"**{question.text}**\n\n{question.answer.strip()}"
 
@@ -40,6 +51,15 @@ class _Parts:
         self.record = record
         self.blocks = blocks
         self.lines = record.code.splitlines()
+        # 블럭에 이름이 없어 종류와 로직 순번으로 부른다
+        self.labels: dict[uuid.UUID, str] = {}
+        logic = 0
+        for block in blocks:
+            if block.kind == BlockKind.LOGIC:
+                logic += 1
+                self.labels[block.id] = f"로직 {logic}"
+            else:
+                self.labels[block.id] = "입력" if block.kind == BlockKind.INPUT else "출력"
         answered = [q for q in questions if q.answer.strip()]
         self.by_block: dict[uuid.UUID, list[Question]] = {}
         self.loose: list[Question] = []
@@ -70,11 +90,19 @@ class _Parts:
     def full_code(self) -> str:
         return _fence(self.record.code, self.record.language)
 
+    def block_runs(self, block: Block) -> list[tuple[int, int]]:
+        units = self.record.units
+        lines = {line for i in block.units for line in range(units[i]["start"][0], units[i]["end"][0] + 1)}
+        return _runs(sorted(lines))
+
     def block_heading(self, block: Block) -> str:
-        return f"### {block.name} ({block.start_line}~{block.end_line}줄)"
+        where = ", ".join(str(a) if a == b else f"{a}~{b}" for a, b in self.block_runs(block))
+        return f"### {self.labels[block.id]} ({where}줄)"
 
     def block_code(self, block: Block) -> str:
-        return _fence("\n".join(self.lines[block.start_line - 1 : block.end_line]), self.record.language)
+        # 블럭의 문장이 떨어져 있으면 사이를 ...로 줄인다
+        parts = ["\n".join(self.lines[a - 1 : b]) for a, b in self.block_runs(block)]
+        return _fence("\n...\n".join(parts), self.record.language)
 
     def block_notes(self, block: Block) -> list[str]:
         return [_qa(q) for q in self.by_block.get(block.id, [])]

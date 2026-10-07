@@ -6,6 +6,8 @@
   import { Label } from '#lib/components/ui/label/index.js';
   import * as NativeSelect from '#lib/components/ui/native-select/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
+  import { blockFacts, buildQuestions } from '#lib/questions.js';
+  import { segmentCode } from '#lib/segment.js';
   import { LANGUAGE_LABEL } from '#lib/study.js';
 
   let { oncreated }: { oncreated: (id: string) => void } = $props();
@@ -29,18 +31,47 @@
 
   const ready = $derived(problem.trim() !== '' && ideaWritten && code.trim() !== '');
 
-  const languages: Language[] = ['cpp', 'python', 'java'];
+  // SAFETY: LANGUAGE_LABEL은 satisfies로 Language의 모든 값을, 그 값만 키로 가진다
+  const languages = Object.keys(LANGUAGE_LABEL) as Language[];
+
+  // 모델이 모든 문장을 어느 블럭에도 넣지 않았을 때 (아주 짧은 코드 등)
+  const UNSPLITTABLE = [
+    '너무 고귀한 풀이라 나누지 못했어요!',
+    '너무 아름다워서 제가 감히 나눌 수 없었어요!',
+    '코드가 너무 눈부셔서 제가 나눌 수 없어요!'
+  ];
 
   async function submit(event: SubmitEvent) {
     event.preventDefault();
     submitting = true;
+    error = '';
+
+    // 블럭은 브라우저에서 나눈다. 처음 한 번은 모델과 문법 파일을 받느라 몇 초 걸린다
+    let segmented;
+
+    try {
+      segmented = await segmentCode(code, language);
+    } catch {
+      submitting = false;
+      error = '코드를 블럭으로 나누지 못했어요. 언어를 확인하고 다시 시도해 주세요.';
+
+      return;
+    }
+
+    if (segmented.blocks.length === 0) {
+      submitting = false;
+      error = UNSPLITTABLE[Math.floor(Math.random() * UNSPLITTABLE.length)];
+
+      return;
+    }
 
     const result = await api.createRecord({
       problem: problem.trim(),
       key_idea: keyIdea.trim(),
-      code,
       language,
-      initially_wrong: initiallyWrong
+      initially_wrong: initiallyWrong,
+      ...segmented,
+      questions: buildQuestions(blockFacts(segmented.units, segmented.blocks), initiallyWrong)
     });
 
     submitting = false;
@@ -88,6 +119,6 @@
   {/if}
 
   <Button type="submit" class="justify-self-start" disabled={!ready || submitting}>
-    블럭 나누기
+    {submitting ? '블럭 나누는 중...' : '블럭 나누기'}
   </Button>
 </form>

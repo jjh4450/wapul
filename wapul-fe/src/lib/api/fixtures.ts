@@ -19,7 +19,23 @@ int main() {
     }
 
     cout << cnt << '\\n';
-}`;
+}
+`;
+
+// wapul-seg가 위 코드에 실제로 낸 문장 위치 (none 문장 포함)
+const at = (
+  line: number,
+  from: number,
+  to: number,
+  tags: { condition?: true; loop?: true } = {}
+) => ({
+  start: [line, from],
+  end: [line, to],
+  condition: false,
+  loop: false,
+  recursion: false,
+  ...tags
+});
 
 export const record: RecordOut = {
   id: 'record-1',
@@ -31,12 +47,29 @@ export const record: RecordOut = {
   updated_at: '2026-10-05T09:30:00+0000',
   code,
   initially_wrong: true,
+  units: [
+    at(1, 0, 24),
+    at(2, 0, 20),
+    at(4, 0, 10),
+    at(5, 4, 10),
+    at(5, 11, 20),
+    at(6, 4, 32),
+    at(7, 4, 26, { loop: true }),
+    at(7, 27, 41),
+    at(9, 4, 29),
+    at(10, 4, 25),
+    at(11, 4, 25, { loop: true }),
+    at(12, 8, 21, { condition: true }),
+    at(12, 24, 30),
+    at(12, 31, 39),
+    at(15, 4, 24)
+  ],
   is_owner: true,
   group_ids: [],
   blocks: [
-    { id: 'block-input', kind: 'input', name: '입력 받기', start_line: 4, end_line: 7 },
-    { id: 'block-logic', kind: 'logic', name: '회의 고르기', start_line: 9, end_line: 13 },
-    { id: 'block-output', kind: 'output', name: '결과 출력', start_line: 15, end_line: 16 }
+    { id: 'block-input', kind: 'input', units: [3, 4, 5, 6, 7] },
+    { id: 'block-logic', kind: 'logic', units: [8, 9, 10, 11, 12, 13] },
+    { id: 'block-output', kind: 'output', units: [14] }
   ],
   questions: [
     {
@@ -44,78 +77,63 @@ export const record: RecordOut = {
       block_id: null,
       kind: 'problem',
       text: '어떤 성질을 발견해서 이 방법을 쓰게 됐나요?',
-      answer: '',
-      examples: [
-        '퀸은 한 줄에 하나만 놓인다. 그래서 줄마다 하나씩 놓아 보고, 막힌 칸이면 되돌아가는 백트래킹을 썼다.',
-        'N번째 값은 바로 앞 두 값만 있으면 정해진다. 두 값만 들고 가는 반복문으로 썼다.'
-      ]
+      answer: ''
     },
     {
       id: 'q-input-meaning',
       block_id: 'block-input',
       kind: 'input_meaning',
       text: '입력을 담은 변수와 자료구조는 각각 무엇을 나타내나요?',
-      answer: 'm은 (끝나는 시간, 시작 시간) 쌍의 목록이다.',
-      examples: ['w[i], v[i]는 i번째 물건의 무게와 가치다.']
+      answer: 'm은 (끝나는 시간, 시작 시간) 쌍의 목록이다.'
     },
     {
       id: 'q-input-condition',
       block_id: 'block-input',
       kind: 'input_condition',
       text: '입력 조건(범위, 형식, 끝나는 조건) 중 이 코드가 기대는 것은 무엇인가요?',
-      answer: '',
-      examples: [
-        'N이 최대 100만이라 한 줄씩 받으면 느려서 한 번에 읽었다.',
-        '입력 끝에 0 0이 오면 끝난다는 조건에 기대고 있다.'
-      ]
+      answer: ''
     },
     {
       id: 'q-logic',
       block_id: 'block-logic',
       kind: 'logic',
       text: '이 부분이 끝나면 무엇이 보장되고, 그게 왜 성립하나요?',
-      answer: '',
-      examples: ['정렬이 끝나면 회의가 끝나는 시간 순서로 놓인다.']
+      answer: ''
     },
     {
       id: 'q-boundary',
       block_id: 'block-logic',
       kind: 'boundary',
       text: '이 설명이 통하지 않는 입력은 뭘까요?',
-      answer: '',
-      examples: ['N이 0이나 1일 때. 반복문이 한 번도 돌지 않는다.']
+      answer: ''
     },
     {
       id: 'q-output-meaning',
       block_id: 'block-output',
       kind: 'output_meaning',
       text: '출력하는 값은 앞에서 만든 결과의 무엇에 해당하나요?',
-      answer: '',
-      examples: ['count는 지금까지 고른 회의 수라서 반복이 끝난 뒤의 값이 곧 답이다.']
+      answer: ''
     },
     {
       id: 'q-output-format',
       block_id: 'block-output',
       kind: 'output_format',
       text: '출력 형식이나 정밀도에서 지켜야 했던 조건은 무엇인가요?',
-      answer: '',
-      examples: ['답이 커서 1,000,000,007로 나눈 나머지를 출력해야 했다.']
+      answer: ''
     },
     {
       id: 'q-varying',
       block_id: null,
       kind: 'varying',
       text: '만약 입력이 하나뿐이라면 이 풀이는 어떻게 될까요?',
-      answer: '',
-      examples: ['N이 10배면 O(n²) 정렬은 100배 느려진다.']
+      answer: ''
     },
     {
       id: 'q-revision',
       block_id: null,
       kind: 'revision',
       text: '처음 제출에서 무엇이 달라졌고, 왜 그게 필요했나요?',
-      answer: '',
-      examples: ['처음엔 int로 합을 구해서 넘쳤다.']
+      answer: ''
     }
   ]
 };
@@ -149,18 +167,18 @@ export const layouts: LayoutOut[] = [
     id: 'code-first',
     title: '전체 코드 먼저',
     markdown:
-      '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n```cpp\nint main() {}\n```\n\n### 입력 받기 (4~7줄)\n'
+      '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n```cpp\nint main() {}\n```\n\n### 입력 (5~7줄)\n'
   },
   {
     id: 'interleaved',
     title: '블럭마다 코드와 설명',
     markdown:
-      '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n### 입력 받기 (4~7줄)\n\n```cpp\nint n; cin >> n;\n```\n'
+      '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n### 입력 (5~7줄)\n\n```cpp\nint n; cin >> n;\n```\n'
   },
   {
     id: 'notes-first',
     title: '설명 먼저, 코드는 끝에',
-    markdown: '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n### 입력 받기 (4~7줄)\n\n### 전체 코드\n'
+    markdown: '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n### 입력 (5~7줄)\n\n### 전체 코드\n'
   }
 ];
 

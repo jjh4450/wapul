@@ -15,23 +15,48 @@ from app.core.base_model import CustomModel
 from app.models.study import BlockKind, Language, QuestionKind
 
 
-class RecordCreate(CustomModel):
-    problem: str = Field(min_length=1, max_length=500)
-    key_idea: str = Field(min_length=1, max_length=500)
-    code: str = Field(min_length=1, max_length=100_000)
-    language: Language
-    initially_wrong: bool = False
+class Unit(CustomModel):
+    """문장 하나 (wapul-seg의 segment 결과). 위치는 [줄, 칸]: 줄은 1부터, 칸은 0부터 세는 글자 수, end는
+    포함하지 않는다. 표시는 저장만 하고, 브라우저가 블럭을 고칠 때 질문을 다시 만드는 데 쓴다."""
+
+    # tuple이 아니라 list로 둔다: openapi-fetch의 응답 타입이 튜플을 배열로 펴서 프론트 타입이 어긋난다
+    start: list[int] = Field(min_length=2, max_length=2)
+    end: list[int] = Field(min_length=2, max_length=2)
+    condition: bool  # 분기 머리, 비교 연산, 삼항식
+    loop: bool  # 반복문 머리
+    recursion: bool  # 감싼 함수를 다시 부름
 
 
 class BlockIn(CustomModel):
     kind: BlockKind
-    name: str = Field(min_length=1, max_length=100)
-    start_line: int = Field(ge=1)
-    end_line: int = Field(ge=1)
+    units: list[int] = Field(min_length=1)  # 기록의 units 번호
+
+
+class QuestionIn(CustomModel):
+    """질문은 브라우저가 블럭을 보고 만든다. 블럭을 고칠 때는 그대로 남은 질문의 답을 실어 보낸다."""
+
+    kind: QuestionKind
+    text: str = Field(min_length=1, max_length=500)
+    block: int | None = None  # 함께 보낸 blocks의 번호, 기록 단위 질문이면 없음
+    answer: str = Field(max_length=10_000)  # 새 질문이면 빈 문자열
+
+
+class RecordCreate(CustomModel):
+    """분할과 질문은 브라우저가 하고(wapul-seg), 그 결과를 코드와 함께 보낸다"""
+
+    problem: str = Field(min_length=1, max_length=500)
+    key_idea: str = Field(min_length=1, max_length=500)
+    code: str = Field(min_length=1, max_length=100_000)  # normalize(code)
+    language: Language
+    initially_wrong: bool = False
+    units: list[Unit] = Field(min_length=1, max_length=20_000)
+    blocks: list[BlockIn] = Field(min_length=1)
+    questions: list[QuestionIn] = Field(min_length=1)
 
 
 class BlocksUpdate(CustomModel):
     blocks: list[BlockIn] = Field(min_length=1)
+    questions: list[QuestionIn] = Field(min_length=1)
 
 
 class AnswerIn(CustomModel):
@@ -50,9 +75,7 @@ class SharesUpdate(CustomModel):
 class BlockOut(CustomModel):
     id: uuid.UUID
     kind: BlockKind
-    name: str
-    start_line: int
-    end_line: int
+    units: list[int]
 
 
 class QuestionOut(CustomModel):
@@ -61,7 +84,6 @@ class QuestionOut(CustomModel):
     kind: QuestionKind
     text: str
     answer: str
-    examples: list[str]  # 다른 문제에 대한 예제 답 (답 칸의 회색 안내문)
 
 
 class RecordSummary(CustomModel):
@@ -77,6 +99,7 @@ class RecordSummary(CustomModel):
 class RecordOut(RecordSummary):
     code: str
     initially_wrong: bool
+    units: list[Unit]
     is_owner: bool
     group_ids: list[uuid.UUID]  # 작성자에게만 채워진다
     blocks: list[BlockOut]

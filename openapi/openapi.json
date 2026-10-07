@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "wapul-be",
-    "version": "a1e44bde9c77"
+    "version": "2445a57194e9"
   },
   "paths": {
     "/v1/records": {
@@ -39,7 +39,7 @@
           "Records"
         ],
         "summary": "Create Record",
-        "description": "기록을 만들고 코드를 블럭으로 나눈 제안과 질문을 함께 돌려준다",
+        "description": "브라우저가 나눈 블럭과 만든 질문으로 기록을 만든다",
         "operationId": "create_record_v1_records_post",
         "requestBody": {
           "content": {
@@ -624,29 +624,19 @@
           "kind": {
             "$ref": "#/components/schemas/BlockKind"
           },
-          "name": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 1,
-            "title": "Name"
-          },
-          "start_line": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "Start Line"
-          },
-          "end_line": {
-            "type": "integer",
-            "minimum": 1.0,
-            "title": "End Line"
+          "units": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Units"
           }
         },
         "type": "object",
         "required": [
           "kind",
-          "name",
-          "start_line",
-          "end_line"
+          "units"
         ],
         "title": "BlockIn"
       },
@@ -669,26 +659,19 @@
           "kind": {
             "$ref": "#/components/schemas/BlockKind"
           },
-          "name": {
-            "type": "string",
-            "title": "Name"
-          },
-          "start_line": {
-            "type": "integer",
-            "title": "Start Line"
-          },
-          "end_line": {
-            "type": "integer",
-            "title": "End Line"
+          "units": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Units"
           }
         },
         "type": "object",
         "required": [
           "id",
           "kind",
-          "name",
-          "start_line",
-          "end_line"
+          "units"
         ],
         "title": "BlockOut"
       },
@@ -701,11 +684,20 @@
             "type": "array",
             "minItems": 1,
             "title": "Blocks"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionIn"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Questions"
           }
         },
         "type": "object",
         "required": [
-          "blocks"
+          "blocks",
+          "questions"
         ],
         "title": "BlocksUpdate"
       },
@@ -840,10 +832,21 @@
         "type": "string",
         "enum": [
           "cpp",
+          "java",
           "python",
-          "java"
+          "rust",
+          "c",
+          "kotlin",
+          "javascript",
+          "go",
+          "csharp",
+          "swift",
+          "ruby",
+          "scala",
+          "php"
         ],
-        "title": "Language"
+        "title": "Language",
+        "description": "분할 모델(wapul-seg)이 지원하는 언어"
       },
       "LayoutOut": {
         "properties": {
@@ -885,6 +888,43 @@
           "role"
         ],
         "title": "MemberOut"
+      },
+      "QuestionIn": {
+        "properties": {
+          "kind": {
+            "$ref": "#/components/schemas/QuestionKind"
+          },
+          "text": {
+            "type": "string",
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Text"
+          },
+          "block": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Block"
+          },
+          "answer": {
+            "type": "string",
+            "maxLength": 10000,
+            "title": "Answer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "kind",
+          "text",
+          "answer"
+        ],
+        "title": "QuestionIn",
+        "description": "질문은 브라우저가 블럭을 보고 만든다. 블럭을 고칠 때는 그대로 남은 질문의 답을 실어 보낸다."
       },
       "QuestionKind": {
         "type": "string",
@@ -930,13 +970,6 @@
           "answer": {
             "type": "string",
             "title": "Answer"
-          },
-          "examples": {
-            "items": {
-              "type": "string"
-            },
-            "type": "array",
-            "title": "Examples"
           }
         },
         "type": "object",
@@ -945,8 +978,7 @@
           "block_id",
           "kind",
           "text",
-          "answer",
-          "examples"
+          "answer"
         ],
         "title": "QuestionOut"
       },
@@ -977,6 +1009,31 @@
             "type": "boolean",
             "title": "Initially Wrong",
             "default": false
+          },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/Unit"
+            },
+            "type": "array",
+            "maxItems": 20000,
+            "minItems": 1,
+            "title": "Units"
+          },
+          "blocks": {
+            "items": {
+              "$ref": "#/components/schemas/BlockIn"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Blocks"
+          },
+          "questions": {
+            "items": {
+              "$ref": "#/components/schemas/QuestionIn"
+            },
+            "type": "array",
+            "minItems": 1,
+            "title": "Questions"
           }
         },
         "type": "object",
@@ -984,9 +1041,13 @@
           "problem",
           "key_idea",
           "code",
-          "language"
+          "language",
+          "units",
+          "blocks",
+          "questions"
         ],
-        "title": "RecordCreate"
+        "title": "RecordCreate",
+        "description": "분할과 질문은 브라우저가 하고(wapul-seg), 그 결과를 코드와 함께 보낸다"
       },
       "RecordOut": {
         "properties": {
@@ -1028,6 +1089,13 @@
             "type": "boolean",
             "title": "Initially Wrong"
           },
+          "units": {
+            "items": {
+              "$ref": "#/components/schemas/Unit"
+            },
+            "type": "array",
+            "title": "Units"
+          },
           "is_owner": {
             "type": "boolean",
             "title": "Is Owner"
@@ -1066,6 +1134,7 @@
           "updated_at",
           "code",
           "initially_wrong",
+          "units",
           "is_owner",
           "group_ids",
           "blocks",
@@ -1185,6 +1254,50 @@
           "group_ids"
         ],
         "title": "SharesUpdate"
+      },
+      "Unit": {
+        "properties": {
+          "start": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "Start"
+          },
+          "end": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "maxItems": 2,
+            "minItems": 2,
+            "title": "End"
+          },
+          "condition": {
+            "type": "boolean",
+            "title": "Condition"
+          },
+          "loop": {
+            "type": "boolean",
+            "title": "Loop"
+          },
+          "recursion": {
+            "type": "boolean",
+            "title": "Recursion"
+          }
+        },
+        "type": "object",
+        "required": [
+          "start",
+          "end",
+          "condition",
+          "loop",
+          "recursion"
+        ],
+        "title": "Unit",
+        "description": "문장 하나 (wapul-seg의 segment 결과). 위치는 [줄, 칸]: 줄은 1부터, 칸은 0부터 세는 글자 수, end는\n포함하지 않는다. 표시는 저장만 하고, 브라우저가 블럭을 고칠 때 질문을 다시 만드는 데 쓴다."
       },
       "ValidationError": {
         "properties": {

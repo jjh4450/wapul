@@ -14,23 +14,22 @@ from sqlmodel import Session, col, delete, select
 from app.core.auth import CurrentUser, get_current_user
 from app.db.session import get_db, get_db_transactional
 from app.models.base import utc_now_naive
-from app.models.study import Block, GroupMember, GroupRecord, Question, QuestionKind, Record
+from app.models.study import Block, GroupMember, GroupRecord, Question, Record
 from app.schemas.study import (
     AnswersUpdate,
     BlockIn,
     BlockOut,
     BlocksUpdate,
     LayoutOut,
+    QuestionIn,
     QuestionOut,
     RecordCreate,
     RecordOut,
     RecordSummary,
     SharesUpdate,
+    Unit,
 )
-from app.services.analysis import analyze
 from app.services.layouts import build_layouts
-from app.services.questions import BlockInfo, build_questions, shuffled_examples
-from app.services.segmenter import get_segmenter
 
 router = APIRouter(prefix="/records", tags=["Records"])
 
@@ -72,63 +71,59 @@ def _questions(db: Session, record_id: uuid.UUID) -> list[Question]:
     return list(db.exec(select(Question).where(Question.record_id == record_id).order_by(Question.position)).all())
 
 
-def _validate_blocks(code: str, blocks: list[BlockIn]) -> list[BlockIn]:
-    line_count = len(code.splitlines())
-    ordered = sorted(blocks, key=lambda b: b.start_line)
-    previous_end = 0
-    for block in ordered:
-        if block.start_line > block.end_line or block.end_line > line_count:
+def _validate_units(code: str, units: list[Unit]) -> None:
+    """문장은 코드 안에 있고, 순서대로 겹치지 않아야 한다"""
+    line_lengths = [len(line) for line in code.split("\n")]
+
+    def inside(point: list[int]) -> bool:
+        line, col = point
+        return 1 <= line <= len(line_lengths) and 0 <= col <= line_lengths[line - 1]
+
+    previous_end = [1, 0]
+    for unit in units:
+        if not (inside(unit.start) and inside(unit.end)) or not previous_end <= unit.start < unit.end:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Units must be ordered spans inside the code")
+        previous_end = unit.end
+
+
+def _validate_blocks(unit_count: int, blocks: list[BlockIn]) -> list[BlockIn]:
+    """문장 번호는 범위 안에 있고, 한 문장은 한 블럭에만 든다"""
+    seen: set[int] = set()
+    for block in blocks:
+        for unit in block.units:
+            if not 0 <= unit < unit_count:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unit {unit} is not in 0..{unit_count - 1}")
+            if unit in seen:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unit {unit} is in more than one block")
+            seen.add(unit)
+    return [BlockIn(kind=b.kind, units=sorted(b.units)) for b in blocks]
+
+
+def _validate_questions(block_count: int, questions: list[QuestionIn]) -> None:
+    for question in questions:
+        if question.block is not None and not 0 <= question.block < block_count:
             raise HTTPException(
-                status.HTTP_422_UNPROCESSABLE_CONTENT,
-                f"Block '{block.name}' must cover lines within 1..{line_count}",
+                status.HTTP_422_UNPROCESSABLE_CONTENT, f"Question block {question.block} is not in 0..{block_count - 1}"
             )
-        if block.start_line <= previous_end:
-            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Block '{block.name}' overlaps another block")
-        previous_end = block.end_line
-    return ordered
 
 
-def _replace_blocks(db: Session, record: Record, blocks: list[BlockIn]) -> None:
-    """블럭을 바꾸고 질문을 다시 만든다. 같은 자리에 남은 질문의 답은 옮겨 둔다."""
-    old_blocks = {b.id: (b.kind, b.start_line, b.end_line) for b in _blocks(db, record.id)}
-
-    def answer_key(kind: QuestionKind, block_key: tuple | None, text: str) -> tuple:
-        # 기록마다 바뀌는 질문은 문구까지 같아야 같은 질문으로 본다
-        return (kind, block_key, text if kind == QuestionKind.VARYING else None)
-
-    kept = {
-        answer_key(q.kind, old_blocks.get(q.block_id), q.text): q.answer for q in _questions(db, record.id) if q.answer
-    }
-
+def _replace_blocks(db: Session, record: Record, blocks: list[BlockIn], questions: list[QuestionIn]) -> None:
+    """블럭과 질문을 통째로 바꾼다. 질문과 남길 답은 브라우저가 정해 보낸다."""
     db.exec(delete(Question).where(col(Question.record_id) == record.id))
     db.exec(delete(Block).where(col(Block.record_id) == record.id))
 
-    new_blocks = [
-        Block(
-            record_id=record.id,
-            position=i,
-            kind=b.kind,
-            name=b.name,
-            start_line=b.start_line,
-            end_line=b.end_line,
-        )
-        for i, b in enumerate(blocks)
-    ]
+    new_blocks = [Block(record_id=record.id, position=i, kind=b.kind, units=b.units) for i, b in enumerate(blocks)]
     db.add_all(new_blocks)
-
-    infos = [BlockInfo(b.id, b.kind, b.start_line, b.end_line) for b in new_blocks]
-    block_keys = {b.id: (b.kind, b.start_line, b.end_line) for b in new_blocks}
-    drafts = build_questions(str(record.id), infos, analyze(record.code, record.language), record.initially_wrong)
     db.add_all(
         Question(
             record_id=record.id,
-            block_id=d.block_id,
+            block_id=None if q.block is None else new_blocks[q.block].id,
             position=i,
-            kind=d.kind,
-            text=d.text,
-            answer=kept.get(answer_key(d.kind, block_keys.get(d.block_id), d.text), ""),
+            kind=q.kind,
+            text=q.text,
+            answer=q.answer,
         )
-        for i, d in enumerate(drafts)
+        for i, q in enumerate(questions)
     )
     db.flush()
 
@@ -143,6 +138,7 @@ def _to_out(db: Session, record: Record, user: CurrentUser) -> RecordOut:
         **_to_summary(record).model_dump(),
         code=record.code,
         initially_wrong=record.initially_wrong,
+        units=[Unit.model_validate(u) for u in record.units],
         is_owner=is_owner,
         group_ids=sorted(_shared_group_ids(db, record.id)) if is_owner else [],
         blocks=[BlockOut.model_validate(b, from_attributes=True) for b in _blocks(db, record.id)],
@@ -153,7 +149,6 @@ def _to_out(db: Session, record: Record, user: CurrentUser) -> RecordOut:
                 kind=q.kind,
                 text=q.text,
                 answer=q.answer,
-                examples=shuffled_examples(q.kind),
             )
             for q in _questions(db, record.id)
         ],
@@ -166,13 +161,19 @@ def create_record(
     user: CurrentUser = Depends(get_current_user),
     db: Session = Depends(get_db_transactional),
 ) -> RecordOut:
-    """기록을 만들고 코드를 블럭으로 나눈 제안과 질문을 함께 돌려준다"""
-    record = Record(owner_id=user.sub, owner_name=display_name(user), **body.model_dump())
+    """브라우저가 나눈 블럭과 만든 질문으로 기록을 만든다"""
+    _validate_units(body.code, body.units)
+    blocks = _validate_blocks(len(body.units), body.blocks)
+    _validate_questions(len(blocks), body.questions)
+    record = Record(
+        owner_id=user.sub,
+        owner_name=display_name(user),
+        units=[u.model_dump() for u in body.units],
+        **body.model_dump(exclude={"units", "blocks", "questions"}),
+    )
     db.add(record)
     db.flush()
-    drafts = get_segmenter().segment(record.code, record.language)
-    blocks = [BlockIn(kind=d.kind, name=d.name, start_line=d.start_line, end_line=d.end_line) for d in drafts]
-    _replace_blocks(db, record, blocks)
+    _replace_blocks(db, record, blocks, body.questions)
     return _to_out(db, record, user)
 
 
@@ -202,7 +203,9 @@ def update_blocks(
     db: Session = Depends(get_db_transactional),
 ) -> RecordOut:
     record = _get_own(db, record_id, user)
-    _replace_blocks(db, record, _validate_blocks(record.code, body.blocks))
+    blocks = _validate_blocks(len(record.units), body.blocks)
+    _validate_questions(len(blocks), body.questions)
+    _replace_blocks(db, record, blocks, body.questions)
     record.updated_at = utc_now_naive()
     db.add(record)
     return _to_out(db, record, user)

@@ -9,9 +9,16 @@ export type BlockKind = Schemas['BlockKind'];
 
 export type QuestionKind = Schemas['QuestionKind'];
 
+export type Unit = Schemas['Unit'];
+
+/** 문장의 위치만 */
+export type Span = Pick<Unit, 'start' | 'end'>;
+
 export type BlockIn = Schemas['BlockIn'];
 
 export type BlockOut = Schemas['BlockOut'];
+
+export type QuestionIn = Schemas['QuestionIn'];
 
 export type QuestionOut = Schemas['QuestionOut'];
 
@@ -78,8 +85,10 @@ export const api = {
   createRecord: (body: RecordCreate) => call(client.POST('/v1/records', { body })),
   getRecord: (id: string) => call(client.GET('/v1/records/{record_id}', byId(id))),
   deleteRecord: (id: string) => callEmpty(client.DELETE('/v1/records/{record_id}', byId(id))),
-  updateBlocks: (id: string, blocks: BlockIn[]) =>
-    call(client.PUT('/v1/records/{record_id}/blocks', { ...byId(id), body: { blocks } })),
+  updateBlocks: (id: string, blocks: BlockIn[], questions: QuestionIn[]) =>
+    call(
+      client.PUT('/v1/records/{record_id}/blocks', { ...byId(id), body: { blocks, questions } })
+    ),
   saveAnswer: (id: string, questionId: string, answer: string) =>
     callEmpty(
       client.PATCH('/v1/records/{record_id}/answers', {

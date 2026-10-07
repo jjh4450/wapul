@@ -10,15 +10,28 @@ import uuid
 from enum import StrEnum
 
 from pydantic import NaiveDatetime
+from sqlalchemy import JSON, Column
 from sqlmodel import Field, SQLModel
 
 from app.models.base import TimestampMixin, UUIDBase, utc_now_naive
 
 
 class Language(StrEnum):
+    """분할 모델(wapul-seg)이 지원하는 언어"""
+
     CPP = "cpp"
-    PYTHON = "python"
     JAVA = "java"
+    PYTHON = "python"
+    RUST = "rust"
+    C = "c"
+    KOTLIN = "kotlin"
+    JAVASCRIPT = "javascript"
+    GO = "go"
+    CSHARP = "csharp"
+    SWIFT = "swift"
+    RUBY = "ruby"
+    SCALA = "scala"
+    PHP = "php"
 
 
 class BlockKind(StrEnum):
@@ -46,9 +59,11 @@ class Record(UUIDBase, TimestampMixin, table=True):
     owner_name: str
     problem: str  # 문제 제목이나 링크
     key_idea: str  # 코드보다 먼저 쓰는 핵심 아이디어 한 줄
-    code: str
+    code: str  # 분할 모델의 normalize를 거친 코드. 문장 위치는 이 문자열 기준이다
     language: Language
     initially_wrong: bool = False
+    # 코드의 모든 문장: schemas.study.Unit을 dict로
+    units: list[dict] = Field(sa_column=Column(JSON, nullable=False))
 
 
 class Block(UUIDBase, table=True):
@@ -57,9 +72,8 @@ class Block(UUIDBase, table=True):
     record_id: uuid.UUID = Field(foreign_key="records.id", ondelete="CASCADE", index=True)
     position: int
     kind: BlockKind
-    name: str
-    start_line: int  # 1부터 시작, 양 끝 포함
-    end_line: int
+    # 이 블럭에 든 문장의 Record.units 번호. 떨어져 있을 수 있다
+    units: list[int] = Field(sa_column=Column(JSON, nullable=False))
 
 
 class Question(UUIDBase, table=True):

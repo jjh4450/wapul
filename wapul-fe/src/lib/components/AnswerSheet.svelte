@@ -7,7 +7,8 @@
   import CodeView from '#lib/components/CodeView.svelte';
   import { Badge } from '#lib/components/ui/badge/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
-  import { BLOCK_KIND_LABEL } from '#lib/study.js';
+  import { shuffledExamples } from '#lib/questions.js';
+  import { BLOCK_KIND_LABEL, blockLabels, unitLines } from '#lib/study.js';
 
   let {
     id,
@@ -27,10 +28,15 @@
 
   let status = $state('');
 
+  /** 질문마다 다른 문제의 예제 답 (답 칸의 회색 안내문) */
+  let examples = $state<{ [questionId: string]: string[] }>({});
+
   // 마지막으로 저장된 답. 바뀐 칸만 저장한다
   const saved = new SvelteMap<string, string>();
 
   const problemQuestions = $derived(record?.questions.filter((q) => q.kind === 'problem') ?? []);
+
+  const labels = $derived(blockLabels(record?.blocks ?? []));
 
   const closingQuestions = $derived(
     record?.questions.filter((q) => q.block_id === null && q.kind !== 'problem') ?? []
@@ -52,6 +58,9 @@
     }
 
     record = result.data;
+    examples = Object.fromEntries(
+      result.data.questions.map((q) => [q.id, shuffledExamples(q.kind)])
+    );
 
     for (const q of result.data.questions) saved.set(q.id, q.answer);
   });
@@ -89,7 +98,7 @@
   <AnswerField
     id={question.id}
     question={question.text}
-    examples={question.examples}
+    examples={examples[question.id] ?? []}
     note={question.kind === 'revision' ? '건너뛸 수 있어요.' : undefined}
     bind:value={question.answer}
     oncommit={() => commit(question)}
@@ -113,14 +122,20 @@
   </section>
 
   <div class="grid gap-10">
-    {#each record.blocks as block (block.id)}
+    {#each record.blocks as block, i (block.id)}
+      {@const units = record.units}
       <section class="grid gap-6 lg:grid-cols-2" aria-labelledby="block-{block.id}">
         <div class="grid content-start gap-2">
           <div class="flex items-center gap-2">
             <Badge variant="secondary">{BLOCK_KIND_LABEL[block.kind]}</Badge>
-            <h2 id="block-{block.id}" class="font-medium">{block.name}</h2>
+            <h2 id="block-{block.id}" class="font-medium">{labels[i]}</h2>
           </div>
-          <CodeView code={record.code} from={block.start_line} to={block.end_line} />
+          <CodeView
+            code={record.code}
+            {units}
+            owner={units.map((_, u) => (block.units.includes(u) ? i : null))}
+            lines={unitLines(units, block.units)}
+          />
         </div>
         <div class="grid content-start gap-5">
           {#each blockQuestions(block.id) as question (question.id)}

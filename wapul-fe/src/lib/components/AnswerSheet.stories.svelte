@@ -3,6 +3,8 @@
   import { expect, fn, waitFor, within } from 'storybook/test';
   import { FakeApi, empty, reply } from '#lib/api/fake.js';
   import { record, sharedRecord } from '#lib/api/fixtures.js';
+  import { shuffledExamples } from '#lib/questions.js';
+  import { truncate } from '#lib/study.js';
   import AnswerSheet from './AnswerSheet.svelte';
 
   const { Story } = defineMeta({
@@ -31,24 +33,23 @@
   beforeEach={() => writing.install()}
   play={async ({ canvas }) => {
     // 블럭마다 코드와 그 블럭의 질문이 한 영역에 나란히 있다
-    const logic = within(await canvas.findByRole('region', { name: '회의 고르기' }));
+    const logic = within(await canvas.findByRole('region', { name: '로직 1' }));
 
     await expect(logic.getByText('sort(m.begin(), m.end());')).toBeInTheDocument();
     await expect(logic.getByLabelText(/무엇이 보장되고/)).toBeInTheDocument();
     await expect(logic.getByLabelText('이 설명이 통하지 않는 입력은 뭘까요?')).toBeInTheDocument();
     await expect(logic.queryByLabelText(/입력을 담은 변수/)).not.toBeInTheDocument();
 
-    const input = within(canvas.getByRole('region', { name: '입력 받기' }));
+    const input = within(canvas.getByRole('region', { name: '입력' }));
 
     await expect(input.getByLabelText(/입력을 담은 변수/)).toHaveValue(
       'm은 (끝나는 시간, 시작 시간) 쌍의 목록이다.'
     );
 
     // 빈 칸에는 다른 문제에서 가져온 예제가 회색 안내문으로 뜬다
-    await expect(canvas.getByLabelText(problemQuestion)).toHaveAttribute(
-      'placeholder',
-      record.questions[0].examples[0]
-    );
+    const placeholder = canvas.getByLabelText(problemQuestion).getAttribute('placeholder');
+
+    await expect(shuffledExamples('problem').map((e) => truncate(e, 90))).toContain(placeholder);
 
     // 처음 제출과 달라진 점은 건너뛸 수 있다
     await expect(canvas.getByText('건너뛸 수 있어요.')).toBeInTheDocument();

@@ -5,62 +5,107 @@ import pytest
 pytestmark = pytest.mark.e2e
 
 CODE = "n = int(input())\n\nans = n * 2 if n > 0 else 0\n\nprint(ans)\n"
+# 브라우저의 wapul-seg가 보내는 모양: 모든 문장과, 문장 번호로 적은 블럭
+NO_TAGS = {"condition": False, "loop": False, "recursion": False}
+UNITS = [
+    {"start": [1, 0], "end": [1, 16], **NO_TAGS},
+    {"start": [3, 0], "end": [3, 27], **NO_TAGS, "condition": True},
+    {"start": [5, 0], "end": [5, 10], **NO_TAGS},
+]
+BLOCKS = [{"kind": "input", "units": [0]}, {"kind": "logic", "units": [1]}, {"kind": "output", "units": [2]}]
+# 질문도 브라우저가 만들어 보낸다
+QUESTIONS = [
+    {"kind": "problem", "text": "어떤 성질을 발견했나요?", "answer": ""},
+    {"kind": "input_meaning", "text": "입력 변수는 무엇인가요?", "block": 0, "answer": ""},
+    {"kind": "logic", "text": "무엇이 보장되나요?", "block": 1, "answer": ""},
+    {"kind": "boundary", "text": "통하지 않는 입력은?", "block": 1, "answer": ""},
+    {"kind": "output_meaning", "text": "출력은 무엇인가요?", "block": 2, "answer": ""},
+    {"kind": "varying", "text": "만약 입력이 하나뿐이라면?", "answer": ""},
+]
 
 
 def _create(client, **overrides):
-    body = {"problem": "BOJ 1000", "key_idea": "두 배", "code": CODE, "language": "python", **overrides}
+    body = {
+        "problem": "BOJ 1000",
+        "key_idea": "두 배",
+        "code": CODE,
+        "language": "python",
+        "units": UNITS,
+        "blocks": BLOCKS,
+        "questions": QUESTIONS,
+        **overrides,
+    }
     res = client.post("/v1/records", json=body)
     assert res.status_code == 201, res.text
     return res.json()
 
 
 class TestRecords:
-    def test_create_proposes_blocks_and_questions(self, multi_user_e2e):
+    def test_create_stores_blocks_and_questions_as_sent(self, multi_user_e2e):
         rec = _create(multi_user_e2e.as_user("a"))
-        assert [b["kind"] for b in rec["blocks"]] == ["input", "logic", "output"]
-        kinds = [q["kind"] for q in rec["questions"]]
-        assert kinds[0] == "problem"
-        assert "boundary" in kinds
-        assert "revision" not in kinds
-        assert all(q["examples"] for q in rec["questions"])
+        assert [(b["kind"], b["units"]) for b in rec["blocks"]] == [("input", [0]), ("logic", [1]), ("output", [2])]
+        assert rec["units"] == UNITS
+        block_ids = [b["id"] for b in rec["blocks"]]
+        assert [(q["kind"], q["text"], q["block_id"]) for q in rec["questions"]] == [
+            (q["kind"], q["text"], None if "block" not in q else block_ids[q["block"]]) for q in QUESTIONS
+        ]
 
-    def test_initially_wrong_adds_revision_question(self, multi_user_e2e):
-        rec = _create(multi_user_e2e.as_user("a"), initially_wrong=True)
-        assert rec["questions"][-1]["kind"] == "revision"
-
-    def test_update_blocks_keeps_answers_that_still_apply(self, multi_user_e2e):
+    def test_update_blocks_replaces_questions_with_carried_answers(self, multi_user_e2e):
         client = multi_user_e2e.as_user("a")
         rec = _create(client)
-        problem_q = rec["questions"][0]
-        res = client.patch(
-            f"/v1/records/{rec['id']}/answers", json={"answers": [{"question_id": problem_q["id"], "answer": "성질"}]}
-        )
-        assert res.status_code == 204
-
+        questions = [
+            {"kind": "problem", "text": "어떤 성질을 발견했나요?", "answer": "성질"},
+            {"kind": "logic", "text": "무엇이 보장되나요?", "block": 0, "answer": ""},
+        ]
         res = client.put(
             f"/v1/records/{rec['id']}/blocks",
-            json={"blocks": [{"kind": "logic", "name": "전부", "start_line": 1, "end_line": 5}]},
+            json={"blocks": [{"kind": "logic", "units": [2, 0]}], "questions": questions},
         )
         assert res.status_code == 200, res.text
         updated = res.json()
-        assert [b["name"] for b in updated["blocks"]] == ["전부"]
-        assert updated["questions"][0]["answer"] == "성질"
+        assert [b["units"] for b in updated["blocks"]] == [[0, 2]]
+        assert [(q["kind"], q["answer"]) for q in updated["questions"]] == [("problem", "성질"), ("logic", "")]
+        assert updated["questions"][1]["block_id"] == updated["blocks"][0]["id"]
 
     @pytest.mark.parametrize(
         "blocks",
         [
-            [{"kind": "logic", "name": "x", "start_line": 1, "end_line": 99}],
-            [{"kind": "logic", "name": "x", "start_line": 3, "end_line": 1}],
-            [
-                {"kind": "logic", "name": "x", "start_line": 1, "end_line": 3},
-                {"kind": "logic", "name": "y", "start_line": 3, "end_line": 5},
-            ],
+            [{"kind": "logic", "units": [3]}],
+            [{"kind": "logic", "units": []}],
+            [{"kind": "logic", "units": [0, 1]}, {"kind": "logic", "units": [1, 2]}],
         ],
     )
     def test_invalid_blocks_rejected(self, multi_user_e2e, blocks):
         client = multi_user_e2e.as_user("a")
         rec = _create(client)
-        assert client.put(f"/v1/records/{rec['id']}/blocks", json={"blocks": blocks}).status_code == 422
+        body = {"blocks": blocks, "questions": QUESTIONS[:1]}
+        assert client.put(f"/v1/records/{rec['id']}/blocks", json=body).status_code == 422
+
+    def test_question_on_missing_block_rejected(self, multi_user_e2e):
+        client = multi_user_e2e.as_user("a")
+        rec = _create(client)
+        body = {"blocks": BLOCKS[:1], "questions": [{"kind": "logic", "text": "L?", "block": 1, "answer": ""}]}
+        assert client.put(f"/v1/records/{rec['id']}/blocks", json=body).status_code == 422
+
+    @pytest.mark.parametrize(
+        "units",
+        [
+            [{**UNITS[0], "end": [1, 17]}, *UNITS[1:]],  # 줄 끝을 넘는다
+            [UNITS[1], UNITS[0], UNITS[2]],  # 순서가 어긋났다
+            [{**UNITS[0], "end": [1, 0]}, *UNITS[1:]],  # 빈 문장
+        ],
+    )
+    def test_invalid_units_rejected(self, multi_user_e2e, units):
+        body = {
+            "problem": "p",
+            "key_idea": "k",
+            "code": CODE,
+            "language": "python",
+            "units": units,
+            "blocks": BLOCKS,
+            "questions": QUESTIONS,
+        }
+        assert multi_user_e2e.as_user("a").post("/v1/records", json=body).status_code == 422
 
     def test_layouts_contain_answers(self, multi_user_e2e):
         client = multi_user_e2e.as_user("a")
