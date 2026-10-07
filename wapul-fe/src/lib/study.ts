@@ -29,15 +29,38 @@ export function blockLabels(blocks: { kind: BlockKind }[]): string[] {
   return blocks.map((b) => (b.kind === 'logic' ? `로직 ${++logic}` : BLOCK_KIND_LABEL[b.kind]));
 }
 
-/** 문장들이 걸친 줄 번호 (1부터, 오름차순) */
-export function unitLines(units: Span[], indices: number[]): number[] {
-  const lines = new Set<number>();
+/** 블럭 색. fill은 문장 바탕, bar는 줄 번호 옆 띠. Tailwind가 찾을 수 있게 클래스 이름을 통째로 적는다 */
+export type BlockColor = { fill: string; bar: string };
 
-  for (const i of indices) {
-    for (let line = units[i].start[0]; line <= units[i].end[0]; line++) lines.add(line);
-  }
+const INPUT_COLOR = { fill: 'bg-sky-500/20', bar: 'bg-sky-500' };
 
-  return [...lines].sort((a, b) => a - b);
+const OUTPUT_COLOR = { fill: 'bg-violet-500/20', bar: 'bg-violet-500' };
+
+// 로직 블럭은 순번대로 돌려 쓴다. 입력·출력의 파랑·보라와 헷갈리지 않는 색만 둔다
+const LOGIC_COLORS = [
+  { fill: 'bg-amber-500/25', bar: 'bg-amber-500' },
+  { fill: 'bg-emerald-500/20', bar: 'bg-emerald-500' },
+  { fill: 'bg-rose-500/20', bar: 'bg-rose-500' },
+  { fill: 'bg-lime-500/25', bar: 'bg-lime-500' },
+  { fill: 'bg-fuchsia-500/20', bar: 'bg-fuchsia-500' }
+];
+
+/** 블럭 색은 이름(blockLabels)을 따른다: 입력과 출력은 늘 같은 색, 로직 n은 n번째 색 */
+export function blockColors(blocks: { kind: BlockKind }[]): BlockColor[] {
+  let logic = 0;
+
+  return blocks.map((b) => {
+    if (b.kind === 'input') return INPUT_COLOR;
+
+    if (b.kind === 'output') return OUTPUT_COLOR;
+
+    return LOGIC_COLORS[logic++ % LOGIC_COLORS.length];
+  });
+}
+
+/** 문장들이 끝나는 줄. 블럭의 질문과 블럭 고르는 창을 이 줄 아래에 단다 */
+export function lastLine(units: Span[], indices: number[]): number {
+  return Math.max(...indices.map((i) => units[i].end[0]));
 }
 
 /** 예제 답이 답 칸보다 길면 "..."로 줄인다 */

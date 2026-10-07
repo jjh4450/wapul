@@ -1,42 +1,65 @@
 <script lang="ts">
-  import type { Span } from '#lib/api/client.js';
+  import type { Snippet } from 'svelte';
+  import { IconX } from '@tabler/icons-svelte';
+  import type { BlockKind, Span } from '#lib/api/client.js';
+  import { blockColors, blockLabels } from '#lib/study.js';
   import { cn } from '#lib/utils.js';
 
-  // 떨어진 블럭도 같은 블럭으로 보이게 블럭마다 색을 하나씩 준다
-  const COLORS = [
-    'bg-sky-500/20',
-    'bg-amber-500/25',
-    'bg-emerald-500/20',
-    'bg-rose-500/20',
-    'bg-violet-500/20'
-  ];
-
   type Piece = { text: string; unit: number | null };
+
+  /** 끌어서 고르는 중. 문장에서 시작하면 걸친 문장만, 줄 번호에서 시작하면 그 줄들의 문장을 모두 고른다 */
+  type Drag = { by: 'unit' | 'line'; from: number; to: number };
 
   let {
     code,
     units = [],
-    owner = [],
-    labels = [],
-    lines: shown,
-    onpick,
+    blocks = [],
+    focus = null,
+    selected = [],
+    onselect,
+    onremove,
+    after,
     class: className
   }: {
     code: string;
     /** 문장 위치 [줄, 칸]. 칸은 글자(코드 포인트) 단위, end는 포함하지 않는다 */
     units?: Span[];
-    /** 문장마다 든 블럭 번호, 없으면 null. 블럭마다 색을 칠한다 */
-    owner?: (number | null)[];
-    /** 블럭 이름. 블럭의 첫 문장이 있는 줄 끝에 단다 */
-    labels?: string[];
-    /** 보여줄 줄 번호 (오름차순), 없으면 전부. 건너뛴 줄은 ⋯로 줄인다 */
-    lines?: number[];
-    /** 주면 문장을 눌러 고를 수 있다 */
-    onpick?: (unit: number) => void;
+    /** 블럭마다 종류와 문장 번호. 블럭마다 색을 칠하고, 첫 문장이 있는 줄에 이름을 단다 */
+    blocks?: { kind: BlockKind; units: number[] }[];
+    /** 이 블럭의 문장만 칠한다. null이면 모든 블럭을 칠한다 */
+    focus?: number | null;
+    /** 고른 문장. 테두리를 두른다 */
+    selected?: number[];
+    /** 주면 문장이나 줄 번호를 끌어서(키보드로는 문장을 눌러서) 문장을 고를 수 있다 */
+    onselect?: (units: number[]) => void;
+    /** 주면 범례에서 블럭을 뺄 수 있다 */
+    onremove?: (block: number) => void;
+    /** 줄 아래에 끼울 내용 (질문 스레드, 블럭 고르는 창). 줄 번호를 받는다 */
+    after?: Snippet<[number]>;
     class?: string;
   } = $props();
 
+  let drag = $state<Drag | null>(null);
+
   const texts = $derived(code.replace(/\n$/, '').split('\n'));
+
+  /** 줄 번호 (1부터) */
+  const numbers = $derived(texts.map((_, i) => i + 1));
+
+  const labels = $derived(blockLabels(blocks));
+
+  const colors = $derived(blockColors(blocks));
+
+  /** 문장마다 든 블럭 번호, 없으면 null */
+  const owner = $derived.by(() => {
+    const of: (number | null)[] = units.map(() => null);
+
+    blocks.forEach((b, i) => {
+      for (const unit of b.units) of[unit] = i;
+    });
+
+    return of;
+  });
 
   /** 줄마다 그 줄에 걸친 문장의 [번호, 시작 칸, 끝 칸] */
   const spans = $derived.by(() => {
@@ -53,23 +76,26 @@
     return byLine;
   });
 
-  const labelAt = $derived.by(() => {
-    const at: { [line: number]: string } = {};
+  /** 줄마다 그 줄에서 시작하는 블럭들 (블럭 이름을 단다) */
+  const startsAt = $derived.by(() => {
+    const at: number[][] = [];
 
-    owner.forEach((block, i) => {
-      if (block !== null && labels[block] && !owner.slice(0, i).includes(block)) {
-        at[units[i].start[0]] = labels[block];
-      }
+    blocks.forEach((b, i) => {
+      if (b.units.length > 0) (at[units[Math.min(...b.units)].start[0]] ??= []).push(i);
     });
 
     return at;
   });
 
-  const rows = $derived.by(() => {
-    const numbers = shown ?? texts.map((_, i) => i + 1);
+  const highlighted = $derived(new Set(drag === null ? selected : dragged(drag)));
 
-    return numbers.map((number, i) => ({ number, gap: i > 0 && numbers[i - 1] + 1 < number }));
-  });
+  function dragged({ by, from, to }: Drag): number[] {
+    const [lo, hi] = from < to ? [from, to] : [to, from];
+
+    if (by === 'unit') return Array.from({ length: hi - lo + 1 }, (_, k) => lo + k);
+
+    return units.flatMap((u, i) => (u.start[0] <= hi && u.end[0] >= lo ? [i] : []));
+  }
 
   function pieces(number: number): Piece[] {
     const chars = Array.from(texts[number - 1] ?? '');
@@ -89,39 +115,128 @@
     return out;
   }
 
-  function color(unit: number | null): string | undefined {
-    const block = unit === null ? null : (owner[unit] ?? null);
+  function fill(unit: number | null): string | undefined {
+    const block = unit === null ? null : owner[unit];
 
-    return block === null ? undefined : COLORS[block % COLORS.length];
+    if (block === null || (focus !== null && block !== focus)) return undefined;
+
+    return colors[block].fill;
+  }
+
+  /** 줄 번호 옆 띠는 그 줄의 첫 블럭 색. 칠하지 않는 블럭의 띠는 흐리게 둔다 */
+  function bar(number: number): string | undefined {
+    const unit = (spans[number] ?? []).find(([u]) => owner[u] !== null)?.[0];
+    const block = unit === undefined ? null : owner[unit];
+
+    if (block === null) return undefined;
+
+    return cn(colors[block].bar, focus !== null && block !== focus && 'opacity-30');
+  }
+
+  function start(event: PointerEvent, by: Drag['by'], at: number) {
+    if (event.button !== 0) return;
+
+    // 터치는 누른 요소가 포인터를 붙잡아 두므로, 놓아 줘야 끄는 동안 지나는 줄과 문장이 잡힌다
+    if (event.target instanceof Element && event.target.hasPointerCapture(event.pointerId)) {
+      event.target.releasePointerCapture(event.pointerId);
+    }
+
+    drag = { by, from: at, to: at };
+  }
+
+  function move(event: PointerEvent) {
+    if (drag === null || !(event.target instanceof Element)) return;
+
+    const attribute = drag.by === 'unit' ? 'data-unit' : 'data-line';
+    const at = event.target.closest(`[${attribute}]`)?.getAttribute(attribute);
+
+    if (at != null) drag.to = Number(at);
+  }
+
+  function end() {
+    if (drag === null) return;
+
+    const picked = dragged(drag);
+
+    drag = null;
+    onselect?.(picked);
+  }
+
+  /** 키보드로 누른 문장 하나를 고른다. 마우스와 터치는 끌기(start, end)가 맡는다 */
+  function press(event: MouseEvent, unit: number) {
+    if (event.detail === 0) onselect?.([unit]);
   }
 </script>
 
-<pre
-  class={cn(
-    'overflow-x-auto rounded-2xl bg-muted py-3 font-mono text-sm leading-6',
-    className
-  )}><code
-    >{#each rows as row (row.number)}{#if row.gap}<span
-          class="flex text-muted-foreground select-none"
-          ><span class="w-10 shrink-0 pr-3 text-right">⋯</span></span
-        >{/if}<span class="flex"
-        ><span class="w-10 shrink-0 pr-3 text-right text-muted-foreground select-none"
-          >{row.number}</span
-        ><span class="flex-1 pr-3 whitespace-pre"
-          >{#each pieces(row.number) as piece, i (i)}{#if onpick && piece.unit !== null}{@const unit =
-                piece.unit}<button
+<svelte:window onpointermove={move} onpointerup={end} onpointercancel={() => (drag = null)} />
+
+<div class={cn('overflow-hidden rounded-2xl border bg-muted/40 text-sm', className)}>
+  {#if blocks.length > 0}
+    <div class="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2 text-xs">
+      {#each labels as label, i (i)}
+        <span class={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5', colors[i].fill)}>
+          <span class={cn('size-2 rounded-full', colors[i].bar)}></span>
+          {label}
+          {#if onremove}
+            <button
+              type="button"
+              class="-mr-1 cursor-pointer rounded-sm p-0.5 hover:bg-foreground/10"
+              aria-label="{label} 블럭 빼기"
+              onclick={() => onremove(i)}><IconX class="size-3" /></button
+            >
+          {/if}
+        </span>
+      {/each}
+      <span class="text-muted-foreground">칠하지 않은 문장은 어느 블럭에도 들지 않아요.</span>
+    </div>
+  {/if}
+
+  <div class={cn('py-3 font-mono leading-6', onselect && 'select-none')}>
+    {#each numbers as number (number)}
+      <div class="flex" data-line={number}>
+        <span class={cn('w-1 shrink-0', bar(number))}></span>
+        {#if onselect}
+          <button
+            type="button"
+            tabindex="-1"
+            class="w-10 shrink-0 cursor-pointer touch-none pr-3 text-right text-muted-foreground hover:text-foreground"
+            aria-label="{number}줄"
+            onpointerdown={(e) => start(e, 'line', number)}>{number}</button
+          >
+        {:else}
+          <span class="w-10 shrink-0 pr-3 text-right text-muted-foreground select-none"
+            >{number}</span
+          >
+        {/if}
+        <span class="min-w-0 flex-1 pr-3 wrap-anywhere whitespace-pre-wrap"
+          >{#each pieces(number) as piece, i (i)}{@const unit =
+              piece.unit}{#if onselect && unit !== null}<button
                 type="button"
                 class={cn(
-                  'cursor-pointer rounded-sm whitespace-pre hover:ring-2 hover:ring-ring',
-                  color(unit)
+                  'cursor-pointer rounded-sm wrap-anywhere whitespace-pre-wrap hover:ring-2 hover:ring-ring',
+                  fill(unit),
+                  highlighted.has(unit) && 'ring-2 ring-primary'
                 )}
-                aria-label="{row.number}줄 문장"
-                onclick={() => onpick(unit)}>{piece.text}</button
-              >{:else}<span class={cn('rounded-sm', color(piece.unit))}>{piece.text}</span
+                data-unit={unit}
+                aria-label="{number}줄 문장"
+                aria-pressed={highlighted.has(unit)}
+                onpointerdown={(e) => start(e, 'unit', unit)}
+                onclick={(e) => press(e, unit)}>{piece.text}</button
+              >{:else}<span
+                class={cn(
+                  'rounded-sm',
+                  fill(unit),
+                  unit !== null && highlighted.has(unit) && 'ring-2 ring-primary'
+                )}>{piece.text}</span
               >{/if}{/each}</span
-        >{#if labelAt[row.number]}<span
-            class="shrink-0 pr-3 font-sans text-xs text-muted-foreground"
-            >{labelAt[row.number]}</span
-          >{/if}</span
-      >{/each}</code
-  ></pre>
+        >
+        {#each startsAt[number] ?? [] as block (block)}
+          <span class={cn('mr-3 shrink-0 rounded-md px-1.5 font-sans text-xs', colors[block].fill)}
+            >{labels[block]}</span
+          >
+        {/each}
+      </div>
+      {@render after?.(number)}
+    {/each}
+  </div>
+</div>

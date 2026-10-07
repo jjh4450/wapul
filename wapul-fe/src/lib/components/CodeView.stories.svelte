@@ -30,7 +30,11 @@ print(count)
   ];
 
   // 입력 블럭에 문장 둘, 로직 블럭은 4줄과 5~7줄, 출력 블럭
-  const owner = [0, 0, 1, 1, 1, 1, 2];
+  const blocks = [
+    { kind: 'input' as const, units: [0, 1] },
+    { kind: 'logic' as const, units: [2, 3, 4, 5] },
+    { kind: 'output' as const, units: [6] }
+  ];
 
   const { Story } = defineMeta({
     title: 'Components/CodeView',
@@ -50,36 +54,89 @@ print(count)
 
 <Story
   name="WithBlocks"
-  args={{ units, owner, labels: ['입력', '로직 1', '출력'] }}
+  args={{ units, blocks }}
   play={async ({ canvas }) => {
-    // 블럭 이름은 블럭의 첫 문장이 있는 줄에 한 번만 붙는다
-    await expect(canvas.getAllByText('입력')).toHaveLength(1);
-    await expect(canvas.getAllByText('로직 1')).toHaveLength(1);
-    await expect(canvas.getAllByText('출력')).toHaveLength(1);
+    // 범례에 한 번, 블럭의 첫 문장이 있는 줄에 한 번 이름이 붙는다
+    await expect(canvas.getAllByText('입력')).toHaveLength(2);
+    await expect(canvas.getAllByText('로직 1')).toHaveLength(2);
+    await expect(canvas.getAllByText('출력')).toHaveLength(2);
+    await expect(
+      canvas.getByText('칠하지 않은 문장은 어느 블럭에도 들지 않아요.')
+    ).toBeInTheDocument();
     // 문장만 칠하고 들여쓰기는 칠하지 않는다
     await expect(canvas.getByText('if s >= end:')).toHaveClass('bg-amber-500/25');
   }}
 />
 
 <Story
-  name="SomeLines"
-  args={{ units, owner: [null, null, 1, 1, null, null, null], lines: [1, 4, 5] }}
+  name="Focused"
+  args={{ units, blocks, focus: 2 }}
   play={async ({ canvas }) => {
-    // 고른 줄만 보이고, 건너뛴 줄은 ⋯로 줄인다. 줄 번호는 원래 코드의 번호를 쓴다
-    await expect(canvas.getByText('count, end = 0, 0')).toBeInTheDocument();
-    await expect(canvas.getByText('4')).toBeInTheDocument();
-    await expect(canvas.getAllByText('⋯')).toHaveLength(1);
-    await expect(canvas.queryByText('print(count)')).not.toBeInTheDocument();
+    // 고른 블럭만 칠하고, 다른 블럭은 줄 옆 띠로만 보인다
+    await expect(canvas.getByText('print(count)')).toHaveClass('bg-violet-500/20');
+    await expect(canvas.getByText('if s >= end:')).not.toHaveClass('bg-amber-500/25');
   }}
 />
 
 <Story
-  name="Pickable"
-  args={{ units, owner, onpick: fn() }}
+  name="DragStatements"
+  args={{ units, blocks, onselect: fn() }}
   play={async ({ canvas, userEvent, args }) => {
-    // 같은 줄의 들여쓰기는 누를 수 없고 문장만 누를 수 있다
-    await expect(canvas.getAllByRole('button')).toHaveLength(units.length);
-    await userEvent.click(canvas.getByRole('button', { name: '6줄 문장' }));
-    await expect(args.onpick).toHaveBeenCalledWith(4);
+    // 문장에서 끌기 시작하면 지나간 문장까지 코드 순서대로 고른다
+    await userEvent.pointer([
+      { keys: '[MouseLeft>]', target: canvas.getByRole('button', { name: '4줄 문장' }) },
+      { target: canvas.getByRole('button', { name: '6줄 문장' }) },
+      { keys: '[/MouseLeft]' }
+    ]);
+    await expect(args.onselect).toHaveBeenLastCalledWith([2, 3, 4]);
+
+    // 거꾸로 끌어도 같다
+    await userEvent.pointer([
+      { keys: '[MouseLeft>]', target: canvas.getByRole('button', { name: '6줄 문장' }) },
+      { target: canvas.getByRole('button', { name: '4줄 문장' }) },
+      { keys: '[/MouseLeft]' }
+    ]);
+    await expect(args.onselect).toHaveBeenLastCalledWith([2, 3, 4]);
+  }}
+/>
+
+<Story
+  name="DragLineNumbers"
+  args={{ units, blocks, onselect: fn() }}
+  play={async ({ canvas, userEvent, args }) => {
+    // 줄 번호에서 끌면 그 줄들에 걸친 문장을 모두 고른다. 빈 줄은 건너뛴다
+    await userEvent.pointer([
+      { keys: '[MouseLeft>]', target: canvas.getByRole('button', { name: '3줄' }) },
+      { target: canvas.getByRole('button', { name: '5줄' }) },
+      { keys: '[/MouseLeft]' }
+    ]);
+    await expect(args.onselect).toHaveBeenLastCalledWith([2, 3]);
+  }}
+/>
+
+<Story
+  name="KeyboardPick"
+  args={{ units, blocks, onselect: fn(), selected: [6] }}
+  play={async ({ canvas, userEvent, args }) => {
+    // 고른 문장은 눌린 상태로 보인다
+    await expect(canvas.getByRole('button', { name: '9줄 문장' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    // 키보드로는 문장을 하나씩 고른다. 줄 번호는 탭 순서에 들지 않는다
+    canvas.getByRole('button', { name: '6줄 문장' }).focus();
+    await userEvent.keyboard('{Enter}');
+    await expect(args.onselect).toHaveBeenLastCalledWith([4]);
+    await expect(canvas.getByRole('button', { name: '6줄' })).toHaveAttribute('tabindex', '-1');
+  }}
+/>
+
+<Story
+  name="RemovableBlocks"
+  args={{ units, blocks, onremove: fn() }}
+  play={async ({ canvas, userEvent, args }) => {
+    await userEvent.click(canvas.getByRole('button', { name: '로직 1 블럭 빼기' }));
+    await expect(args.onremove).toHaveBeenCalledWith(1);
   }}
 />

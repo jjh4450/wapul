@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Span } from './api/client.js';
-import { blockLabels, formatDate, truncate, unitLines } from './study.js';
+import { blockColors, blockLabels, formatDate, lastLine, truncate } from './study.js';
 
 describe('truncate', () => {
   it('keeps text that fits', () => {
@@ -35,14 +35,29 @@ describe('blockLabels', () => {
   });
 });
 
-describe('unitLines', () => {
-  it('collects every line the statements cover, once and in order', () => {
+describe('blockColors', () => {
+  it('keeps input and output colors and gives each logic block the next color', () => {
+    const kinds = ['input', 'logic', 'logic', 'output'] as const;
+
+    const colors = blockColors(kinds.map((kind) => ({ kind })));
+
+    expect(new Set(colors.map((c) => c.bar)).size).toBe(4);
+    expect(blockColors([{ kind: 'input' }])[0]).toEqual(colors[0]);
+    expect(blockColors([{ kind: 'logic' }, { kind: 'output' }])).toEqual(
+      colors.slice(1, 2).concat(colors[3])
+    );
+  });
+});
+
+describe('lastLine', () => {
+  it('finds the line where the last of the statements ends, whatever their order', () => {
     const units = [
       { start: [5, 0], end: [6, 3] },
       { start: [1, 0], end: [1, 9] },
       { start: [6, 4], end: [6, 9] }
     ] satisfies Span[];
 
-    expect(unitLines(units, [0, 1, 2])).toEqual([1, 5, 6]);
+    expect(lastLine(units, [1, 0])).toBe(6);
+    expect(lastLine(units, [1])).toBe(1);
   });
 });
