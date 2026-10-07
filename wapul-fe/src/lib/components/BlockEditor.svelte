@@ -1,19 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { IconArrowBackUp, IconArrowForwardUp } from '@tabler/icons-svelte';
-  import { api, type BlockKind, type RecordDraft, type RecordOut } from '#lib/api/client.js';
+  import { api, type RecordDraft, type RecordOut } from '#lib/api/client.js';
+  import { BlockDraft } from '#lib/blockDraft.svelte.js';
   import CodeView from '#lib/components/CodeView.svelte';
   import { Button } from '#lib/components/ui/button/index.js';
-  import { blockFacts, buildQuestions, keepQuestions, type MarkedBlock } from '#lib/questions.js';
-  import { BLOCK_KIND_LABEL, blockColors, blockLabels, lastLine } from '#lib/study.js';
+  import { blockFacts, buildQuestions, keepQuestions } from '#lib/questions.js';
+  import { lastLine } from '#lib/study.js';
   import { cn } from '#lib/utils.js';
-
-  /** 고른 문장을 넣을 곳. into는 고른 문장을 원래 블럭에서 뺀 블럭 목록에 문장을 넣는다 */
-  type Choice = {
-    label: string;
-    bar?: string;
-    into: (next: MarkedBlock[], picked: number[]) => void;
-  };
 
   let {
     id,
@@ -33,66 +27,17 @@
   /** 고치는 기록. 새 기록이면 null */
   let old = $state.raw<RecordOut | null>(null);
 
-  let blocks = $state<MarkedBlock[]>([]);
-
-  /** 끌어서 고른 문장. 넣을 블럭을 고르면 비운다 */
-  let selected = $state<number[]>([]);
-
-  // 되돌리기와 다시 하기. 바꾸기 전 블럭 목록을 통째로 쌓는다
-  let past = $state.raw<MarkedBlock[][]>([]);
-
-  let future = $state.raw<MarkedBlock[][]>([]);
+  /** 고치는 중인 블럭. 기록을 불러오면 그 블럭으로 바꿔 끼운다 */
+  let editing = $state.raw(new BlockDraft());
 
   let error = $state('');
 
   let saving = $state(false);
 
-  const labels = $derived(blockLabels(blocks));
-
-  const colors = $derived(blockColors(blocks));
-
-  const owned = $derived(new Set(blocks.flatMap((b) => b.units)));
-
   /** 블럭 고르는 창을 달 줄: 고른 문장이 끝나는 줄 */
   const pickerLine = $derived(
-    record && selected.length > 0 ? lastLine(record.units, selected) : null
+    record && editing.selected.length > 0 ? lastLine(record.units, editing.selected) : null
   );
-
-  // 입력, 로직들, 새 로직, 출력 순. 입력과 출력은 블럭이 없을 때만 새로 만든다
-  // 입력, 지금 있는 로직들, 새 로직(로직 n+1), 출력 순. 입력과 출력은 블럭이 없을 때만 새로 만든다
-  const choices = $derived.by(() => {
-    const newLogic: Choice = {
-      label: `+ ${BLOCK_KIND_LABEL.logic} ${blocks.filter((b) => b.kind === 'logic').length + 1}`,
-      into: (next, picked) => next.push({ kind: 'logic', units: picked, wrong: false })
-    };
-
-    const list: Choice[] = [];
-
-    if (blocks[0]?.kind !== 'input') {
-      list.push({
-        label: `+ ${BLOCK_KIND_LABEL.input}`,
-        into: (next, picked) => next.push({ kind: 'input', units: picked, wrong: false })
-      });
-    }
-
-    blocks.forEach((b, i) => {
-      if (b.kind === 'output') list.push(newLogic);
-      list.push({
-        label: labels[i],
-        bar: colors[i].bar,
-        into: (next, picked) => next[i].units.push(...picked)
-      });
-    });
-
-    if (blocks.at(-1)?.kind !== 'output') {
-      list.push(newLogic, {
-        label: `+ ${BLOCK_KIND_LABEL.output}`,
-        into: (next, picked) => next.push({ kind: 'output', units: picked, wrong: false })
-      });
-    }
-
-    return list;
-  });
 
   onMount(async () => {
     if (draft !== undefined) {
@@ -114,7 +59,7 @@
     record = result.data;
     old = result.data;
     // 처음 제출에서 틀렸다는 표시는 그 블럭에 붙은 달라진 점 질문으로 남아 있다
-    blocks = arrange(
+    editing = new BlockDraft(
       result.data.blocks.map((b) => ({
         kind: b.kind,
         units: [...b.units],
@@ -123,96 +68,9 @@
     );
   });
 
-  const RANK = { input: 0, logic: 1, output: 2 } satisfies { [K in BlockKind]: number };
-
-  /**
-   * 입력을 맨 앞, 출력을 맨 뒤에 둔다. 로직 블럭은 만든 순서 그대로 두고, 문장이 다 빠진 블럭도
-   * 남겨 둔다(저장할 때 뺀다). 그래야 고치는 동안 블럭 번호와 색이 바뀌지 않는다
-   */
-  function arrange(next: MarkedBlock[]): MarkedBlock[] {
-    return next
-      .map((b) => ({ ...b, units: b.units.toSorted((x, y) => x - y) }))
-      .sort((a, b) => RANK[a.kind] - RANK[b.kind]);
-  }
-
-  function change(next: MarkedBlock[]) {
-    past = [...past, $state.snapshot(blocks)];
-    future = [];
-    blocks = arrange(next);
-    selected = [];
-  }
-
-  function undo() {
-    const previous = past.at(-1);
-
-    if (previous === undefined) return;
-
-    future = [$state.snapshot(blocks), ...future];
-    past = past.slice(0, -1);
-    blocks = previous;
-    selected = [];
-  }
-
-  function redo() {
-    const [next, ...rest] = future;
-
-    if (next === undefined) return;
-
-    past = [...past, $state.snapshot(blocks)];
-    future = rest;
-    blocks = next;
-    selected = [];
-  }
-
-  /** 고른 문장을 원래 블럭에서 빼고, into가 있으면 그 블럭에 넣는다 */
-  function place(into?: Choice['into']) {
-    const picked = $state.snapshot(selected);
-
-    const next = $state
-      .snapshot(blocks)
-      .map((b) => ({ ...b, units: b.units.filter((u) => !picked.includes(u)) }));
-
-    into?.(next, picked);
-    change(next);
-  }
-
-  /** 블럭 하나의 종류를 바꾼다. 입력과 출력은 하나씩이라, 이미 있으면 그 블럭에 합친다 */
-  function setKind(i: number, kind: BlockKind) {
-    const next = $state.snapshot(blocks);
-    const into = kind === 'logic' ? -1 : next.findIndex((b) => b.kind === kind);
-
-    if (kind === 'logic') {
-      // 로직으로 바꾼 블럭은 새 로직(로직 n+1)처럼 맨 뒤에 붙어서, 있던 로직의 번호가 밀리지 않는다
-      const [moved] = next.splice(i, 1);
-
-      next.push({ ...moved, kind });
-    } else if (into === -1) {
-      next[i].kind = kind;
-    } else {
-      const target = next[into];
-      const [moved] = next.splice(i, 1);
-
-      target.units.push(...moved.units);
-      target.wrong ||= moved.wrong;
-    }
-
-    change(next);
-  }
-
-  function setWrong(i: number, wrong: boolean) {
-    const next = $state.snapshot(blocks);
-
-    next[i].wrong = wrong;
-    change(next);
-  }
-
-  function removeBlock(i: number) {
-    change($state.snapshot(blocks).filter((_, j) => j !== i));
-  }
-
   function shortcut(event: KeyboardEvent) {
     if (event.key === 'Escape') {
-      selected = [];
+      editing.selected = [];
 
       return;
     }
@@ -221,16 +79,15 @@
 
     const key = event.key.toLowerCase();
 
-    if (key === 'z' && !event.shiftKey) undo();
-    else if (key === 'z' || key === 'y') redo();
+    if (key === 'z' && !event.shiftKey) editing.undo();
+    else if (key === 'z' || key === 'y') editing.redo();
     else return;
 
     event.preventDefault();
   }
 
   async function save() {
-    // 문장이 다 빠진 블럭은 저장하지 않는다
-    const kept = blocks.filter((b) => b.units.length > 0);
+    const kept = editing.filled;
 
     if (!record || kept.length === 0) {
       error = '문장이 든 블럭이 하나는 있어야 해요.';
@@ -266,17 +123,17 @@
       role="group"
       aria-label="고른 문장을 넣을 블럭"
     >
-      <span class="px-1 text-muted-foreground">문장 {selected.length}개를</span>
-      {#each choices as choice (choice.label)}
-        <Button variant="outline" size="sm" onclick={() => place(choice.into)}>
+      <span class="px-1 text-muted-foreground">문장 {editing.selected.length}개를</span>
+      {#each editing.choices as choice (choice.label)}
+        <Button variant="outline" size="sm" onclick={() => editing.place(choice.into)}>
           {#if choice.bar}<span class={cn('size-2 rounded-full', choice.bar)}></span>{/if}
           {choice.label}
         </Button>
       {/each}
-      {#if selected.some((u) => owned.has(u))}
-        <Button variant="ghost" size="sm" onclick={() => place()}>블럭에서 빼기</Button>
+      {#if editing.selected.some((u) => editing.owned.includes(u))}
+        <Button variant="ghost" size="sm" onclick={() => editing.place()}>블럭에서 빼기</Button>
       {/if}
-      <Button variant="ghost" size="sm" onclick={() => (selected = [])}>취소</Button>
+      <Button variant="ghost" size="sm" onclick={() => (editing.selected = [])}>취소</Button>
     </div>
   {/if}
 {/snippet}
@@ -291,15 +148,19 @@
 
   <div class="grid max-w-4xl gap-3">
     <div class="flex gap-2">
-      <Button variant="outline" size="sm" title="Ctrl+Z" disabled={past.length === 0} onclick={undo}
-        ><IconArrowBackUp />되돌리기</Button
+      <Button
+        variant="outline"
+        size="sm"
+        title="Ctrl+Z"
+        disabled={!editing.canUndo}
+        onclick={() => editing.undo()}><IconArrowBackUp />되돌리기</Button
       >
       <Button
         variant="outline"
         size="sm"
         title="Ctrl+Shift+Z"
-        disabled={future.length === 0}
-        onclick={redo}><IconArrowForwardUp />다시 하기</Button
+        disabled={!editing.canRedo}
+        onclick={() => editing.redo()}><IconArrowForwardUp />다시 하기</Button
       >
     </div>
 
@@ -307,12 +168,12 @@
       code={record.code}
       language={record.language}
       units={record.units}
-      {blocks}
-      {selected}
-      onselect={(picked) => (selected = picked)}
-      onkind={setKind}
-      onwrong={setWrong}
-      onremove={removeBlock}
+      blocks={editing.blocks}
+      selected={editing.selected}
+      onselect={(picked) => (editing.selected = picked)}
+      onkind={(i, kind) => editing.setKind(i, kind)}
+      onwrong={(i, wrong) => editing.setWrong(i, wrong)}
+      onremove={(i) => editing.remove(i)}
       after={picker}
     />
 
