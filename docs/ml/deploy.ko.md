@@ -15,18 +15,27 @@ wapul/
 └── wapul-fe/SEGMENTER_VERSION  # 프론트엔드가 쓰는 릴리즈 버전 (seg-vX.Y.Z)
 ```
 
-```
-segment(code, language)                                    ← 프론트엔드가 부르는 함수 하나
-  │
-  ├─ TS    normalize(code)
-  ├─ TS    web-tree-sitter로 파싱 (그 언어의 문법 .wasm을 처음 쓸 때 받음)
-  ├─ TS    모델 파일을 처음 쓸 때 받아 WASM에 넘김
-  ├─ TS    문장 나누기 → 문장별 AST 정보 → 종류 특징 이름
-  ├─ WASM  kinds(특징)        → 문장마다 종류 (LightGBM)
-  ├─ TS    로직 문장의 own 특징과 쌍(pair) 특징
-  ├─ WASM  blocks(own, pairs) → 로직 문장마다 블럭 번호 (후보 행 → LightGBM 점수 → 묶기)
-  │
-  └─ 결과  문장마다 {start, end, kind, block?}  (labels.jsonl과 같은 형식)
+```mermaid
+flowchart TB
+    call["segment(code, language)<br/>프론트엔드가 부르는 함수 하나"]
+    subgraph ts["TS (js/)"]
+        direction TB
+        n["normalize(code)"]
+        p["web-tree-sitter 파싱<br/>문법 .wasm은 언어마다 처음 쓸 때 받음"]
+        u["문장 나누기 → 문장별 AST 정보 → 종류 특징 이름"]
+        f["로직 문장의 own 특징과 쌍(pair) 특징"]
+    end
+    subgraph wasm["WASM (src/)"]
+        direction TB
+        k["kinds(특징) → 문장마다 종류<br/>LightGBM"]
+        b["blocks(own, pairs) → 로직 문장마다 블럭 번호<br/>후보 행 → LightGBM 점수 → 묶기"]
+    end
+    model[("모델 파일 (model/)<br/>처음 쓸 때 받아 WASM에 넘김")]
+    out["문장마다 {start, end, kind, block?}<br/>labels.jsonl과 같은 형식"]
+
+    call --> n --> p --> u --> k --> f --> b --> out
+    model -.-> k
+    model -.-> b
 ```
 
 ## 쓰기
