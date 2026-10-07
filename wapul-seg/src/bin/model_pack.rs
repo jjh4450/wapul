@@ -1,10 +1,11 @@
 //! Pack the model files wapul-ml trains into the one binary the WASM loads:
 //!
 //!     model-pack <model dir> <out file>
+//!     cargo run --release --bin model-pack -- ../wapul-ml/models/segmenter-vN ../model/wapul-seg.model
 //!
-//! `<model dir>` holds `kinds-lgbm.txt`, `kinds-features.txt` and `blocks-lgbm.txt` (the root
-//! `model/`). The output keeps the trees as evaluated and replaces feature names by their hashes
-//! (docs/ml/deploy.ko.md, "모델").
+//! `<model dir>` holds `kinds-lgbm.txt`, `kinds-features.txt` and `blocks-lgbm.txt`. The output
+//! keeps the trees as evaluated and replaces feature names by their hashes; only it is committed,
+//! as the root `model/wapul-seg.model` (docs/ml/deploy.ko.md, "모델").
 
 use std::{env, fs, process};
 

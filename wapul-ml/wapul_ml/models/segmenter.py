@@ -37,7 +37,7 @@ LANGS = ("cpp", "java", "python", "rust")
 FORMAT = 3  # bump when the saved files or the output change shape
 # 5-fold CV on the 300 human-reviewed solutions (docs/ml/experiments.ko.md)
 MIN_SOURCES = 5
-CV = {"kinds_macro_f1": 0.900, "blocks_given_gold_kinds": {"B3": 0.809, "CEAFe": 0.732, "pairF1": 0.668}}
+CV = {"kinds_macro_f1": 0.902, "blocks_given_gold_kinds": {"B3": 0.809, "CEAFe": 0.732, "pairF1": 0.668}}
 
 
 def train() -> None:
@@ -45,7 +45,7 @@ def train() -> None:
         sys.exit(f"{OUT} already holds a trained model; bump the version in OUT instead of overwriting it")
     OUT.mkdir(parents=True, exist_ok=True)
     sols = load_solutions()
-    per_sol = [with_ngrams(unit_features(s)) for s in sols]
+    per_sol = [with_ngrams(unit_features(s, mask_literals=True)) for s in sols]
     keep = common_features(per_sol, [source_of(s.id) for s in sols], MIN_SOURCES)
     kinds = kind_lgbm.train([f for fs in per_sol for f in fs], [u.kind for s in sols for u in s.units], keep=keep)
     kinds.save(OUT / "kinds-lgbm.txt", OUT / "kinds-features.json")
@@ -70,7 +70,9 @@ class BlockModel:
             raise ValueError(f"language must be one of {LANGS}")
         sol = Solution(sid, language, "model", code, [])
         sol.units = [Unit(u.text, u.start[0], u.start[1], u.end, "none", None) for u in units(code, language)]
-        for u, kind in zip(sol.units, self.kinds.predict(with_ngrams(unit_features(sol))), strict=True):
+        for u, kind in zip(
+            sol.units, self.kinds.predict(with_ngrams(unit_features(sol, mask_literals=True))), strict=True
+        ):
             u.kind = kind
         blocks = block_ranker.predict_blocks(self.blocks, BlockCandidates(sol, labeled=False))
         for u, b in zip([u for u in sol.units if u.kind == "logic"], blocks, strict=True):

@@ -7,6 +7,8 @@
 // `c:` the innermost enclosing loop or branch header, `f:` the enclosing function header.
 // Identifier tokens also give `prefix#gram` for their character 3- and 4-grams.
 
+import { type Node, type Tree } from 'web-tree-sitter';
+
 import { type UnitAst } from './ast.ts';
 import { type Language } from './languages.ts';
 import { type Unit } from './units.ts';
@@ -37,11 +39,70 @@ export function tokens(text: string): string[] {
   return out;
 }
 
+// String and character literals, outermost, across the supported grammars. Their contents
+// differ from problem to problem, so tokens see `""` in their place (kind_features.py LITERALS).
+const LITERALS = new Set([
+  'string_literal',
+  'raw_string_literal',
+  'char_literal',
+  'character_literal',
+  'multiline_string_literal',
+  'string',
+  'template_string',
+  'interpreted_string_literal',
+  'rune_literal',
+  'interpolated_string_expression',
+  'verbatim_string_literal',
+  'line_string_literal',
+  'multi_line_string_literal',
+  'heredoc_body',
+  'encapsed_string',
+  'heredoc',
+  'nowdoc'
+]);
+
+/** Index ranges of the outermost literals, in order. */
+export function literalSpans(tree: Tree): [number, number][] {
+  const out: [number, number][] = [];
+  const stack: Node[] = [tree.rootNode];
+
+  for (let node = stack.pop(); node !== undefined; node = stack.pop()) {
+    // Named only: some grammars spell a type keyword like a literal (C#'s `string`)
+    if (node.isNamed && LITERALS.has(node.type)) {
+      out.push([node.startIndex, node.endIndex]);
+    } else {
+      for (const child of node.children) {
+        stack.push(child);
+      }
+    }
+  }
+
+  return out.sort((a, b) => a[0] - b[0]);
+}
+
+/** `code.slice(start, end)` with each literal (or the part of it inside) replaced by `""`. */
+function masked(code: string, start: number, end: number, literals: [number, number][]): string {
+  let out = '';
+  let at = start;
+
+  for (const [s, e] of literals) {
+    if (e <= start || s >= end) {
+      continue;
+    }
+
+    out += code.slice(at, Math.max(s, start)) + '""';
+    at = Math.min(e, end);
+  }
+
+  return out + code.slice(at, end);
+}
+
 export function unitFeatures(
   code: string,
   language: Language,
   units: Unit[],
-  asts: UnitAst[]
+  asts: UnitAst[],
+  literals: [number, number][]
 ): Features[] {
   const headerAt = new Map<number, number>();
   asts.forEach((a, j) => {
@@ -49,7 +110,7 @@ export function unitFeatures(
       headerAt.set(a.span[0], j);
     }
   });
-  const toks = units.map((u) => tokens(u.text));
+  const toks = units.map((u) => tokens(masked(code, u.startIndex, u.endIndex, literals)));
   const n = units.length;
 
   return units.map((u, j) => {
@@ -86,7 +147,7 @@ export function unitFeatures(
     }
 
     if (a.isHeader) {
-      for (const t of new Set(tokens(code.slice(u.endIndex, a.span[1])))) {
+      for (const t of new Set(tokens(masked(code, u.endIndex, a.span[1], literals)))) {
         f.set(`b:${t}`, 1);
       }
     }

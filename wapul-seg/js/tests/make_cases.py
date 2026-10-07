@@ -34,7 +34,7 @@ def case(model: BlockModel, sid: str, code: str, language: str) -> dict:
     sol = Solution(sid, language, "model", code, [])
     sol.units = [Unit(u.text, u.start[0], u.start[1], u.end, "none", None) for u in units(code, language)]
     asts = analyze(code, language, [((u.line, u.col), u.end) for u in sol.units])
-    feats = with_ngrams(unit_features(sol))
+    feats = with_ngrams(unit_features(sol, mask_literals=True))
     for u, kind in zip(sol.units, model.kinds.predict(feats), strict=True):
         u.kind = kind
     logic = Units(sol)

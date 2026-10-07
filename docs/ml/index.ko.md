@@ -44,6 +44,7 @@ wapul-ml/
 │   ├── kinds_cv.py            # 종류 분류 교차 검증: CodeBERT
 │   ├── kinds_ngram.py         # 종류 분류 글자 n-gram, Rust 테스트
 │   ├── kinds_min_sources.py   # 여러 저장소에 나온 특징만 남기기
+│   ├── kinds_literals.py      # 문자열 리터럴의 내용 빼기
 │   ├── rust_review.py         # Rust 풀이에 최종 모델 돌려 보기
 │   ├── blocks_cv.py           # 블럭 묶기 교차 검증
 │   ├── baseline_cv.py         # 비교 기준과 전체(end to end) 교차 검증

@@ -9,7 +9,7 @@
  "trained_on": 300,
  "min_sources": 5,
  "cv": {
-  "kinds_macro_f1": 0.9,
+  "kinds_macro_f1": 0.902,
   "blocks_given_gold_kinds": {
    "B3": 0.809,
    "CEAFe": 0.732,

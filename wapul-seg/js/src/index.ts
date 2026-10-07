@@ -3,7 +3,7 @@
 import { analyze } from './ast.ts';
 import { type Assets, fetchAssets } from './assets.ts';
 import { blockFeatures } from './blocks.ts';
-import { featureText, unitFeatures, withNgrams } from './kinds.ts';
+import { featureText, literalSpans, unitFeatures, withNgrams } from './kinds.ts';
 import { type Language, LANGUAGES } from './languages.ts';
 import { model } from './model.ts';
 import { normalize } from './normalize.ts';
@@ -52,7 +52,8 @@ export async function segment(
   try {
     const us = units(tree, code);
     const asts = analyze(tree, us, language);
-    const kinds = m.kinds(featureText(withNgrams(unitFeatures(code, language, us, asts))));
+    const feats = withNgrams(unitFeatures(code, language, us, asts, literalSpans(tree)));
+    const kinds = m.kinds(featureText(feats));
     const logic = asts.filter((_, j) => KINDS[kinds[j]] === 'logic');
     const f = blockFeatures(logic);
     const blocks = m.blocks(f.own, f.facts, f.readsOffsets, f.reads, f.writesOffsets, f.writes);

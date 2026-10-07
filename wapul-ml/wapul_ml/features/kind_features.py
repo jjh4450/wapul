@@ -13,6 +13,7 @@ import re
 
 from wapul_ml.data.solutions import Solution
 from wapul_ml.features.unit_ast import _byte_offsets, analyze
+from wapul_ml.units import parser
 
 TOKEN = re.compile(r"[A-Za-z_]\w*|\d+|\S")
 MAX_TOKENS = 64  # a long body says enough in its first tokens
@@ -23,12 +24,63 @@ def tokens(text: str) -> list[str]:
     return ["NUM" if t.isdigit() else t for t in TOKEN.findall(text)[:MAX_TOKENS]]
 
 
-def unit_features(s: Solution) -> list[dict[str, float]]:
+# String and character literals, outermost, across the supported grammars (segmenter-v3 and
+# later): their contents differ from problem to problem, so tokens see `""` in their place
+LITERALS = {
+    "string_literal",
+    "raw_string_literal",
+    "char_literal",
+    "character_literal",
+    "multiline_string_literal",
+    "string",
+    "template_string",
+    "interpreted_string_literal",
+    "rune_literal",
+    "interpolated_string_expression",
+    "verbatim_string_literal",
+    "line_string_literal",
+    "multi_line_string_literal",
+    "heredoc_body",
+    "encapsed_string",
+    "heredoc",
+    "nowdoc",
+}
+
+
+def literal_spans(code: str, language: str) -> list[tuple[int, int]]:
+    """Byte ranges of the outermost literals, in order."""
+    out, stack = [], [parser(language).parse(code.encode()).root_node]
+    while stack:
+        node = stack.pop()
+        # Named only: some grammars spell a type keyword like a literal (C#'s `string`)
+        if node.is_named and node.type in LITERALS:
+            out.append((node.start_byte, node.end_byte))
+        else:
+            stack.extend(node.children)
+    return sorted(out)
+
+
+def masked(data: bytes, start: int, end: int, literals: list[tuple[int, int]]) -> str:
+    """`data[start:end]` with each literal (or the part of it inside) replaced by `""`."""
+    parts, at = [], start
+    for s, e in literals:
+        if e <= start or s >= end:
+            continue
+        s, e = max(s, start), min(e, end)
+        parts += [data[at:s], b'""']
+        at = e
+    parts.append(data[at:end])
+    return b"".join(parts).decode(errors="replace")
+
+
+def unit_features(s: Solution, mask_literals: bool = False) -> list[dict[str, float]]:
+    """`mask_literals`: tokens see `""` in place of each literal (segmenter-v3 and later)."""
     asts = analyze(s.code, s.language, [((u.line, u.col), u.end) for u in s.units])
     data = s.code.encode()
     offset = _byte_offsets(s.code, data)
     header_at = {a.span[0]: j for j, a in enumerate(asts) if a.is_header}
-    toks = [tokens(u.text) for u in s.units]
+    literals = literal_spans(s.code, s.language) if mask_literals else []
+    toks = [tokens(masked(data, offset(u.line, u.col), offset(*u.end), literals)) for u in s.units]
     n = len(s.units)
     out = []
     for j, (u, a) in enumerate(zip(s.units, asts, strict=True)):
@@ -48,7 +100,7 @@ def unit_features(s: Solution) -> list[dict[str, float]]:
                 else:
                     f[f"{side}{k}:EDGE"] = 1.0
         if a.is_header:
-            body = data[offset(*u.end) : a.span[1]].decode(errors="replace")
+            body = masked(data, offset(*u.end), a.span[1], literals)
             for t in set(tokens(body)):
                 f["b:" + t] = 1.0
         for prefix, at in (("c", a.control), ("f", a.function)):

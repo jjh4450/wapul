@@ -8,7 +8,7 @@ wapul-ml에서 학습한 모델을 브라우저가 쓰게 하는 구성입니다
 
 ```
 wapul/
-├── model/                      # 출시할 모델 파일 (wapul-ml에서 학습, 사람이 커밋)
+├── model/                      # 출시할 모델: 묶은 바이너리 wapul-seg.model과 model.json (사람이 커밋)
 ├── wapul-seg/
 │   ├── js/                     # TS (vite 라이브러리): segment(), 파싱, 문장 나누기, 특징
 │   └── src/                    # Rust → WASM: 특징을 받아 종류와 블럭을 돌려줌
@@ -30,7 +30,7 @@ flowchart TB
         k["kinds(특징) → 문장마다 종류<br/>LightGBM"]
         b["blocks(own, facts, reads, writes) → 로직 문장마다 블럭 번호<br/>쌍 특징 → 후보 행 → LightGBM 점수 → 묶기"]
     end
-    model[("wapul-seg.model<br/>model/을 빌드 때 묶은 바이너리, 처음 쓸 때 받아 WASM에 넘김")]
+    model[("wapul-seg.model<br/>model/의 묶은 바이너리, 처음 쓸 때 받아 WASM에 넘김")]
     out["문장마다 {start, end, kind, block?}<br/>labels.jsonl과 같은 형식"]
 
     call --> n --> p --> u --> k --> f --> b --> out
@@ -70,7 +70,7 @@ wapul-seg.model         # 모델: 트리 두 벌과 특징 이름 해시 (2MB)
 | 파싱 | TS, web-tree-sitter | 아래 "하지 않는 것"의 첫 줄 참고 |
 | 문장 나누기, AST 정보, 특징 | TS (`wapul-seg/js/`) | 파이썬 원본이 tree-sitter 노드 API(`children`, `child_by_field_name`, `descendant_for_byte_range` …)를 그대로 쓰므로 web-tree-sitter 위에서 1:1로 옮겨짐. 트리를 다른 런타임으로 넘길 필요가 없음 |
 | 특징 이름 → 열 번호, LightGBM 추론, 블럭 후보 행과 묶기 | WASM (`wapul-seg/src/`) | 모델에 속한 것: 특징 어휘는 모델 파일과 같이 움직이고, 후보 행 형식은 랭커가 학습된 형식 그 자체. 숫자 배열만 쓰고 트리를 보지 않음 |
-| 모델 파일 | 루트 `model/`(텍스트)를 빌드 때 바이너리 하나로 묶어 패키지에 넣고, TS가 처음 쓸 때 받음 | 아래 "모델" 참고 |
+| 모델 파일 | 루트 `model/`의 묶은 바이너리 하나를 패키지에 넣고, TS가 처음 쓸 때 받음 | 아래 "모델" 참고 |
 
 - 프론트엔드는 `segment(code, language)` 하나만 부릅니다. TS 코드는 문법 버전, WASM과 짝이 맞아야 하므로 프론트엔드가 아니라 `wapul-seg/js/`에 두고 같은 릴리즈로 배포합니다.
 - 입력 형식의 원본은 여전히 wapul-ml의 `normalize.py`, `units.py`, `features/`, `models/block_ranker.py`입니다. TS와 Rust는 사본이고, 아래 "검증"을 통과해야 합니다. 원본을 고치면 사본도 같이 고칩니다.
@@ -102,10 +102,17 @@ wapul-seg.model         # 모델: 트리 두 벌과 특징 이름 해시 (2MB)
 
 ## 모델
 
-- 출시할 모델은 루트 `model/`에 둡니다(`kinds-lgbm.txt`, `kinds-features.txt`, `blocks-lgbm.txt`, `model.json`). `openapi/`처럼 패키지 밖의 계약 파일이고, wapul-ml의 `models/segmenter-vN/`에서 사람이 복사해 커밋합니다. 학습에는 비공개 데이터가 필요해서 CI는 학습하지 않고, 모델은 자주 바뀌지 않습니다.
-- WASM에 넣지 않고 문법 `.wasm`처럼 패키지의 별도 파일로 둡니다. 빌드 때 `model-pack`(`src/bin/model_pack.rs`)이 세 텍스트 파일을 `wapul-seg.model` 하나(2MB)로 묶습니다. 트리는 평가하는 형태 그대로 저장하므로 예측이 같고, 특징 이름은 FNV-1a 64비트 해시로 바꿔 넣어 학습 풀이의 식별자 토큰이 패키지에 실리지 않습니다(해시 충돌은 묶을 때 검사). WASM은 텍스트 파서 없이 이 형식만 읽습니다(cargo feature `text`는 테스트와 `model-pack`만 켬). TS가 처음 `segment`를 부를 때 이 파일을 받아 `new Model(bytes)`에 넘깁니다.
+- 출시할 모델은 루트 `model/`에 둡니다(`wapul-seg.model`, `model.json`). `openapi/`처럼 패키지 밖의 계약 파일입니다. wapul-ml의 `models/segmenter-vN/`(텍스트 모델, git에서 무시)을 `model-pack`으로 묶어 바이너리만 커밋합니다. 학습에는 비공개 데이터가 필요해서 CI는 학습하지 않고, 모델은 자주 바뀌지 않습니다.
+
+```bash
+cd wapul-seg
+cargo run --release --bin model-pack -- ../wapul-ml/models/segmenter-vN ../model/wapul-seg.model
+cp ../wapul-ml/models/segmenter-vN/model.json ../model/
+```
+
+- WASM에 넣지 않고 문법 `.wasm`처럼 패키지의 별도 파일로 둡니다. `model-pack`(`src/bin/model_pack.rs`)이 세 텍스트 파일을 `wapul-seg.model` 하나로 묶습니다. 트리는 평가하는 형태 그대로 저장하므로 예측이 같고, 특징 이름은 FNV-1a 64비트 해시로 바꿔 넣어 학습 풀이의 식별자 토큰이 패키지에 실리지 않습니다(해시 충돌은 묶을 때 검사). WASM은 텍스트 파서 없이 이 형식만 읽습니다(cargo feature `text`는 테스트와 `model-pack`만 켬). TS가 처음 `segment`를 부를 때 이 파일을 받아 `new Model(bytes)`에 넘깁니다.
 - 모델 파일은 패키지와 함께 버전이 갑니다. 프론트엔드는 `wapul-seg@X.Y.Z` 하나로 WASM, 문법, 모델을 한 벌로 받으므로 짝이 어긋나지 않습니다.
-- wapul-seg의 Rust 테스트는 루트 `model/`의 모델을 읽습니다.
+- wapul-seg의 Rust 테스트와 빌드(`scripts/build-wasm.sh`)는 루트 `model/wapul-seg.model`을 읽습니다.
 
 ## WASM 호출
 
@@ -169,7 +176,7 @@ cd js && pnpm build        # tsc, vite 라이브러리 빌드, 릴리즈 파일�
 | LightGBM 추론 | [bosk](https://github.com/stanwarp/bosk)(Apache-2.0 / MIT)의 순수 Rust 텍스트 모델 파서를 가져와 다중 클래스와 희소 입력을 더함 | LightGBM과 예측이 같도록 검증된 구현. 원본은 다중 클래스를 거부하고 밀집 입력만 받음. 만든 사람이 한 명이라 의존성 대신 저장소로 가져옴 |
 | 종류 특징 | 글자 n-gram 추가 | 학습하지 않은 언어(Rust)에서 macro-F1 0.663 → 0.870 ([실험 23](experiments.md)) |
 | 배포물 | npm 패키지 `wapul-seg@X.Y.Z`: `js/dist/` 그대로(JS 모듈과 타입 선언, `wapul-seg` WASM, web-tree-sitter 런타임, 언어별 문법 `.wasm`, 묶은 모델 `wapul-seg.model`). 모노레포의 `wapul-seg/js`에서 냄 | 바이너리를 git 기록에 쌓지 않고, 프론트엔드가 package.json에서 버전을 고정함. 저장소를 따로 두지 않아도 되고, 루트 `model/`과 파이썬 원본 옆에 있어야 사본 규칙을 지킬 수 있음 |
-| 버전 | CI(`seg-release.yml`)가 계산. Y는 `model/`의 모델 파일이 바뀌면, Z는 그 외 릴리스마다, X는 수동 `major`. 손으로 올리지 않음 | 백엔드, 프론트엔드와 같은 규칙. 모델이 바뀌면 결과가 달라지므로 Y로 드러냄 |
+| 버전 | CI(`seg-release.yml`)가 계산. Y는 `model/wapul-seg.model`이 바뀌면, Z는 그 외 릴리스마다, X는 수동 `major`. 손으로 올리지 않음 | 백엔드, 프론트엔드와 같은 규칙. 모델이 바뀌면 결과가 달라지므로 Y로 드러냄 |
 | npm 인증 | 워크플로는 trusted publishing(OIDC)을 먼저 시도하고, 실패하면 `NPM_TOKEN` 시크릿(granular token)으로 올림. 지금은 토큰이 쓰임 | 이 저장소는 2026-07-15 이후 생성이라 OIDC `sub`가 immutable 형식(`repo:owner@id/repo@id`)인데 npm이 아직 받지 않음([npm/cli#9969](https://github.com/npm/cli/issues/9969)). 고쳐지면 npmjs.com 패키지 설정에 저장소 `jjh4450/wapul`과 워크플로 `seg-release.yml`을 등록하고 시크릿을 지움 |
 | 프론트엔드가 받는 시점 | `pnpm install` 때, package.json에 고정한 버전 | 실행 중 외부 의존이 없고, 버전 갱신이 PR로 드러남 |
 | 학습 | wapul-ml의 파이썬 그대로 | `wapul-seg`는 파이썬 구현과 같은 결과를 내는 배포용 사본. 일치는 "검증"으로 보장 |

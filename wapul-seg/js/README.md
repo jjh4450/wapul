@@ -52,21 +52,21 @@ wapul-seg/
 │   └── tests/             # 파이썬 모델과의 단계별 일치 검사
 ├── src/           # Rust → WASM: 특징 어휘, LightGBM, 쌍 특징과 블럭 묶기
 │   ├── lgbm/      # 순수 Rust LightGBM 추론 (bosk에서 가져옴)
-│   └── bin/       # model-pack: 루트 model/을 wapul-seg.model로 묶음
+│   └── bin/       # model-pack: wapul-ml의 텍스트 모델을 wapul-seg.model로 묶음
 └── scripts/build-wasm.sh
 ```
 
-TypeScript와 Rust는 wapul-ml의 파이썬(`normalize.py`, `units.py`, `features/`, `models/block_ranker.py`)의 사본이고 파이썬이 원본입니다. 출시할 모델은 모노레포 루트 `model/`에 있습니다.
+TypeScript와 Rust는 wapul-ml의 파이썬(`normalize.py`, `units.py`, `features/`, `models/block_ranker.py`)의 사본이고 파이썬이 원본입니다. 출시할 모델(묶은 바이너리)은 모노레포 루트 `model/`에 있습니다.
 
 ## 개발
 
 ```bash
 # Rust (wasm32-unknown-unknown 타깃, Cargo.lock 버전의 wasm-bindgen-cli 필요)
 cd wapul-seg
-sh scripts/build-wasm.sh   # model/ → pkg/wapul-seg.model, WASM + 글루 → pkg/ (js/가 import)
+sh scripts/build-wasm.sh   # WASM + 글루 → pkg/, model/wapul-seg.model → pkg/ (js/가 import)
 cargo fmt --check
 cargo clippy --release --target wasm32-unknown-unknown --no-default-features
-cargo test --release       # 루트 model/의 모델을 읽음
+cargo test --release       # 루트 model/wapul-seg.model을 읽음
 
 # TypeScript
 cd js
@@ -83,6 +83,6 @@ pnpm build      # dist/: 모듈, 타입 선언, WASM, 문법 .wasm 13개, wapul-
 
 ## 릴리스
 
-CI(`seg-release.yml`)가 main에서 Segmenter CI를 통과한 커밋만 `wapul-seg@X.Y.Z`로 npm에 올리고 `seg-vX.Y.Z` 태그를 답니다. Y는 루트 `model/`이 바뀔 때, Z는 그 외 릴리스마다, X는 수동 `major`입니다.
+CI(`seg-release.yml`)가 main에서 Segmenter CI를 통과한 커밋만 `wapul-seg@X.Y.Z`로 npm에 올리고 `seg-vX.Y.Z` 태그를 답니다. Y는 루트 `model/wapul-seg.model`이 바뀔 때, Z는 그 외 릴리스마다, X는 수동 `major`입니다.
 
 자세한 결정과 구조는 [배포 문서](https://jjh4450.github.io/wapul/ml/deploy/)에 있습니다.

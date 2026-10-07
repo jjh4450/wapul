@@ -265,20 +265,17 @@ impl Model {
 mod tests {
     use super::*;
 
-    /// The release model at the repo root (docs/ml/deploy.ko.md, "모델").
-    fn release_model() -> Segmenter {
-        let read = |name: &str| {
-            std::fs::read_to_string(
-                concat!(env!("CARGO_MANIFEST_DIR"), "/../model/").to_owned() + name,
-            )
-            .unwrap()
-        };
-        Segmenter::from_text(
-            &read("kinds-lgbm.txt"),
-            &read("kinds-features.txt"),
-            &read("blocks-lgbm.txt"),
-        )
+    /// The packed release model at the repo root (docs/ml/deploy.ko.md, "모델").
+    fn release_bytes() -> Vec<u8> {
+        std::fs::read(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../model/wapul-seg.model"
+        ))
         .unwrap()
+    }
+
+    fn release_model() -> Segmenter {
+        Segmenter::from_bytes(&release_bytes()).unwrap()
     }
 
     const FEATURES: &str = "lang=cpp\ncat=expression\nt:cin\nt:>>\nt:n\nheader\t0\ndepth\t0\npos\t0.5\n\n\
@@ -316,19 +313,9 @@ mod tests {
 
     #[test]
     fn packed_model_reads_back_the_same() {
-        let m = release_model();
-        let bytes = m.to_bytes();
-        let packed = Segmenter::from_bytes(&bytes).unwrap();
-        assert_eq!(packed.kinds(FEATURES).unwrap(), m.kinds(FEATURES).unwrap());
-        assert_eq!(packed.columns, m.columns);
-        let own = vec![0.0f32; 3 * blocks::N_OWN];
-        let facts = vec![0; 3 * blocks::N_FACTS];
-        assert_eq!(
-            packed
-                .blocks(&own, &facts, &[0; 4], &[], &[0; 4], &[])
-                .unwrap(),
-            m.blocks(&own, &facts, &[0; 4], &[], &[0; 4], &[]).unwrap()
-        );
+        let bytes = release_bytes();
+        let m = Segmenter::from_bytes(&bytes).unwrap();
+        assert_eq!(m.to_bytes(), bytes);
         assert!(Segmenter::from_bytes(&bytes[..bytes.len() / 2]).is_err());
         assert!(Segmenter::from_bytes(b"nope").is_err());
         let mut wrong_format = bytes.clone();

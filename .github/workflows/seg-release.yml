@@ -57,7 +57,7 @@ jobs:
             fi
           fi
 
-          MODEL=$(cat model/kinds-lgbm.txt model/kinds-features.txt model/blocks-lgbm.txt | sha256sum | cut -c1-16)
+          MODEL=$(sha256sum model/wapul-seg.model | cut -c1-16)
           if [ -z "$LAST" ]; then
             VERSION="1.0.0"
           else
@@ -137,4 +137,4 @@ jobs:
             --generate-notes \
             --title "Segmenter $TAG" \
             --notes "npm: https://www.npmjs.com/package/wapul-seg/v/$VERSION
-          Model: \`$MODEL\` (sha256 of model/*.txt, first 16 hex)"
+          Model: \`$MODEL\` (sha256 of model/wapul-seg.model, first 16 hex)"

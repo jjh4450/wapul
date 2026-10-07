@@ -11,7 +11,7 @@ import { analyze } from '../src/ast.ts';
 import { type Assets } from '../src/assets.ts';
 import { blockFeatures } from '../src/blocks.ts';
 import { KINDS, segment } from '../src/index.ts';
-import { featureText, unitFeatures, withNgrams } from '../src/kinds.ts';
+import { featureText, literalSpans, unitFeatures, withNgrams } from '../src/kinds.ts';
 import { grammarFile, type Language, LANGUAGES } from '../src/languages.ts';
 import { model } from '../src/model.ts';
 import { normalize } from '../src/normalize.ts';
@@ -106,7 +106,9 @@ describe.each(cases)('$id', (c) => {
   test('kind features', async () => {
     const tree = await parsed();
     const us = units(tree, c.code);
-    const feats = withNgrams(unitFeatures(c.code, c.language, us, analyze(tree, us, c.language)));
+    const feats = withNgrams(
+      unitFeatures(c.code, c.language, us, analyze(tree, us, c.language), literalSpans(tree))
+    );
 
     tree.delete();
     expect(feats.map((f) => Object.fromEntries(f))).toEqual(c.features);
@@ -116,7 +118,9 @@ describe.each(cases)('$id', (c) => {
     const m = await model(assets);
     const tree = await parsed();
     const us = units(tree, c.code);
-    const feats = withNgrams(unitFeatures(c.code, c.language, us, analyze(tree, us, c.language)));
+    const feats = withNgrams(
+      unitFeatures(c.code, c.language, us, analyze(tree, us, c.language), literalSpans(tree))
+    );
     const kinds = [...m.kinds(featureText(feats))].map((k) => KINDS[k]);
 
     tree.delete();
