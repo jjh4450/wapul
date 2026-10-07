@@ -47,7 +47,10 @@ class LgbmKinds:
         return cls(state["features"], lightgbm.Booster(model_file=str(trees)))
 
 
-def train(feats: list[dict[str, float]], kinds: list[str], seed: int = 0) -> LgbmKinds:
+def train(feats: list[dict[str, float]], kinds: list[str], seed: int = 0, keep: set[str] | None = None) -> LgbmKinds:
+    """`keep`: only these feature names enter the model (segmenter-v3 and later)."""
+    if keep is not None:
+        feats = [{n: v for n, v in f.items() if n in keep} for f in feats]
     vec = DictVectorizer()
     X = vec.fit_transform(feats).astype(np.float32)
     clf = lightgbm.LGBMClassifier(**PARAMS, random_state=seed, verbose=-1)

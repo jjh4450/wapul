@@ -86,3 +86,19 @@ def with_ngrams(feats: list[dict[str, float]]) -> list[dict[str, float]]:
                     g[f"{prefix}#{c}"] = 1.0
         out.append(g)
     return out
+
+
+def source_of(solution_id: str) -> str:
+    """The repository a solution came from, from its id."""
+    return "/".join(solution_id.split("/")[:3])
+
+
+def common_features(feats: list[list[dict[str, float]]], sources: list[str], min_sources: int) -> set[str]:
+    """Feature names that solutions from at least `min_sources` distinct sources contain, given
+    each solution's unit features. A feature only one repository has does not carry over to
+    other code (segmenter-v3 and later)."""
+    seen: dict[str, set[str]] = {}
+    for sol_feats, source in zip(feats, sources, strict=True):
+        for name in {n for f in sol_feats for n in f}:
+            seen.setdefault(name, set()).add(source)
+    return {n for n, s in seen.items() if len(s) >= min_sources}

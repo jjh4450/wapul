@@ -28,6 +28,7 @@
 | 정규화 + tree-sitter 문장 단위 | 라벨이 이 단위로 만들어짐 | 적용 (`normalize.py`, `units.py`) |
 | 종류 분류: 문장과 앞뒤 3문장의 토큰, 감싸는 제어문·함수 머리, AST 사실을 특징으로 LightGBM | CodeSeg의 맥락 붙이기 | 적용 (`features/kind_features.py`, `models/kind_lgbm.py`) |
 | 종류 특징: 식별자의 글자 3·4-gram | 학습하지 않은 언어의 입출력 관용구 | 적용 (`with_ngrams`, [실험 23](experiments.md)). Rust를 학습 없이 지원 |
+| 종류 특징: 저장소 5곳 이상에 나온 것만 | 한 저장소에만 나오는 특징은 일반화되지 않고 모델만 키움 | 적용 (`common_features`, [실험 24](experiments.md)) |
 | 종류 분류: 앞뒤 3문장 맥락을 붙인 입력으로 CodeBERT 미세조정 | CodeSeg | `segmenter-v1`에만: LightGBM과 점수가 같고 크기와 CPU 시간이 수백 배 ([실험 22](experiments.md), `models/kind_classifier.py`) |
 | 블럭 특징: 데이터 흐름 사슬, 제어문 덩어리, 같은 문법 유형 + 거리, 깊이 | SEGMENT | 적용 (`features/unit_ast.py`) |
 | 블럭 묶기: logic 문장마다 지금까지 만든 블럭 중 하나 또는 새 블럭을 고름 | 대화 분리, 군집 순위(cluster ranking) | 적용 (`features/candidates.py`, `models/block_ranker.py`, 블럭 단위) |
@@ -51,7 +52,7 @@
 
 | 대상 | 점수 |
 |------|------|
-| 종류 macro-F1 | 0.902 (학습하지 않은 Rust 12개: 0.870) |
+| 종류 macro-F1 | 0.900 (학습하지 않은 Rust 12개: 특징을 줄이기 전 0.870) |
 | 블럭 묶기 B³ / CEAF-e | 0.809 / 0.732 |
 | 같은 블럭 쌍 정밀도 / 재현율 / F1 | 0.654 / 0.682 / 0.668 |
 | 모델 크기 | 7.8MB (종류 트리 6.8MB, 특징 이름 0.4MB, 블럭 트리 0.5MB) |
