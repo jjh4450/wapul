@@ -3,7 +3,7 @@
   import { expect, fn, waitFor, within } from 'storybook/test';
   import { FakeApi, empty, reply } from '#lib/api/fake.js';
   import { record, sharedRecord } from '#lib/api/fixtures.js';
-  import { shuffledExamples } from '#lib/questions.js';
+  import { EXAMPLES } from '#lib/questions.js';
   import { truncate } from '#lib/study.js';
   import AnswerSheet from './AnswerSheet.svelte';
 
@@ -49,7 +49,7 @@
     // 빈 칸에는 다른 문제에서 가져온 예제가 회색 안내문으로 뜬다
     const placeholder = canvas.getByLabelText(problemQuestion).getAttribute('placeholder');
 
-    await expect(shuffledExamples('problem').map((e) => truncate(e, 90))).toContain(placeholder);
+    await expect(EXAMPLES.problem.map((e) => truncate(e, 90))).toContain(placeholder);
 
     // 처음 제출과 달라진 점은 건너뛸 수 있다
     await expect(canvas.getByText('건너뛸 수 있어요.')).toBeInTheDocument();

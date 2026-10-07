@@ -7,7 +7,7 @@
   import CodeView from '#lib/components/CodeView.svelte';
   import { Badge } from '#lib/components/ui/badge/index.js';
   import { Button } from '#lib/components/ui/button/index.js';
-  import { shuffledExamples } from '#lib/questions.js';
+  import { pickExample } from '#lib/questions.js';
   import { BLOCK_KIND_LABEL, blockLabels, unitLines } from '#lib/study.js';
 
   let {
@@ -29,7 +29,7 @@
   let status = $state('');
 
   /** 질문마다 다른 문제의 예제 답 (답 칸의 회색 안내문) */
-  let examples = $state<{ [questionId: string]: string[] }>({});
+  let examples = $state<{ [questionId: string]: string }>({});
 
   // 마지막으로 저장된 답. 바뀐 칸만 저장한다
   const saved = new SvelteMap<string, string>();
@@ -58,9 +58,7 @@
     }
 
     record = result.data;
-    examples = Object.fromEntries(
-      result.data.questions.map((q) => [q.id, shuffledExamples(q.kind)])
-    );
+    examples = Object.fromEntries(result.data.questions.map((q) => [q.id, pickExample(q.kind)]));
 
     for (const q of result.data.questions) saved.set(q.id, q.answer);
   });
@@ -98,7 +96,7 @@
   <AnswerField
     id={question.id}
     question={question.text}
-    examples={examples[question.id] ?? []}
+    example={examples[question.id] ?? ''}
     note={question.kind === 'revision' ? '건너뛸 수 있어요.' : undefined}
     bind:value={question.answer}
     oncommit={() => commit(question)}

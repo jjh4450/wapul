@@ -76,7 +76,7 @@ const VARYING_GENERAL = [
   '만약 입력이 하나뿐이라면 이 풀이는 어떻게 될까요?'
 ];
 
-const EXAMPLES = {
+export const EXAMPLES = {
   problem: [
     'N이 100만이라 O(n²) 정렬은 시간 안에 못 끝난다. 비교 정렬은 O(n log n)보다 빠를 수 없어서 병합 정렬을 썼다.',
     '퀸은 한 줄에 하나만 놓인다. 그래서 줄마다 하나씩 놓아 보고, 이미 막힌 칸이면 더 내려가지 않고 되돌아가는 백트래킹을 썼다.',
@@ -283,14 +283,7 @@ export function keepQuestions(
   return rest;
 }
 
-/** 질문 종류의 예제 답을 매번 다른 순서로. 답 칸에는 첫 예제부터 보인다 */
-export function shuffledExamples(kind: QuestionKind, random: () => number = Math.random): string[] {
-  const examples = [...EXAMPLES[kind]];
-
-  for (let i = examples.length - 1; i > 0; i--) {
-    const j = Math.floor(random() * (i + 1));
-    [examples[i], examples[j]] = [examples[j], examples[i]];
-  }
-
-  return examples;
+/** 질문 종류의 예제 답 하나. 답 칸에 회색 안내문으로 이것만 보인다 */
+export function pickExample(kind: QuestionKind, random: () => number = Math.random): string {
+  return choice(EXAMPLES[kind], random);
 }

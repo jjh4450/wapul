@@ -5,45 +5,34 @@
 
   const question = '이 부분이 끝나면 무엇이 보장되고, 그게 왜 성립하나요?';
 
-  const examples = [
-    '정렬이 끝나면 회의가 끝나는 시간 순서로 놓인다.',
-    '이 부분이 끝나면 cur와 prev에는 F(i)와 F(i-1)이 들어 있다.'
-  ];
+  const example = '정렬이 끝나면 회의가 끝나는 시간 순서로 놓인다.';
 
   const { Story } = defineMeta({
     title: 'Components/AnswerField',
     component: AnswerField,
     tags: ['autodocs'],
-    args: { id: 'q1', question, examples, oncommit: fn() }
+    args: { id: 'q1', question, example, oncommit: fn() }
   });
 </script>
 
 <Story
   name="Empty"
-  play={async ({ canvas, userEvent }) => {
-    const field = canvas.getByLabelText(question);
-
-    const next = canvas.getByRole('button', { name: '다른 예시' });
-
-    // 예제는 하나씩만 보이고, 다른 예시로 넘기면 끝에서 처음으로 돌아온다
-    await expect(field).toHaveAttribute('placeholder', examples[0]);
-    await userEvent.click(next);
-    await expect(field).toHaveAttribute('placeholder', examples[1]);
-    await userEvent.click(next);
-    await expect(field).toHaveAttribute('placeholder', examples[0]);
+  play={async ({ canvas }) => {
+    // 예제는 빈 칸의 회색 안내문 하나뿐이고 넘겨 볼 버튼은 없다
+    await expect(canvas.getByLabelText(question)).toHaveAttribute('placeholder', example);
+    await expect(canvas.queryByRole('button')).not.toBeInTheDocument();
   }}
 />
 
 <Story
   name="LongExample"
-  args={{ examples: ['가'.repeat(120)] }}
+  args={{ example: '가'.repeat(120) }}
   play={async ({ canvas }) => {
-    // 칸보다 긴 예제는 ...로 줄이고, 예제가 하나면 넘길 버튼이 없다
+    // 칸보다 긴 예제는 ...로 줄인다
     await expect(canvas.getByLabelText(question)).toHaveAttribute(
       'placeholder',
       `${'가'.repeat(90)}...`
     );
-    await expect(canvas.queryByRole('button', { name: '다른 예시' })).not.toBeInTheDocument();
   }}
 />
 
@@ -56,8 +45,7 @@
   }}
   play={async ({ canvas }) => {
     await expect(canvas.getByText('건너뛸 수 있어요.')).toBeInTheDocument();
-    // 답을 쓰고 나면 예제를 넘길 일이 없다
-    await expect(canvas.queryByRole('button', { name: '다른 예시' })).not.toBeInTheDocument();
+    await expect(canvas.getByRole('textbox')).toHaveValue('시작 시간도 함께 정렬했다.');
   }}
 />
 
