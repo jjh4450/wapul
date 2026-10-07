@@ -26,34 +26,38 @@
 | 구성 요소 | 근거 | 상태 |
 |-----------|------|------|
 | 정규화 + tree-sitter 문장 단위 | 라벨이 이 단위로 만들어짐 | 적용 (`normalize.py`, `units.py`) |
-| 종류 분류: 앞뒤 3문장 맥락을 붙인 입력으로 CodeBERT 미세조정 | CodeSeg | 적용 (`models/kind_classifier.py`, `context_text`) |
+| 종류 분류: 문장과 앞뒤 3문장의 토큰, 감싸는 제어문·함수 머리, AST 사실을 특징으로 LightGBM | CodeSeg의 맥락 붙이기 | 적용 (`features/kind_features.py`, `models/kind_lgbm.py`) |
+| 종류 분류: 앞뒤 3문장 맥락을 붙인 입력으로 CodeBERT 미세조정 | CodeSeg | `segmenter-v1`에만: LightGBM과 점수가 같고 크기와 CPU 시간이 수백 배 ([실험 22](experiments.md), `models/kind_classifier.py`) |
 | 블럭 특징: 데이터 흐름 사슬, 제어문 덩어리, 같은 문법 유형 + 거리, 깊이 | SEGMENT | 적용 (`features/unit_ast.py`) |
 | 블럭 묶기: logic 문장마다 지금까지 만든 블럭 중 하나 또는 새 블럭을 고름 | 대화 분리, 군집 순위(cluster ranking) | 적용 (`features/candidates.py`, `models/block_ranker.py`, 블럭 단위) |
-| 블럭 점수기: 작은 MLP(softmax, 정답 후보 확률 합 최대화) + LightGBM LambdaRank의 확률 평균 | Lee 외 2017, LambdaRank | 적용 |
-| 최종 모델 묶음과 예측 | — | 적용 (`wapul_ml/models/segmenter.py`, 저장은 `models/segmenter-v1/`) |
+| 블럭 점수기: LightGBM LambdaRank | LambdaRank | 적용 |
+| 블럭 점수기: 작은 MLP(softmax, 정답 후보 확률 합 최대화) + LightGBM의 확률 평균 | Lee 외 2017 | `segmenter-v1`에만: LightGBM만 쓸 때보다 B³ 0.007 높지만 잡음 안이고, v2는 런타임을 하나로 둠 |
+| 최종 모델 묶음과 예측 | — | 적용 (`wapul_ml/models/segmenter.py`, 저장은 `models/segmenter-v2/`). `segmenter-v1`은 고정된 `segmenter_v1.py`로 읽음 |
 | 쌍 "같은 블럭?" 분류(RBF SVM) + α 임계값 + 순서대로 붙이기 | 상호참조 점진적 군집 | 비교 기준으로 남김 (`models/baseline.py`, `notebooks/baseline_cv.py`) |
-| 문장 임베딩(E5 등) | SetFit의 linear probe | 제외: 블럭 묶기에 기여 없음, 종류 분류는 CodeBERT 미세조정이 더 높음 |
+| 문장 임베딩(E5 등) | SetFit의 linear probe | 제외: 블럭 묶기에 기여 없음, 종류 분류는 문자열 특징 LightGBM이 더 높음 |
 | 임베딩 미세조정(SetFit, TSDAE, E5 쌍 점수기) | SetFit, TSDAE | 제외: 블럭 묶기가 오르지 않거나 떨어짐 |
 | CodeBERT로 문장 쌍을 함께 읽는 블럭 점수기 | 대화 분리의 BERT 쌍 점수기 | 제외: AST MLP보다 높지 않고 CPU 비용이 logic 문장 수의 제곱 |
+| 문장 모양(AST 잎 토큰) 유사도, 사용자 함수 호출 관계 | 오류 분석 | 제외: 라벨에서 같은 블럭 신호가 약하고 점수 차이가 잡음 안([실험 20, 21](experiments.md)) |
 | 이어진 구간 경계 찍기 | CodeSeg의 범위 묶기, 텍스트 분할 | 제외: 떨어진 블럭 19%를 표현 못 함 |
-| 스코프를 구분한 def-use 연결 (가장 최근 정의 → 사용) | SEGMENT의 데이터 흐름 사슬 | 미적용. 지금은 변수를 이름으로만 비교해서 반복문마다 다시 쓰는 `i`, `j`가 같은 변수로 잡힘 |
+| 스코프를 구분한 def-use 연결 (가장 최근 정의 → 사용) | SEGMENT의 데이터 흐름 사슬 | 제외: 이름만 같아 생긴 잘못된 연결은 잘못 합친 쌍의 1.5%에만 걸림([실험 18](experiments.md)) |
 | 평가: B³, CEAF-e | 상호참조 평가 | 적용 (`evaluation/metrics.py`) |
 
 ## 현재 결과
 
 사람이 검토한 풀이 300건(6,435문장)에 대한 5-fold 교차 검증입니다. 블럭 묶기는 정답 종류를 준 상태에서 logic 문장만 묶은 점수입니다. 300건에서는 B³ 약 0.018, 쌍 F1 약 0.040 미만의 차이를 확정할 수 없습니다.
 
-**최종 모델** (`segmenter-v1`)
+**최종 모델** (`segmenter-v2`)
 
 | 대상 | 점수 |
 |------|------|
-| 종류 macro-F1 | 0.887 (input 0.907, output 0.773, logic 0.933, none 0.935) |
-| 블럭 묶기 B³ / CEAF-e | 0.816 / 0.742 |
-| 같은 블럭 쌍 정밀도 / 재현율 / F1 | 0.664 / 0.692 / 0.678 |
-| CPU 추론, 풀이 하나 (4스레드, 중앙값 / 최대) | 1.3초 / 4.5초 |
+| 종류 macro-F1 | 0.891 |
+| 블럭 묶기 B³ / CEAF-e | 0.809 / 0.732 |
+| 같은 블럭 쌍 정밀도 / 재현율 / F1 | 0.654 / 0.682 / 0.668 |
+| 모델 크기 | 6.9MB |
+| CPU 추론, 풀이 하나 (4스레드, 중앙값 / 최대) | 0.00초 / 0.01초 |
 
 - 이 구성 그대로의 전체(end to end) 점수는 아직 없습니다. 블럭 묶기가 SVM + α 군집일 때 전체 B³는 0.830이었습니다.
-- CPU 시간은 Ryzen 9 9900X에서 잰 값이고, 거의 전부 종류 분류의 CodeBERT가 씁니다.
+- CPU 시간은 Ryzen 9 9900X에서 잰 값입니다.
 
 **비교 기준** (블럭 묶기, 정답 종류)
 
@@ -61,7 +65,8 @@
 |------|----|-------|
 | 전부 한 블럭 | 0.485 | 0.349 |
 | 쌍 + α 군집 (`notebooks/baseline_cv.py`) | 0.793 | 0.630 |
-| **최종 모델** | **0.816** | **0.678** |
+| `segmenter-v1` (MLP + LightGBM) | 0.816 | 0.678 |
+| **최종 모델** (LightGBM) | **0.809** | **0.668** |
 
 ## 근거
 
@@ -88,7 +93,8 @@
 
 ## 순서
 
-1. 최종 모델 구성 그대로 전체(end to end) 점수 재기
-2. 종류 분류 CodeBERT의 int8 양자화: CPU 시간을 줄이되 macro-F1이 유지되는지 확인
-3. 스코프를 구분한 def-use 특징: 블럭 묶기의 정보가 AST 관계에서 나오므로 그 정확도를 높임
-4. 라벨 늘리기: LLM 초안을 학습 데이터로 쓰는 방안을 검토
+`segmenter-v2`는 모델 경량화 실험의 결과로 고정합니다. 다음 버전은 배포 실험입니다.
+
+1. `segmenter-v3`: 다른 시스템(프론트엔드, 백엔드)이 WASM 하나로 모델을 쓰게 하는 실험. 문장 나누기부터 추론까지 Rust로 옮기고(tree-sitter는 파이썬과 같은 문법 버전, LightGBM 추론은 [bosk](https://github.com/stanwarp/bosk)를 가져와 다중 클래스와 희소 입력을 더함), 종류 특징에 글자 n-gram을 더하고([실험 23](experiments.md)), Rust를 지원 언어에 넣음. 파이썬과 출력이 같은지 corpus 전체로 확인
+2. 최종 모델 구성 그대로 전체(end to end) 점수 재기
+3. 라벨 늘리기: LLM 초안을 학습 데이터로 쓰는 방안을 검토

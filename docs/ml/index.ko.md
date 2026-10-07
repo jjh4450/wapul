@@ -26,20 +26,30 @@ wapul-ml/
 │   │   └── solutions.py       # 라벨과 corpus를 문장 단위 데이터로 불러오기
 │   ├── features/
 │   │   ├── unit_ast.py        # 문장별 AST 정보 (변수 흐름, 감싸는 제어문, 문장 범주)와 SEGMENT 쌍 특징
+│   │   ├── kind_features.py   # 종류 분류 특징 (토큰과 AST 사실의 문자열 사전)
 │   │   └── candidates.py      # 블럭 묶기 후보 행 (앞 문장 단위, 블럭 단위)
 │   ├── models/
-│   │   ├── kind_classifier.py # 종류 분류: CodeBERT 미세조정
+│   │   ├── kind_lgbm.py       # 종류 분류: LightGBM
+│   │   ├── kind_classifier.py # 종류 분류: CodeBERT 미세조정 (segmenter-v1)
 │   │   ├── block_ranker.py    # 블럭 묶기: 후보 점수기(MLP, LightGBM)와 디코딩
-│   │   ├── segmenter.py       # 최종 모델: 학습, 저장, 예측
+│   │   ├── segmenter.py       # 최종 모델 v2: 학습, 저장, 예측
+│   │   ├── segmenter_v1.py    # segmenter-v1 읽기 (고정)
 │   │   └── baseline.py        # 비교 기준: 쌍 분류 + α 군집
 │   └── evaluation/
 │       ├── metrics.py         # 블럭 묶기 평가 지표
 │       └── review.py          # 검토 화면 (HTML)
 ├── notebooks/                 # 실험: jupytext 형식의 노트북
-│   ├── kinds_cv.py            # 종류 분류 교차 검증
+│   ├── kinds_light_cv.py      # 종류 분류 교차 검증: 선형 모델, LightGBM
+│   ├── kinds_cv.py            # 종류 분류 교차 검증: CodeBERT
+│   ├── kinds_ngram.py         # 종류 분류 글자 n-gram, Rust 테스트
+│   ├── rust_review.py         # Rust 풀이에 최종 모델 돌려 보기
 │   ├── blocks_cv.py           # 블럭 묶기 교차 검증
 │   ├── baseline_cv.py         # 비교 기준과 전체(end to end) 교차 검증
-│   └── cpu_time.py            # 최종 모델의 CPU 추론 시간
+│   ├── cpu_time.py            # 최종 모델의 CPU 추론 시간
+│   ├── defuse_errors.py       # 오류 분석: 이름 연결과 def-use 연결
+│   ├── block_errors.py        # 오류 분석: 데이터 흐름이 없는 오류
+│   ├── shape_feature.py       # 문장 모양 특징
+│   └── call_feature.py        # 함수 호출 특징
 ├── models/                    # 학습한 모델 (git에서 무시)
 ├── Dockerfile                 # 실험 실행 환경
 └── data/                      # 비공개 데이터 저장소 (git에서 무시)
@@ -102,13 +112,14 @@ docker run --rm --gpus all -p 8888:8888 \
 ### 최종 모델
 
 ```bash
-python -m wapul_ml train                    # 라벨 전체로 학습해 models/segmenter-v1/에 저장
+python -m wapul_ml train                    # 라벨 전체로 학습해 models/segmenter-v2/에 저장
 python -m wapul_ml predict FILE LANGUAGE    # 파일 하나의 문장 라벨을 JSON으로 출력
 python -m wapul_ml review [N]               # 라벨 없는 corpus 풀이 N개를 cache/review.html로
 ```
 
-- 학습한 모델은 `models/segmenter-vN/`에 저장됩니다(git에서 무시). 다시 학습할 때는 `wapul_ml/models/segmenter.py`의 `OUT` 버전을 올립니다. 이미 모델이 있는 폴더에는 `train`이 저장하지 않습니다.
-- `models/` 아래의 학습된 모델은 지우지 않고 옮깁니다. git에서 무시되어 지우면 되돌릴 수 없고, 다시 학습해도 같은 모델이 나오지 않습니다. 블럭 점수기는 똑같이 나오지만, 종류 분류기는 GPU 연산이 실행마다 조금씩 달라 같은 코드의 재학습에서 문장 종류 예측의 약 1%가 달라졌습니다.
+- 학습한 모델은 `models/segmenter-vN/`에 저장됩니다(git에서 무시). 다시 학습할 때는 `wapul_ml/models/segmenter.py`의 `OUT` 버전을 올립니다. 이미 모델이 있는 폴더에는 `train`이 저장하지 않습니다. `segmenter.py`는 `format` 2인 모델(`segmenter-v2`)을 읽고, `segmenter-v1`은 `wapul_ml.models.segmenter_v1`의 `BlockModel`로 읽습니다.
+- 버전을 올려도 이전 버전 코드는 고정합니다. `segmenter_v1.py`는 고치지 않고, 그것이 가져다 쓰는 공용 코드(`units.py`, `normalize.py`, `features/`, `block_ranker.py`, `kind_classifier.py`)를 고칠 때는 `segmenter-v1`의 출력이 그대로인지 확인합니다.
+- `models/` 아래의 학습된 모델은 지우지 않고 옮깁니다. git에서 무시되어 지우면 되돌릴 수 없고, 다시 학습해도 같은 모델이 나온다는 보장이 없습니다. `segmenter-v1`의 CodeBERT 종류 분류기는 GPU 연산이 실행마다 조금씩 달라 같은 코드의 재학습에서 문장 종류 예측의 약 1%가 달라졌습니다.
 - `predict`는 `labels.jsonl`과 같은 형식으로, 문장마다 `start` / `end`(줄은 1부터, 열은 0부터 글자 단위, 끝은 포함하지 않음), `kind`, logic이면 `block`(1부터)을 냅니다. 같은 블럭 번호가 떨어져 있을 수 있습니다.
 - `cache/review.html`은 비공개 데이터를 담으므로 로컬에서만 엽니다(예: `cd cache && python -m http.server 8765 --bind 127.0.0.1`).
 - Windows Git Bash에서는 `/work` 같은 경로가 Windows 경로로 바뀌어 마운트가 깨집니다. 명령 앞에 `MSYS_NO_PATHCONV=1`을 붙입니다. PowerShell에서는 `-v "${PWD}:/work"`로 씁니다.

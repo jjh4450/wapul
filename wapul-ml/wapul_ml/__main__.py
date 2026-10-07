@@ -1,6 +1,6 @@
 """The block model's command line.
 
-python -m wapul_ml train                    # fit and save to models/segmenter-v1/
+python -m wapul_ml train                    # fit and save to models/segmenter-v2/
 python -m wapul_ml predict FILE LANGUAGE    # print the labels of one file as JSON
 python -m wapul_ml review [N]               # N random unlabeled corpus solutions -> cache/review.html
 """

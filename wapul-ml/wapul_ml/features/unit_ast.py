@@ -53,6 +53,26 @@ _CATEGORY_BY_TYPE = {
     "local_variable_declaration": "declaration",
     "field_declaration": "declaration",
     "expression_statement": "expression",
+    # Rust
+    "use_declaration": "import",
+    "mod_item": "def",
+    "function_item": "def",
+    "impl_item": "def",
+    "struct_item": "def",
+    "enum_item": "def",
+    "trait_item": "def",
+    "for_expression": "loop",
+    "while_expression": "loop",
+    "loop_expression": "loop",
+    "if_expression": "branch",
+    "match_expression": "branch",
+    "match_arm": "branch",
+    "return_expression": "return",
+    "break_expression": "jump",
+    "continue_expression": "jump",
+    "let_declaration": "declaration",
+    "const_item": "declaration",
+    "static_item": "declaration",
 }
 LOOPS = {t for t, c in _CATEGORY_BY_TYPE.items() if c == "loop"}
 DEFS = {t for t, c in _CATEGORY_BY_TYPE.items() if c == "def"}
@@ -109,7 +129,7 @@ def _writes(node: Node, start: int, end: int, out: set[str]) -> None:
         return
     t = node.type
     target = None
-    if t in ("assignment_expression", "assignment", "augmented_assignment"):
+    if t in ("assignment_expression", "assignment", "augmented_assignment", "compound_assignment_expr"):
         target = node.child_by_field_name("left")
     elif t in ("init_declarator", "variable_declarator"):
         target = node.child_by_field_name("declarator") or node.child_by_field_name("name")
@@ -117,6 +137,8 @@ def _writes(node: Node, start: int, end: int, out: set[str]) -> None:
         target = node.child_by_field_name("argument") or (node.named_children[0] if node.named_children else None)
     elif t in ("for_range_loop",):
         target = node.child_by_field_name("declarator")
+    elif t in ("let_declaration", "for_expression"):  # Rust `let x =`, `for x in`
+        target = node.child_by_field_name("pattern")
     elif t == "for_statement" and node.child_by_field_name("left") is not None:  # Python `for x in`
         target = node.child_by_field_name("left")
     elif t == "binary_expression" and node.child_by_field_name("operator") is not None:
