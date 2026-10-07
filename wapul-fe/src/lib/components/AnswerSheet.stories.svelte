@@ -14,8 +14,28 @@
     args: { id: 'record-1', onfinish: fn(), onnotowner: fn() }
   });
 
+  /** 블럭 수정을 받은 대로 저장한 것처럼 돌려준다. 백엔드처럼 블럭과 질문에 새 id를 붙인다 */
+  const echoBlocks: FakeHandler = (call) => {
+    const body: { blocks: RecordOut['blocks']; questions: QuestionIn[] } = JSON.parse(call.body);
+
+    const saved: RecordOut = {
+      ...record,
+      blocks: body.blocks.map((b, i) => ({ ...b, id: `new-block-${i}` })),
+      questions: body.questions.map((q, i) => ({
+        id: `new-q-${i}`,
+        block_id: q.block == null ? null : `new-block-${q.block}`,
+        kind: q.kind,
+        text: q.text,
+        answer: q.answer
+      }))
+    };
+
+    return reply(saved)(call);
+  };
+
   const writing = new FakeApi([
     ['GET /v1/records/:id', reply(record)],
+    ['PUT /v1/records/:id/blocks', echoBlocks],
     ['PATCH /v1/records/:id/answers', empty()]
   ]);
 
@@ -39,28 +59,9 @@
 
   const viewer = new FakeApi([['GET /v1/records/:id', reply(sharedRecord)]]);
 
-  /** 블럭 수정을 받은 대로 저장한 것처럼 돌려준다. 백엔드처럼 블럭과 질문에 새 id를 붙인다 */
-  const echoBlocks: FakeHandler = (call) => {
-    const body: { blocks: RecordOut['blocks']; questions: QuestionIn[] } = JSON.parse(call.body);
-
-    const saved: RecordOut = {
-      ...record,
-      blocks: body.blocks.map((b, i) => ({ ...b, id: `new-block-${i}` })),
-      questions: body.questions.map((q, i) => ({
-        id: `new-q-${i}`,
-        block_id: q.block == null ? null : `new-block-${q.block}`,
-        kind: q.kind,
-        text: q.text,
-        answer: q.answer
-      }))
-    };
-
-    return reply(saved)(call);
-  };
-
-  const marking = new FakeApi([
+  const markFails = new FakeApi([
     ['GET /v1/records/:id', reply(record)],
-    ['PUT /v1/records/:id/blocks', echoBlocks],
+    ['PUT /v1/records/:id/blocks', reply({ detail: 'x' }, 500)],
     ['PATCH /v1/records/:id/answers', empty()]
   ]);
 
@@ -148,7 +149,7 @@
 
 <Story
   name="MarkWrongInThread"
-  beforeEach={() => marking.install()}
+  beforeEach={() => writing.install()}
   play={async ({ canvas, userEvent }) => {
     await userEvent.click(await canvas.findByRole('button', { name: '다음 질문' }));
 
@@ -163,7 +164,7 @@
     await waitFor(() => expect(input().getByText('건너뛸 수 있어요.')).toBeInTheDocument());
     await expect(input().getByLabelText(/입력 조건/)).toHaveValue('N은 10만 이하');
 
-    const [call] = marking.callsTo('PUT', '/v1/records/record-1/blocks');
+    const [call] = writing.callsTo('PUT', '/v1/records/record-1/blocks');
 
     const sent = JSON.parse(call.body).questions.map((q: QuestionIn) => [q.kind, q.block]);
 
@@ -172,6 +173,23 @@
       ['input_condition', 0],
       ['revision', 0]
     ]);
+  }}
+/>
+
+<Story
+  name="MarkWrongFails"
+  beforeEach={() => markFails.install()}
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '다음 질문' }));
+
+    const input = within(canvas.getByRole('region', { name: '입력' }));
+    const mark = input.getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ });
+
+    // 저장하지 못하면 체크가 켜진 채로 남지 않고, 이유가 체크 바로 아래에 뜬다
+    await userEvent.click(mark);
+    await expect(await input.findByText(/표시를 바꾸지 못했어요/)).toBeInTheDocument();
+    await expect(mark).not.toBeChecked();
+    await expect(input.queryByText('건너뛸 수 있어요.')).not.toBeInTheDocument();
   }}
 />
 

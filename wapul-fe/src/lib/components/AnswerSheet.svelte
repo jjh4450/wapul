@@ -129,6 +129,8 @@
    * 올려 그 위에 블럭 코드가 보이게 하고, 묶음 머리를 눌렀을 때는 화면 밖으로 밀린 만큼만 움직인다
    */
   async function open(key: string, jump: boolean) {
+    if (key !== current) markError = '';
+
     current = key;
     await tick();
 
@@ -141,6 +143,9 @@
 
   /** 처음 제출에서 틀렸다는 표시를 바꾸는 중. 그동안 다시 누르지 못한다 */
   let marking = $state(false);
+
+  /** 표시를 바꾸지 못한 이유. 펼친 묶음의 체크 바로 아래에 보인다 */
+  let markError = $state('');
 
   /**
    * 블럭에 처음 제출에서 틀렸다는 표시를 켜거나 끈다. 표시는 그 블럭의 달라진 점 질문이라, 질문을
@@ -197,10 +202,12 @@
     marking = false;
 
     if (!result.ok) {
-      status = result.message;
+      markError = `표시를 바꾸지 못했어요. ${result.message}`;
 
       return;
     }
+
+    markError = '';
 
     // 블럭과 질문을 다시 만들어 id가 모두 바뀐다. 펼친 묶음, 저장한 답, 예제를 새 id로 옮긴다
     const opened = blocks.findIndex((b) => b.id === current);
@@ -288,13 +295,18 @@
         {#if t.block !== null}
           {@const block = t.block}
           <Label class="font-normal">
+            <!-- 체크는 저장된 상태(달라진 점 질문이 있는지)만 따른다. 저장에 실패하면 그대로 남는다 -->
             <Checkbox
-              checked={t.questions.some((q) => q.kind === 'revision')}
+              bind:checked={
+                () => t.questions.some((q) => q.kind === 'revision'), (on) => markWrong(block, on)
+              }
               disabled={marking}
-              onCheckedChange={(on) => markWrong(block, on)}
             />
             이 부분은 처음 제출에서 틀렸어요
           </Label>
+          {#if markError}
+            <p class="text-xs text-destructive">{markError}</p>
+          {/if}
         {/if}
         {#if next}
           <Button
