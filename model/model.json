@@ -1,0 +1,19 @@
+{
+ "format": 3,
+ "languages": [
+  "cpp",
+  "java",
+  "python",
+  "rust"
+ ],
+ "trained_on": 300,
+ "min_sources": 5,
+ "cv": {
+  "kinds_macro_f1": 0.9,
+  "blocks_given_gold_kinds": {
+   "B3": 0.809,
+   "CEAFe": 0.732,
+   "pairF1": 0.668
+  }
+ }
+}
