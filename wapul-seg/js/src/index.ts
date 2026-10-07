@@ -54,8 +54,8 @@ export async function segment(
     const asts = analyze(tree, us, language);
     const kinds = m.kinds(featureText(withNgrams(unitFeatures(code, language, us, asts))));
     const logic = asts.filter((_, j) => KINDS[kinds[j]] === 'logic');
-    const { own, pairs } = blockFeatures(logic);
-    const blocks = m.blocks(own, pairs);
+    const f = blockFeatures(logic);
+    const blocks = m.blocks(f.own, f.facts, f.readsOffsets, f.reads, f.writesOffsets, f.writes);
     let next = 0;
 
     return us.map((u, j) => {

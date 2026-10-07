@@ -1,5 +1,5 @@
 // Assemble the release under dist/ after `vite build`: the module, the WASM, the runtime and
-// grammar .wasm files, and the model from the repo root (docs/ml/deploy.ko.md, "구성"). Run
+// grammar .wasm files, and the packed model (docs/ml/deploy.ko.md, "구성"). Run
 // from js/: `node tools/bundle.ts`.
 
 import { copyFile, mkdir } from 'node:fs/promises';
@@ -13,8 +13,6 @@ const require = createRequire(import.meta.url);
 
 const js = path.resolve(import.meta.dirname, '..');
 
-const repo = path.resolve(js, '..', '..');
-
 const dist = path.join(js, 'dist');
 
 const files: [string, string][] = [
@@ -26,9 +24,8 @@ const files: [string, string][] = [
       grammarFile(language)
     ])
   )),
-  ...['kinds-lgbm.txt', 'kinds-features.txt', 'blocks-lgbm.txt', 'model.json'].map(
-    (name): [string, string] => [path.join(repo, 'model', name), `model/${name}`]
-  )
+  // The root model/ packed by scripts/build-wasm.sh
+  [path.join(js, '..', 'pkg', 'wapul-seg.model'), 'wapul-seg.model']
 ];
 
 for (const [from, to] of files) {

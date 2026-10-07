@@ -35,12 +35,8 @@ async function file(name: string): Promise<string> {
     return grammarPath(grammar);
   }
 
-  if (name === 'wapul_seg_bg.wasm') {
+  if (name === 'wapul_seg_bg.wasm' || name === 'wapul-seg.model') {
     return path.join(root, '..', 'pkg', name);
-  }
-
-  if (name.startsWith('model/')) {
-    return path.join(root, '..', '..', name);
   }
 
   throw new Error(`unknown asset ${name}`);
@@ -128,13 +124,23 @@ describe.each(cases)('$id', (c) => {
   });
 
   test('block features', async () => {
+    const m = await model(assets);
     const tree = await parsed();
     const us = units(tree, c.code);
     const logic = analyze(tree, us, c.language).filter((_, j) => c.kinds[j] === 'logic');
-    const { own, pairs } = blockFeatures(logic);
+    const f = blockFeatures(logic);
+
+    const pairs = m.pairFeatures(
+      f.own,
+      f.facts,
+      f.readsOffsets,
+      f.reads,
+      f.writesOffsets,
+      f.writes
+    );
 
     tree.delete();
-    expect([...own]).toEqual(c.own.flat().map(Math.fround));
+    expect([...f.own]).toEqual(c.own.flat().map(Math.fround));
     expect([...pairs]).toEqual(c.pairs.flat().map(Math.fround));
   });
 

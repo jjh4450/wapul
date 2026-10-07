@@ -1,5 +1,5 @@
-// Per-unit AST facts and the SEGMENT pair rules: a copy of wapul-ml's
-// wapul_ml/features/unit_ast.py, the original. Change both together and rerun the parity check.
+// Per-unit AST facts: a copy of `analyze` in wapul-ml's wapul_ml/features/unit_ast.py, the
+// original. Change both together and rerun the parity check.
 
 import { type Node, type Tree } from 'web-tree-sitter';
 
@@ -254,41 +254,4 @@ export function analyze(tree: Tree, units: Unit[], language: Language): UnitAst[
       parent: node.parent === null ? -1 : node.parent.startIndex
     };
   });
-}
-
-function intersectionSize(a: Set<string>, b: Set<string>): number {
-  let n = 0;
-
-  for (const x of a) {
-    if (b.has(x)) {
-      n += 1;
-    }
-  }
-
-  return n;
-}
-
-const flag = (v: boolean): number => (v ? 1 : 0);
-
-/** The SEGMENT block rules for unit x before unit y: 11 values. */
-export function segmentFeatures(x: UnitAst, y: UnitAst): number[] {
-  const shared = intersectionSize(x.reads, y.reads);
-  const union = x.reads.size + y.reads.size - shared;
-
-  return [
-    // data-flow chain
-    flag(intersectionSize(x.writes, y.reads) > 0),
-    flag(intersectionSize(y.writes, x.reads) > 0),
-    flag(intersectionSize(x.writes, y.writes) > 0),
-    shared / (union || 1),
-    // control block
-    flag(x.isHeader && x.span[0] <= y.span[0] && y.span[1] <= x.span[1]),
-    flag(x.control === y.control),
-    flag(x.loop === y.loop),
-    flag(x.function === y.function),
-    flag(x.parent === y.parent),
-    // same syntactic category
-    flag(x.category === y.category),
-    flag(x.nodeType === y.nodeType)
-  ];
 }

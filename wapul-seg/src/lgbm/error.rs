@@ -23,6 +23,12 @@ pub enum Error {
     /// The text parsed but contained no decision trees.
     EmptyModel,
 
+    /// The packed binary model (`binary.rs`) is truncated or malformed.
+    Binary {
+        /// What was wrong, with the byte offset where it was found.
+        message: String,
+    },
+
     /// The model uses a capability this module does not implement (e.g. linear trees). Refusing
     /// to load is deliberate: evaluating such a model with the supported subset would return
     /// silently wrong predictions.
@@ -46,6 +52,7 @@ impl fmt::Display for Error {
         match self {
             Error::Parse { line, message } => write!(f, "parse error on line {line}: {message}"),
             Error::EmptyModel => write!(f, "no decision trees found in model"),
+            Error::Binary { message } => write!(f, "packed model: {message}"),
             Error::Unsupported { message } => write!(f, "unsupported model: {message}"),
             Error::FeatureCount { expected, got } => {
                 write!(f, "model expects {expected} features, got {got}")

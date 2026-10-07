@@ -22,10 +22,12 @@
 
 #![forbid(unsafe_code)]
 
+pub mod binary;
 mod error;
 
 pub use error::{Error, Result};
 
+#[cfg(feature = "text")]
 use std::str::FromStr;
 
 /// Output transform implied by the training objective. Applied to the summed (or, under
@@ -50,6 +52,7 @@ enum Objective {
 impl Objective {
     /// Parse the value of the model file's `objective=` line, e.g. `"binary sigmoid:1"`,
     /// `"regression sqrt"` or `"multiclass num_class:4"`.
+    #[cfg(feature = "text")]
     ///
     /// Tokens after the objective name are whitelisted per objective: an unrecognised token may
     /// change the output transform (as `sqrt` does), so it is refused rather than skipped. bosk
@@ -142,6 +145,7 @@ impl Objective {
     }
 
     /// The refusal for an objective-line token outside the whitelist.
+    #[cfg(feature = "text")]
     fn unknown_token(name: &str, tok: &str) -> Error {
         Error::Unsupported {
             message: format!(
@@ -450,6 +454,7 @@ pub struct LgbModel {
 }
 
 /// Parse a whitespace-separated list of values, attributing any failure to `field` on `line`.
+#[cfg(feature = "text")]
 fn parse_list<T>(s: &str, field: &str, line: usize) -> Result<Vec<T>>
 where
     T: FromStr,
@@ -466,6 +471,7 @@ where
 }
 
 /// Parse a single scalar value, attributing any failure to `field` on `line`.
+#[cfg(feature = "text")]
 fn parse_scalar<T>(s: &str, field: &str, line: usize) -> Result<T>
 where
     T: FromStr,
@@ -478,12 +484,14 @@ where
 }
 
 impl LgbModel {
-    /// Parse a model from the contents of a LightGBM text file.
+    /// Parse a model from the contents of a LightGBM text file. Native only (feature `text`):
+    /// the WASM reads the packed form from [`binary`].
     ///
     /// Returns [`Error::Unsupported`] for models this module cannot evaluate faithfully: a
     /// refusal to load is preferred over silently wrong predictions. A file without an
     /// `objective=` line (LightGBM itself always writes one) is evaluated with the identity
     /// transform, i.e. raw scores.
+    #[cfg(feature = "text")]
     pub fn parse(content: &str) -> Result<Self> {
         let lines: Vec<&str> = content.lines().collect();
 
@@ -704,5 +712,5 @@ impl LgbModel {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "text"))]
 mod tests;

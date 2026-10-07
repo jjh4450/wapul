@@ -6,8 +6,20 @@ edition = "2024"
 [dependencies]
 wasm-bindgen = "0.2.129"
 
+[features]
+default = ["text"]
+# LightGBM's text model format: the converter and the tests read it; the WASM is built without
+# it and loads only the packed binary (scripts/build-wasm.sh)
+text = []
+
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+# Packs the text model files into the one binary the WASM loads
+[[bin]]
+name = "model-pack"
+path = "src/bin/model_pack.rs"
+required-features = ["text"]
 
 # Small WASM: no debug names, size-optimized, no unwinding tables
 [profile.release]
