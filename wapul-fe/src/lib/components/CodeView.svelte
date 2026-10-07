@@ -1,12 +1,17 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { IconChevronDown, IconX } from '@tabler/icons-svelte';
-  import type { BlockKind, Span } from '#lib/api/client.js';
+  import type { BlockKind, Language, Span } from '#lib/api/client.js';
   import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+  import { highlight, type Tint } from '#lib/highlight.js';
   import { BLOCK_KIND_LABEL, blockColors, blockLabels } from '#lib/study.js';
   import { cn } from '#lib/utils.js';
 
-  type Piece = { text: string; unit: number | null };
+  /** 줄을 문장 경계로 자른 조각. from, to는 칸 */
+  type Piece = { unit: number | null; from: number; to: number };
+
+  /** 조각을 다시 문법 색 경계로 자른 글자들. color는 글자색 클래스 */
+  type Run = { text: string; color?: string };
 
   /** 끌어서 고르는 중. 문장에서 시작하면 걸친 문장만, 줄 번호에서 시작하면 그 줄들의 문장을 모두 고른다 */
   type Drag = { by: 'unit' | 'line'; from: number; to: number };
@@ -15,6 +20,7 @@
 
   let {
     code,
+    language,
     units = [],
     blocks = [],
     focus = null,
@@ -26,6 +32,8 @@
     class: className
   }: {
     code: string;
+    /** 주면 코드에 문법 색을 칠한다 */
+    language?: Language;
     /** 문장 위치 [줄, 칸]. 칸은 글자(코드 포인트) 단위, end는 포함하지 않는다 */
     units?: Span[];
     /** 블럭마다 종류와 문장 번호. 블럭마다 색을 칠하고, 첫 문장이 있는 줄에 이름을 단다 */
@@ -47,10 +55,19 @@
 
   let drag = $state<Drag | null>(null);
 
-  const texts = $derived(code.replace(/\n$/, '').split('\n'));
+  /** 줄마다(0번이 1줄) 글자 */
+  const lines = $derived(
+    code
+      .replace(/\n$/, '')
+      .split('\n')
+      .map((line) => Array.from(line))
+  );
 
   /** 줄 번호 (1부터) */
-  const numbers = $derived(texts.map((_, i) => i + 1));
+  const numbers = $derived(lines.map((_, i) => i + 1));
+
+  /** 줄마다(0번이 1줄) 문법 색 조각 */
+  const tints: Tint[][] = $derived(language === undefined ? [] : highlight(code, language));
 
   const labels = $derived(blockLabels(blocks));
 
@@ -104,19 +121,41 @@
   }
 
   function pieces(number: number): Piece[] {
-    const chars = Array.from(texts[number - 1] ?? '');
+    const length = lines[number - 1]?.length ?? 0;
     const out: Piece[] = [];
     let col = 0;
 
     for (const [unit, from, to] of spans[number] ?? []) {
-      const end = Math.min(to, chars.length);
+      const end = Math.min(to, length);
 
-      if (from > col) out.push({ text: chars.slice(col, from).join(''), unit: null });
-      out.push({ text: chars.slice(from, end).join(''), unit });
+      if (from > col) out.push({ unit: null, from: col, to: from });
+      out.push({ unit, from, to: end });
       col = end;
     }
 
-    if (col < chars.length) out.push({ text: chars.slice(col).join(''), unit: null });
+    if (col < length) out.push({ unit: null, from: col, to: length });
+
+    return out;
+  }
+
+  function runs(number: number, piece: Piece): Run[] {
+    const chars = lines[number - 1] ?? [];
+    const text = (from: number, to: number) => chars.slice(from, to).join('');
+    const out: Run[] = [];
+    let col = piece.from;
+
+    for (const tint of tints[number - 1] ?? []) {
+      const from = Math.max(col, tint.from);
+      const to = Math.min(piece.to, tint.to);
+
+      if (from >= to) continue;
+
+      if (from > col) out.push({ text: text(col, from) });
+      out.push({ text: text(from, to), color: tint.color });
+      col = to;
+    }
+
+    if (col < piece.to) out.push({ text: text(col, piece.to) });
 
     return out;
   }
@@ -124,7 +163,9 @@
   function fill(unit: number | null): string | undefined {
     const block = unit === null ? null : owner[unit];
 
-    if (block === null || (focus !== null && block !== focus)) return undefined;
+    if (block === null) return undefined;
+
+    if (focus !== null && block !== focus) return undefined;
 
     return colors[block].fill;
   }
@@ -179,6 +220,12 @@
     if (event.detail === 0) onselect?.([unit]);
   }
 </script>
+
+{#snippet colored(
+  number: number,
+  piece: Piece
+)}{#each runs(number, piece) as run, k (k)}{#if run.color}<span class={run.color}>{run.text}</span
+      >{:else}{run.text}{/if}{/each}{/snippet}
 
 <svelte:window onpointermove={move} onpointerup={end} onpointercancel={() => (drag = null)} />
 
@@ -258,13 +305,13 @@
                 aria-label="{number}줄 문장"
                 aria-pressed={highlighted.has(unit)}
                 onpointerdown={(e) => start(e, 'unit', unit)}
-                onclick={(e) => press(e, unit)}>{piece.text}</button
+                onclick={(e) => press(e, unit)}>{@render colored(number, piece)}</button
               >{:else}<span
                 class={cn(
                   'rounded-sm',
                   fill(unit),
                   unit !== null && highlighted.has(unit) && 'ring-2 ring-primary'
-                )}>{piece.text}</span
+                )}>{@render colored(number, piece)}</span
               >{/if}{/each}</span
         >
         {#each startsAt[number] ?? [] as block (block)}

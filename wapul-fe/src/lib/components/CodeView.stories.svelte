@@ -79,6 +79,19 @@ print(count)
 />
 
 <Story
+  name="Highlighted"
+  args={{ units, blocks, language: 'python' }}
+  play={async ({ canvas }) => {
+    // 문법 색은 글자색, 블럭 색은 바탕이라 둘이 겹쳐도 보인다
+    await expect(canvas.getAllByText('int')[0]).toHaveClass('text-code-constant');
+    const loop = canvas.getAllByText('for')[1];
+
+    await expect(loop).toHaveClass('text-code-keyword');
+    await expect(loop.parentElement).toHaveClass('bg-amber-500/25');
+  }}
+/>
+
+<Story
   name="DragStatements"
   args={{ units, blocks, onselect: fn() }}
   play={async ({ canvas, userEvent, args }) => {

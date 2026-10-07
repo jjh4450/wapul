@@ -247,6 +247,7 @@
 
     <CodeView
       code={record.code}
+      language={record.language}
       units={record.units}
       {blocks}
       {selected}

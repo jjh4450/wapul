@@ -48,11 +48,13 @@
 <Story
   name="ThreadsUnderBlocks"
   beforeEach={() => writing.install()}
-  play={async ({ canvas }) => {
+  play={async ({ canvas, canvasElement }) => {
     // 전체 코드가 보이고, 블럭 질문은 블럭이 끝나는 줄 바로 아래에 달린다
     const logic = await canvas.findByRole('region', { name: '로직 1' });
 
-    await expect(canvas.getByText('#include <bits/stdc++.h>')).toBeInTheDocument();
+    await expect(canvasElement.querySelector('[data-line="1"]')).toHaveTextContent(
+      '#include <bits/stdc++.h>'
+    );
     await expect(lineAbove(logic)).toBe('12');
     await expect(lineAbove(canvas.getByRole('region', { name: '입력' }))).toBe('7');
     await expect(lineAbove(canvas.getByRole('region', { name: '출력' }))).toBe('15');
