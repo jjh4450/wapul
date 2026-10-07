@@ -27,12 +27,13 @@
 |-----------|------|------|
 | 정규화 + tree-sitter 문장 단위 | 라벨이 이 단위로 만들어짐 | 적용 (`normalize.py`, `units.py`) |
 | 종류 분류: 문장과 앞뒤 3문장의 토큰, 감싸는 제어문·함수 머리, AST 사실을 특징으로 LightGBM | CodeSeg의 맥락 붙이기 | 적용 (`features/kind_features.py`, `models/kind_lgbm.py`) |
+| 종류 특징: 식별자의 글자 3·4-gram | 학습하지 않은 언어의 입출력 관용구 | 적용 (`with_ngrams`, [실험 23](experiments.md)). Rust를 학습 없이 지원 |
 | 종류 분류: 앞뒤 3문장 맥락을 붙인 입력으로 CodeBERT 미세조정 | CodeSeg | `segmenter-v1`에만: LightGBM과 점수가 같고 크기와 CPU 시간이 수백 배 ([실험 22](experiments.md), `models/kind_classifier.py`) |
 | 블럭 특징: 데이터 흐름 사슬, 제어문 덩어리, 같은 문법 유형 + 거리, 깊이 | SEGMENT | 적용 (`features/unit_ast.py`) |
 | 블럭 묶기: logic 문장마다 지금까지 만든 블럭 중 하나 또는 새 블럭을 고름 | 대화 분리, 군집 순위(cluster ranking) | 적용 (`features/candidates.py`, `models/block_ranker.py`, 블럭 단위) |
 | 블럭 점수기: LightGBM LambdaRank | LambdaRank | 적용 |
 | 블럭 점수기: 작은 MLP(softmax, 정답 후보 확률 합 최대화) + LightGBM의 확률 평균 | Lee 외 2017 | `segmenter-v1`에만: LightGBM만 쓸 때보다 B³ 0.007 높지만 잡음 안이고, v2는 런타임을 하나로 둠 |
-| 최종 모델 묶음과 예측 | — | 적용 (`wapul_ml/models/segmenter.py`, 저장은 `models/segmenter-v2/`). `segmenter-v1`은 고정된 `segmenter_v1.py`로 읽음 |
+| 최종 모델 묶음과 예측 | — | 적용 (`wapul_ml/models/segmenter.py`, 저장은 `models/segmenter-v3/`). 이전 버전은 고정된 `segmenter_v1.py`, `segmenter_v2.py`로 읽음 |
 | 쌍 "같은 블럭?" 분류(RBF SVM) + α 임계값 + 순서대로 붙이기 | 상호참조 점진적 군집 | 비교 기준으로 남김 (`models/baseline.py`, `notebooks/baseline_cv.py`) |
 | 문장 임베딩(E5 등) | SetFit의 linear probe | 제외: 블럭 묶기에 기여 없음, 종류 분류는 문자열 특징 LightGBM이 더 높음 |
 | 임베딩 미세조정(SetFit, TSDAE, E5 쌍 점수기) | SetFit, TSDAE | 제외: 블럭 묶기가 오르지 않거나 떨어짐 |
@@ -46,18 +47,18 @@
 
 사람이 검토한 풀이 300건(6,435문장)에 대한 5-fold 교차 검증입니다. 블럭 묶기는 정답 종류를 준 상태에서 logic 문장만 묶은 점수입니다. 300건에서는 B³ 약 0.018, 쌍 F1 약 0.040 미만의 차이를 확정할 수 없습니다.
 
-**최종 모델** (`segmenter-v2`)
+**최종 모델** (`segmenter-v3`)
 
 | 대상 | 점수 |
 |------|------|
-| 종류 macro-F1 | 0.891 |
+| 종류 macro-F1 | 0.902 (학습하지 않은 Rust 12개: 0.870) |
 | 블럭 묶기 B³ / CEAF-e | 0.809 / 0.732 |
 | 같은 블럭 쌍 정밀도 / 재현율 / F1 | 0.654 / 0.682 / 0.668 |
-| 모델 크기 | 6.9MB |
+| 모델 크기 | 7.8MB (종류 트리 6.8MB, 특징 이름 0.4MB, 블럭 트리 0.5MB) |
 | CPU 추론, 풀이 하나 (4스레드, 중앙값 / 최대) | 0.00초 / 0.01초 |
 
 - 이 구성 그대로의 전체(end to end) 점수는 아직 없습니다. 블럭 묶기가 SVM + α 군집일 때 전체 B³는 0.830이었습니다.
-- CPU 시간은 Ryzen 9 9900X에서 잰 값입니다.
+- CPU 시간은 Ryzen 9 9900X에서 `segmenter-v2`로 잰 값입니다.
 
 **비교 기준** (블럭 묶기, 정답 종류)
 

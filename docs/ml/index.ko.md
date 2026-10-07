@@ -32,8 +32,9 @@ wapul-ml/
 │   │   ├── kind_lgbm.py       # 종류 분류: LightGBM
 │   │   ├── kind_classifier.py # 종류 분류: CodeBERT 미세조정 (segmenter-v1)
 │   │   ├── block_ranker.py    # 블럭 묶기: 후보 점수기(MLP, LightGBM)와 디코딩
-│   │   ├── segmenter.py       # 최종 모델 v2: 학습, 저장, 예측
+│   │   ├── segmenter.py       # 최종 모델 v3: 학습, 저장, 예측
 │   │   ├── segmenter_v1.py    # segmenter-v1 읽기 (고정)
+│   │   ├── segmenter_v2.py    # segmenter-v2 읽기 (고정)
 │   │   └── baseline.py        # 비교 기준: 쌍 분류 + α 군집
 │   └── evaluation/
 │       ├── metrics.py         # 블럭 묶기 평가 지표
@@ -113,13 +114,13 @@ docker run --rm --gpus all -p 8888:8888 \
 ### 최종 모델
 
 ```bash
-python -m wapul_ml train                    # 라벨 전체로 학습해 models/segmenter-v2/에 저장
+python -m wapul_ml train                    # 라벨 전체로 학습해 models/segmenter-v3/에 저장
 python -m wapul_ml predict FILE LANGUAGE    # 파일 하나의 문장 라벨을 JSON으로 출력
 python -m wapul_ml review [N]               # 라벨 없는 corpus 풀이 N개를 cache/review.html로
 ```
 
-- 학습한 모델은 `models/segmenter-vN/`에 저장됩니다(git에서 무시). 다시 학습할 때는 `wapul_ml/models/segmenter.py`의 `OUT` 버전을 올립니다. 이미 모델이 있는 폴더에는 `train`이 저장하지 않습니다. `segmenter.py`는 `format` 2인 모델(`segmenter-v2`)을 읽고, `segmenter-v1`은 `wapul_ml.models.segmenter_v1`의 `BlockModel`로 읽습니다.
-- 버전을 올려도 이전 버전 코드는 고정합니다. `segmenter_v1.py`는 고치지 않고, 그것이 가져다 쓰는 공용 코드(`units.py`, `normalize.py`, `features/`, `block_ranker.py`, `kind_classifier.py`)를 고칠 때는 `segmenter-v1`의 출력이 그대로인지 확인합니다.
+- 학습한 모델은 `models/segmenter-vN/`에 저장됩니다(git에서 무시). 다시 학습할 때는 `wapul_ml/models/segmenter.py`의 `OUT` 버전을 올립니다. 이미 모델이 있는 폴더에는 `train`이 저장하지 않습니다. `segmenter.py`는 `format` 3인 모델(`segmenter-v3`)을 읽고, 이전 버전은 `wapul_ml.models.segmenter_v1`, `segmenter_v2`의 `BlockModel`로 읽습니다.
+- 버전을 올려도 이전 버전 코드는 고정합니다. `segmenter_v1.py`, `segmenter_v2.py`는 고치지 않고, 이들이 가져다 쓰는 공용 코드(`units.py`, `normalize.py`, `features/`, `block_ranker.py`, `kind_classifier.py`, `kind_lgbm.py`)를 고칠 때는 이전 버전의 출력이 그대로인지 확인합니다. 새 버전에만 필요한 동작은 기존 함수를 바꾸지 않고 새 함수로 더합니다(예: v3의 `with_ngrams`).
 - `models/` 아래의 학습된 모델은 지우지 않고 옮깁니다. git에서 무시되어 지우면 되돌릴 수 없고, 다시 학습해도 같은 모델이 나온다는 보장이 없습니다. `segmenter-v1`의 CodeBERT 종류 분류기는 GPU 연산이 실행마다 조금씩 달라 같은 코드의 재학습에서 문장 종류 예측의 약 1%가 달라졌습니다.
 - `predict`는 `labels.jsonl`과 같은 형식으로, 문장마다 `start` / `end`(줄은 1부터, 열은 0부터 글자 단위, 끝은 포함하지 않음), `kind`, logic이면 `block`(1부터)을 냅니다. 같은 블럭 번호가 떨어져 있을 수 있습니다.
 - `cache/review.html`은 비공개 데이터를 담으므로 로컬에서만 엽니다(예: `cd cache && python -m http.server 8765 --bind 127.0.0.1`).

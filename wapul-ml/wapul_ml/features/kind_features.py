@@ -61,3 +61,28 @@ def unit_features(s: Solution) -> list[dict[str, float]]:
         f["in_function"] = float(a.function >= 0)
         out.append(f)
     return out
+
+
+IDENT = re.compile(r"[A-Za-z_]\w*")
+NGRAMS = (3, 4)
+
+
+def char_ngrams(token: str) -> set[str]:
+    t = token.lower()
+    return {t[i : i + n] for n in NGRAMS for i in range(len(t) - n + 1)}
+
+
+def with_ngrams(feats: list[dict[str, float]]) -> list[dict[str, float]]:
+    """Each identifier feature `prefix:tok` also gives `prefix#gram` for its character 3- and
+    4-grams, so input/output idioms of an unseen language (`read_line`, `writeln!`) share pieces
+    with known ones (`readLine`, `bw.write`). segmenter-v3 and later."""
+    out = []
+    for f in feats:
+        g = dict(f)
+        for name in f:
+            prefix, sep, tok = name.partition(":")
+            if sep and IDENT.fullmatch(tok):
+                for c in char_ngrams(tok):
+                    g[f"{prefix}#{c}"] = 1.0
+        out.append(g)
+    return out

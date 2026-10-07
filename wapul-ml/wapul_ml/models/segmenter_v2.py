@@ -1,7 +1,7 @@
-"""The block model v3: statement kinds, then logic blocks, both with LightGBM (no neural net).
+"""The block model v2: statement kinds, then logic blocks, both with LightGBM (no neural net).
 
-1. kinds: LightGBM over string features of each unit and its neighbours, with character
-   n-grams of identifiers (kind_lgbm.py, features/kind_features.py)
+1. kinds: LightGBM over string features of each unit and its neighbours
+   (kind_lgbm.py, features/kind_features.py)
 2. blocks: each logic unit, in code order, joins one of the blocks built so far or opens a new
    one, scored by a LightGBM ranker over AST features (block_ranker.py); blocks may be
    non-contiguous
@@ -10,12 +10,8 @@ Output units follow labels.jsonl: start and end positions, kind, and a block num
 logic. `unit_kinds` gives the same as input / output / none / logic<n> per unit, the shape the
 backend's LLM segmenter produces.
 
-Trained on C++, Java and Python; Rust is supported through the character n-grams
-(docs/ml/experiments.ko.md, experiment 23). wapul-seg runs this model in WASM and reads
-kinds-features.txt (one feature name per line, in column order) instead of the JSON.
-
-Earlier versions stay readable through their frozen modules: segmenter_v1.py (CodeBERT kinds,
-MLP + LightGBM blocks) and segmenter_v2.py (no n-grams, no Rust).
+segmenter-v1 (CodeBERT kinds, MLP + LightGBM blocks) stays readable through segmenter_v1.py,
+which is frozen.
 """
 
 import json
@@ -24,16 +20,16 @@ from pathlib import Path
 
 from wapul_ml.data.solutions import Solution, Unit, load_solutions
 from wapul_ml.features.candidates import BlockCandidates
-from wapul_ml.features.kind_features import unit_features, with_ngrams
+from wapul_ml.features.kind_features import unit_features
 from wapul_ml.models import block_ranker, kind_lgbm
 from wapul_ml.paths import MODELS
 from wapul_ml.units import units
 
-OUT = MODELS / "segmenter-v3"  # a new training run gets a new version, never overwrites this one
-LANGS = ("cpp", "java", "python", "rust")
-FORMAT = 3  # bump when the saved files or the output change shape
+OUT = MODELS / "segmenter-v2"  # a new training run gets a new version, never overwrites this one
+LANGS = ("cpp", "java", "python")
+FORMAT = 2  # bump when the saved files or the output change shape
 # 5-fold CV on the 300 human-reviewed solutions (docs/ml/experiments.ko.md)
-CV = {"kinds_macro_f1": 0.902, "blocks_given_gold_kinds": {"B3": 0.809, "CEAFe": 0.732, "pairF1": 0.668}}
+CV = {"kinds_macro_f1": 0.891, "blocks_given_gold_kinds": {"B3": 0.809, "CEAFe": 0.732, "pairF1": 0.668}}
 
 
 def train() -> None:
@@ -41,10 +37,9 @@ def train() -> None:
         sys.exit(f"{OUT} already holds a trained model; bump the version in OUT instead of overwriting it")
     OUT.mkdir(parents=True, exist_ok=True)
     sols = load_solutions()
-    feats = [f for s in sols for f in with_ngrams(unit_features(s))]
+    feats = [f for s in sols for f in unit_features(s)]
     kinds = kind_lgbm.train(feats, [u.kind for s in sols for u in s.units])
     kinds.save(OUT / "kinds-lgbm.txt", OUT / "kinds-features.json")
-    (OUT / "kinds-features.txt").write_text("".join(f"{n}\n" for n in kinds.names), encoding="utf-8")
     block_ranker.train_lgbm([BlockCandidates(s) for s in sols], seed=0).save(OUT / "blocks-lgbm.txt")
     meta = {"format": FORMAT, "languages": LANGS, "trained_on": len(sols), "cv": CV}
     (OUT / "model.json").write_text(json.dumps(meta, indent=1) + "\n")
@@ -65,7 +60,7 @@ class BlockModel:
             raise ValueError(f"language must be one of {LANGS}")
         sol = Solution(sid, language, "model", code, [])
         sol.units = [Unit(u.text, u.start[0], u.start[1], u.end, "none", None) for u in units(code, language)]
-        for u, kind in zip(sol.units, self.kinds.predict(with_ngrams(unit_features(sol))), strict=True):
+        for u, kind in zip(sol.units, self.kinds.predict(unit_features(sol)), strict=True):
             u.kind = kind
         blocks = block_ranker.predict_blocks(self.blocks, BlockCandidates(sol, labeled=False))
         for u, b in zip([u for u in sol.units if u.kind == "logic"], blocks, strict=True):
