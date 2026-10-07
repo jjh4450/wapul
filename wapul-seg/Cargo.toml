@@ -4,9 +4,15 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-serde = { version = "1.0.229", features = ["derive"] }
-tsify = { version = "0.5.8", features = ["js"] }
 wasm-bindgen = "0.2.129"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+# Small WASM: no debug names, size-optimized, no unwinding tables
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
