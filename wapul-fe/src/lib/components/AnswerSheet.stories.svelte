@@ -79,7 +79,17 @@
     // 다음 질문은 코드에서 다음에 나오는 묶음(입력)을 연다. 앞 묶음은 접힌다
     await userEvent.click(await canvas.findByRole('button', { name: '다음 질문' }));
 
-    const input = within(canvas.getByRole('region', { name: '입력' }));
+    const inputThread = canvas.getByRole('region', { name: '입력' });
+    const input = within(inputThread);
+
+    // 화면을 그 묶음으로 옮기고, 첫 빈 칸에 커서를 둔다
+    await waitFor(() => {
+      const { top } = inputThread.getBoundingClientRect();
+
+      expect(top).toBeGreaterThanOrEqual(0);
+      expect(top).toBeLessThan(window.innerHeight);
+    });
+    await expect(input.getByLabelText(/입력 조건/)).toHaveFocus();
 
     await expect(input.getByLabelText(/입력을 담은 변수/)).toHaveValue(
       'm은 (끝나는 시간, 시작 시간) 쌍의 목록이다.'

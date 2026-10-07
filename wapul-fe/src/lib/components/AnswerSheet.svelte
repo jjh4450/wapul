@@ -122,14 +122,19 @@
       (threads.find((t) => t.questions.some((q) => q.answer === '')) ?? threads[0])?.key ?? '';
   });
 
-  async function open(key: string) {
+  /**
+   * 묶음을 펼치고 첫 빈 칸에 커서를 둔다. 다음 질문으로 넘어갈 때(jump)는 펼친 묶음을 화면 위쪽으로
+   * 올려 그 위에 블럭 코드가 보이게 하고, 묶음 머리를 눌렀을 때는 화면 밖으로 밀린 만큼만 움직인다
+   */
+  async function open(key: string, jump: boolean) {
     current = key;
     await tick();
 
     const thread = document.getElementById(`thread-${key}`);
+    const fields = [...(thread?.querySelectorAll('textarea') ?? [])];
 
-    thread?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
-    thread?.querySelector('textarea')?.focus({ preventScroll: true });
+    thread?.scrollIntoView({ block: jump ? 'start' : 'nearest', behavior: 'smooth' });
+    (fields.find((f) => f.value === '') ?? fields[0])?.focus({ preventScroll: true });
   }
 
   async function commit(question: QuestionOut): Promise<boolean> {
@@ -175,13 +180,13 @@
   <section
     id="thread-{t.key}"
     aria-label={t.label}
-    class="scroll-my-4 rounded-xl border bg-background font-sans text-sm"
+    class="scroll-mt-[25vh] scroll-mb-4 rounded-xl border bg-background font-sans text-sm"
   >
     <button
       type="button"
       class="flex w-full cursor-pointer items-center gap-2 px-3 py-2 text-left"
       aria-expanded={expanded}
-      onclick={() => open(t.key)}
+      onclick={() => open(t.key, false)}
     >
       {#if expanded}<IconChevronDown class="size-4" />{:else}<IconChevronRight
           class="size-4"
@@ -204,7 +209,7 @@
             variant="outline"
             size="sm"
             class="justify-self-start"
-            onclick={() => open(next.key)}>다음 질문</Button
+            onclick={() => open(next.key, true)}>다음 질문</Button
           >
         {/if}
       </div>
