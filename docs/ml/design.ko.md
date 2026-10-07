@@ -95,6 +95,6 @@
 
 `segmenter-v2`는 모델 경량화 실험의 결과로 고정합니다. 다음 버전은 배포 실험입니다.
 
-1. `segmenter-v3`: 다른 시스템(프론트엔드, 백엔드)이 WASM 하나로 모델을 쓰게 하는 실험. 문장 나누기부터 추론까지 Rust로 옮기고(tree-sitter는 파이썬과 같은 문법 버전, LightGBM 추론은 [bosk](https://github.com/stanwarp/bosk)를 가져와 다중 클래스와 희소 입력을 더함), 종류 특징에 글자 n-gram을 더하고([실험 23](experiments.md)), Rust를 지원 언어에 넣음. 파이썬과 출력이 같은지 corpus 전체로 확인
+1. `segmenter-v3`: 다른 시스템이 WASM 하나로 모델을 쓰게 하는 배포 실험. 구성과 결정은 [배포](deploy.md)에 있습니다
 2. 최종 모델 구성 그대로 전체(end to end) 점수 재기
 3. 라벨 늘리기: LLM 초안을 학습 데이터로 쓰는 방안을 검토

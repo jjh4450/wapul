@@ -102,5 +102,6 @@ nav:
     - Overview: ml/index.md
     - Design: ml/design.md
     - Experiments: ml/experiments.md
+    - Deploy: ml/deploy.md
   - Development:
     - Docs Guide: development/docs-guide.md
