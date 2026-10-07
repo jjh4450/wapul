@@ -41,10 +41,11 @@ flowchart TB
 ## 쓰기
 
 ```ts
-import { segment, fetchAssets } from 'wapul-seg.js';
+// 릴리즈 폴더(아래)를 정적 파일 /seg/ 아래에 두었을 때
+import { segment, fetchAssets } from './wapul-seg.js';
 
 const labeled = await segment(code, 'cpp', fetchAssets('/seg/'));
-// [{ start: [1, 0], end: [1, 18], kind: 'none' }, ..., { ..., kind: 'logic', block: 2 }]
+// [{ start: [1, 0], end: [1, 19], kind: 'none' }, ..., { start: [7, 4], end: [7, 25], kind: 'logic', block: 2 }, ...]
 ```
 
 - `assets`는 릴리즈 파일이 있는 곳입니다. 생략하면 모듈 파일과 같은 폴더를 씁니다. 처음 부를 때 WASM, 모델 파일, web-tree-sitter 런타임을 받고, 문법 `.wasm`은 언어마다 처음 쓸 때 받습니다.
@@ -137,15 +138,18 @@ TS를 **Node에서 그대로** 돌려 파이썬 구현과 단계마다 비교합
 - 릴리즈 전에는 `--corpus N`으로 비공개 corpus에서 N개를 뽑아 같은 검사를 합니다. 결과는 `wapul-ml/cache/seg-parity/`에 두고(git 무시) `WAPUL_SEG_CASES`로 가리킵니다.
 
 ```bash
-docker run --rm -v "$(pwd):/wapul" -e PYTHONPATH=/wapul/wapul-ml wapul-ml     python /wapul/wapul-seg/js/tests/make_cases.py --corpus 500
-cd wapul-seg/js && WAPUL_SEG_CASES=../../wapul-ml/cache/seg-parity/cases.json pnpm test
+# 모노레포 루트에서, wapul-ml 이미지로
+docker run --rm -v "$(pwd):/wapul" -e PYTHONPATH=/wapul/wapul-ml wapul-ml python /wapul/wapul-seg/js/tests/make_cases.py --corpus 500
+cd wapul-seg/js
+WAPUL_SEG_CASES=../../wapul-ml/cache/seg-parity/cases.json pnpm test
 ```
 
 ## 빌드
 
 ```bash
-cd wapul-seg && scripts/build-wasm.sh   # cargo + wasm-bindgen-cli → pkg/ (js/가 import)
-cd js && pnpm build                      # tsc, vite 라이브러리 빌드, 릴리즈 파일을 dist/에 모음
+cd wapul-seg
+sh scripts/build-wasm.sh   # cargo + wasm-bindgen-cli → pkg/ (js/가 import)
+cd js && pnpm build        # tsc, vite 라이브러리 빌드, 릴리즈 파일을 dist/에 모음
 ```
 
 - CI: `seg-ci.yml`이 PR마다 Rust fmt·clippy·test와 `pnpm lint`·`check`·`test`를 돌리고, `seg-release.yml`이 main에서 같은 빌드로 릴리즈를 만듭니다. 둘 다 `.github/actions/seg-build`의 빌드 단계를 씁니다.

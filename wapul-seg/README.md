@@ -6,7 +6,7 @@
 
 ```bash
 # Rust → WASM (wasm32-unknown-unknown 타깃, Cargo.lock 버전의 wasm-bindgen-cli 필요)
-scripts/build-wasm.sh      # → pkg/ (js/가 import)
+sh scripts/build-wasm.sh   # → pkg/ (js/가 import)
 cargo fmt --check && cargo clippy --target wasm32-unknown-unknown && cargo test --release
 
 # TypeScript
