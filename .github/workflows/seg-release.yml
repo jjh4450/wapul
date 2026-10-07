@@ -5,14 +5,12 @@ name: Segmenter Release
 # 이 저장소는 2026-07-15 이후 생성이라 OIDC sub가 immutable 형식(repo:owner@id/repo@id)인데, npm이
 # 아직 이를 받지 않는다 (npm/cli#9969). 고쳐지면 npmjs.com 패키지 설정에 trusted publisher
 # (jjh4450/wapul, seg-release.yml)를 등록하고 시크릿을 지운다 (docs/ml/deploy.ko.md).
+# Segmenter CI가 main에서 성공한 커밋만 릴리스한다 (CI가 경로 필터를 맡음)
 on:
-  push:
+  workflow_run:
+    workflows: [ Segmenter CI ]
+    types: [ completed ]
     branches: [ main ]
-    paths:
-      - 'wapul-seg/**'
-      - 'model/**'
-      - '.github/actions/seg-build/**'
-      - '.github/workflows/seg-release.yml'
   workflow_dispatch:
     inputs:
       major:
@@ -32,12 +30,15 @@ permissions:
 jobs:
   # 버전 seg-vX.Y.Z: X는 수동(major 입력), Y는 모델 파일(model/)이 바뀌면, Z는 그 외 릴리스마다 증가
   release:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          # workflow_run이면 CI가 검사한 그 커밋
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Compute version
         id: version

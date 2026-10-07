@@ -83,6 +83,6 @@ pnpm build      # dist/: 모듈, 타입 선언, WASM, 문법 .wasm 13개, wapul-
 
 ## 릴리스
 
-CI(`seg-release.yml`)가 main에서 `wapul-seg@X.Y.Z`를 npm에 올리고 `seg-vX.Y.Z` 태그를 답니다. Y는 루트 `model/`이 바뀔 때, Z는 그 외 릴리스마다, X는 수동 `major`입니다.
+CI(`seg-release.yml`)가 main에서 Segmenter CI를 통과한 커밋만 `wapul-seg@X.Y.Z`로 npm에 올리고 `seg-vX.Y.Z` 태그를 답니다. Y는 루트 `model/`이 바뀔 때, Z는 그 외 릴리스마다, X는 수동 `major`입니다.
 
 자세한 결정과 구조는 [배포 문서](https://jjh4450.github.io/wapul/ml/deploy/)에 있습니다.

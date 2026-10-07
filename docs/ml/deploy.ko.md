@@ -154,7 +154,7 @@ sh scripts/build-wasm.sh   # cargo + wasm-bindgen-cli → pkg/ (js/가 import)
 cd js && pnpm build        # tsc, vite 라이브러리 빌드, 릴리즈 파일을 dist/에 모음
 ```
 
-- CI: `seg-ci.yml`이 PR마다 Rust fmt·clippy·test와 `pnpm lint`·`check`·`test`를 돌리고, `seg-release.yml`이 main에서 같은 빌드로 릴리즈를 만듭니다. 둘 다 `.github/actions/seg-build`의 빌드 단계를 씁니다.
+- CI: `seg-ci.yml`이 PR마다 Rust fmt·clippy·test와 `pnpm lint`·`check`·`test`를 돌리고, `seg-release.yml`은 main에서 `seg-ci.yml`이 성공한 커밋만 같은 빌드로 릴리즈합니다. 둘 다 `.github/actions/seg-build`의 빌드 단계를 씁니다.
 - wasm-bindgen-cli는 `Cargo.lock`의 `wasm-bindgen`과 같은 버전이어야 합니다. CI는 그 버전을 읽어 설치합니다.
 - Windows에서는 cargo가 막혀 있어 Rust 쪽을 `rust:1-slim` 컨테이너에서 돌립니다(CLAUDE.md).
 
