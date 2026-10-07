@@ -214,14 +214,33 @@
     return colors[block].fill;
   }
 
-  /** 줄 번호 옆 띠는 그 줄의 첫 블럭 색. 칠하지 않는 블럭의 띠는 흐리게 둔다 */
-  function bar(number: number): string | undefined {
+  /** 문장이 든 블럭의 색 변수 (fill의 클래스가 이 색으로 칠한다) */
+  function tint(unit: number | null): string | undefined {
+    const block = unit === null ? null : owner[unit];
+
+    return block === null ? undefined : colors[block].style;
+  }
+
+  /** 줄의 첫 블럭. 줄 번호 옆 띠를 그 블럭 색으로 칠한다 */
+  function lineBlock(number: number): number | null {
     const unit = (spans[number] ?? []).find(([u]) => owner[u] !== null)?.[0];
-    const block = unit === undefined ? null : owner[unit];
+
+    return unit === undefined ? null : owner[unit];
+  }
+
+  /** 줄 번호 옆 띠. 칠하지 않는 블럭의 띠는 흐리게 둔다 */
+  function bar(number: number): string | undefined {
+    const block = lineBlock(number);
 
     if (block === null) return undefined;
 
     return cn(colors[block].bar, focus !== null && block !== focus && 'opacity-30');
+  }
+
+  function barTint(number: number): string | undefined {
+    const block = lineBlock(number);
+
+    return block === null ? undefined : colors[block].style;
   }
 
   function start(event: PointerEvent) {
@@ -317,6 +336,7 @@
             'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5',
             i === hovered ? colors[i].strong : colors[i].fill
           )}
+          style={colors[i].style}
           data-block={i}
         >
           <span class={cn('size-2 rounded-full', colors[i].bar)}></span>
@@ -377,7 +397,7 @@
   <div class={cn('py-3 font-mono leading-6', onselect && 'select-none')}>
     {#each numbers as number (number)}
       <div class="flex" data-line={number}>
-        <span class={cn('w-1 shrink-0', bar(number))}></span>
+        <span class={cn('w-1 shrink-0', bar(number))} style={barTint(number)}></span>
         {#if onselect}
           <button
             type="button"
@@ -400,6 +420,7 @@
                   fill(unit),
                   highlighted.has(unit) && 'ring-2 ring-primary'
                 )}
+                style={tint(unit)}
                 data-unit={unit}
                 aria-label="{number}줄 문장"
                 aria-pressed={highlighted.has(unit)}
@@ -410,6 +431,7 @@
                   fill(unit),
                   unit !== null && highlighted.has(unit) && 'ring-2 ring-primary'
                 )}
+                style={tint(unit)}
                 data-unit={unit}
                 data-col={unit === null ? piece.from : null}>{@render colored(number, piece)}</span
               >{/if}{/each}</span
@@ -420,6 +442,7 @@
               'mr-3 shrink-0 rounded-md px-1.5 font-sans text-xs',
               block === hovered ? colors[block].strong : colors[block].fill
             )}
+            style={colors[block].style}
             data-block={block}>{labels[block]}</span
           >
         {/each}

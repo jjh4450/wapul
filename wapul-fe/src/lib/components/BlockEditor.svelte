@@ -126,7 +126,10 @@
       <span class="px-1 text-muted-foreground">문장 {editing.selected.length}개를</span>
       {#each editing.choices as choice (choice.label)}
         <Button variant="outline" size="sm" onclick={() => editing.place(choice.into)}>
-          {#if choice.bar}<span class={cn('size-2 rounded-full', choice.bar)}></span>{/if}
+          {#if choice.color}<span
+              class={cn('size-2 rounded-full', choice.color.bar)}
+              style={choice.color.style}
+            ></span>{/if}
           {choice.label}
         </Button>
       {/each}

@@ -159,13 +159,16 @@
       '출력 블럭 빼기'
     ]);
 
-    const fill = (unit: number) =>
-      canvas.getAllByRole('button', { name: /줄 문장$/ })[unit].className;
+    // 같은 블럭이면 같은 색이다
+    const colorOf = (unit: number) =>
+      canvas
+        .getAllByRole('button', { name: /줄 문장$/ })
+        [unit].style.getPropertyValue('--block')
+        .trim();
 
-    await expect(fill(3)).toContain('bg-emerald-500');
-    await expect(fill(8)).toContain('bg-emerald-500');
-    await expect(fill(13)).toContain('bg-emerald-500');
-    await expect(fill(9)).toContain('bg-amber-500');
+    await expect(colorOf(8)).toBe(colorOf(3));
+    await expect(colorOf(13)).toBe(colorOf(3));
+    await expect(colorOf(9)).not.toBe(colorOf(3));
   }}
 />
 

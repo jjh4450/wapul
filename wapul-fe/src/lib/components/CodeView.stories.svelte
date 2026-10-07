@@ -1,6 +1,7 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import { expect, fn, waitFor, within } from 'storybook/test';
+  import { blockColors } from '#lib/study.js';
   import CodeView from './CodeView.svelte';
 
   const code = `n = int(input())
@@ -36,6 +37,14 @@ print(count)
     { kind: 'output' as const, units: [6] }
   ];
 
+  const colors = blockColors(blocks);
+
+  /** 요소가 칠해진 블럭 색 (--block 값) */
+  const colorOf = (el: HTMLElement | null) => el?.style.getPropertyValue('--block').trim();
+
+  /** blocks[i]의 색 */
+  const color = (i: number) => colors[i].style.replace('--block:', '').trim();
+
   const { Story } = defineMeta({
     title: 'Components/CodeView',
     component: CodeView,
@@ -64,7 +73,8 @@ print(count)
       canvas.getByText('칠하지 않은 문장은 어느 블럭에도 들지 않아요.')
     ).toBeInTheDocument();
     // 문장만 칠하고 들여쓰기는 칠하지 않는다
-    await expect(canvas.getByText('if s >= end:')).toHaveClass('bg-amber-500/25');
+    await expect(canvas.getByText('if s >= end:')).toHaveClass('bg-(--block)/25');
+    await expect(colorOf(canvas.getByText('if s >= end:'))).toBe(color(1));
   }}
 />
 
@@ -73,8 +83,8 @@ print(count)
   args={{ units, blocks, focus: 2 }}
   play={async ({ canvas }) => {
     // 고른 블럭만 칠하고, 다른 블럭은 줄 옆 띠로만 보인다
-    await expect(canvas.getByText('print(count)')).toHaveClass('bg-violet-500/20');
-    await expect(canvas.getByText('if s >= end:')).not.toHaveClass('bg-amber-500/25');
+    await expect(canvas.getByText('print(count)')).toHaveClass('bg-(--block)/25');
+    await expect(canvas.getByText('if s >= end:')).not.toHaveClass('bg-(--block)/25');
   }}
 />
 
@@ -87,7 +97,8 @@ print(count)
     const loop = canvas.getAllByText('for')[1];
 
     await expect(loop).toHaveClass('text-code-keyword');
-    await expect(loop.parentElement).toHaveClass('bg-amber-500/25');
+    await expect(loop.parentElement).toHaveClass('bg-(--block)/25');
+    await expect(colorOf(loop.parentElement)).toBe(color(1));
   }}
 />
 
@@ -99,16 +110,16 @@ print(count)
 
     // 문장에 마우스를 올리면 떨어진 문장까지 그 블럭 전부를 진하게 칠한다. 칠하지 않던 블럭도
     await userEvent.hover(canvas.getByText('count, end = 0, 0'));
-    await expect(condition).toHaveClass('bg-amber-500/50');
+    await expect(condition).toHaveClass('bg-(--block)/50');
 
     await userEvent.unhover(canvas.getByText('count, end = 0, 0'));
     await userEvent.hover(canvas.getByText('n = int(input())'));
-    await expect(condition).not.toHaveClass('bg-amber-500/50');
-    await expect(canvas.getByText(/^meetings = /)).toHaveClass('bg-sky-500/45');
+    await expect(condition).not.toHaveClass('bg-(--block)/50');
+    await expect(canvas.getByText(/^meetings = /)).toHaveClass('bg-(--block)/50');
 
     // 범례의 블럭 이름에 올려도 같다
     await userEvent.hover(canvas.getAllByText('로직 1')[0]);
-    await expect(condition).toHaveClass('bg-amber-500/50');
+    await expect(condition).toHaveClass('bg-(--block)/50');
   }}
 />
 

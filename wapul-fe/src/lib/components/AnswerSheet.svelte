@@ -310,7 +310,8 @@
         class={cn(
           'rounded-md px-1.5 text-xs',
           t.block === null ? 'bg-muted' : colors[t.block].fill
-        )}>{t.label}</span
+        )}
+        style={t.block === null ? undefined : colors[t.block].style}>{t.label}</span
       >
       <span class="text-muted-foreground">질문 {t.questions.length}개 · {answered}개 답함</span>
     </button>

@@ -1,11 +1,12 @@
 import type { BlockKind } from '#lib/api/client.js';
 import type { MarkedBlock } from '#lib/questions.js';
-import { BLOCK_KIND_LABEL, blockColors, blockLabels } from '#lib/study.js';
+import { BLOCK_KIND_LABEL, type BlockColor, blockColors, blockLabels } from '#lib/study.js';
 
 /** 고른 문장을 넣을 곳. into는 고른 문장을 원래 블럭에서 뺀 블럭 목록에 문장을 넣는다 */
 export type Choice = {
   label: string;
-  bar?: string;
+  /** 있는 블럭이면 그 블럭 색 (BlockColor) */
+  color?: BlockColor;
   into: (next: MarkedBlock[], picked: number[]) => void;
 };
 
@@ -67,7 +68,7 @@ export class BlockDraft {
 
       list.push({
         label: this.labels[i],
-        bar: this.colors[i].bar,
+        color: this.colors[i],
         into: (next, picked) => next[i].units.push(...picked)
       });
     });

@@ -41,10 +41,21 @@ describe('blockColors', () => {
 
     const colors = blockColors(kinds.map((kind) => ({ kind })));
 
-    expect(new Set(colors.map((c) => c.bar)).size).toBe(4);
+    expect(new Set(colors.map((c) => c.style)).size).toBe(4);
     expect(blockColors([{ kind: 'input' }])[0]).toEqual(colors[0]);
     expect(blockColors([{ kind: 'logic' }, { kind: 'output' }])).toEqual(
       colors.slice(1, 2).concat(colors[3])
+    );
+  });
+});
+
+describe('blockColors (many logic blocks)', () => {
+  it('never repeats a color, and adding blocks keeps the colors already given', () => {
+    const many = blockColors(Array.from({ length: 40 }, () => ({ kind: 'logic' as const })));
+
+    expect(new Set(many.map((c) => c.style)).size).toBe(40);
+    expect(blockColors([{ kind: 'input' }, { kind: 'logic' }, { kind: 'logic' }]).slice(1)).toEqual(
+      many.slice(0, 2)
     );
   });
 });

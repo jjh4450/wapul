@@ -30,34 +30,63 @@ export function blockLabels(blocks: { kind: BlockKind }[]): string[] {
 }
 
 /**
- * 블럭 색. fill은 문장 바탕, strong은 마우스를 올린 블럭의 바탕, bar는 줄 번호 옆 띠.
- * Tailwind가 찾을 수 있게 클래스 이름을 통째로 적는다
+ * 블럭 색. style은 요소에 넣을 CSS 변수(--block: 색)이고, fill은 문장 바탕, strong은 마우스를 올린
+ * 블럭의 바탕, bar는 줄 번호 옆 띠의 클래스다. 변수는 자식에게 이어져서 안쪽 요소도 bar 등으로 칠할 수 있다
  */
-export type BlockColor = { fill: string; strong: string; bar: string };
+export type BlockColor = { style: string; fill: string; strong: string; bar: string };
 
-const INPUT_COLOR = { fill: 'bg-sky-500/20', strong: 'bg-sky-500/45', bar: 'bg-sky-500' };
+const FILL = 'bg-(--block)/25';
 
-const OUTPUT_COLOR = { fill: 'bg-violet-500/20', strong: 'bg-violet-500/45', bar: 'bg-violet-500' };
+const STRONG = 'bg-(--block)/50';
 
-// 로직 블럭은 순번대로 돌려 쓴다. 입력·출력의 파랑·보라와 헷갈리지 않는 색만 둔다
-const LOGIC_COLORS = [
-  { fill: 'bg-amber-500/25', strong: 'bg-amber-500/50', bar: 'bg-amber-500' },
-  { fill: 'bg-emerald-500/20', strong: 'bg-emerald-500/45', bar: 'bg-emerald-500' },
-  { fill: 'bg-rose-500/20', strong: 'bg-rose-500/45', bar: 'bg-rose-500' },
-  { fill: 'bg-lime-500/25', strong: 'bg-lime-500/50', bar: 'bg-lime-500' },
-  { fill: 'bg-fuchsia-500/20', strong: 'bg-fuchsia-500/45', bar: 'bg-fuchsia-500' }
-];
+const BAR = 'bg-(--block)';
+
+// Tailwind의 sky-500, violet-500
+const INPUT_COLOR = 'oklch(0.685 0.169 237.3)';
+
+const OUTPUT_COLOR = 'oklch(0.606 0.25 292.7)';
+
+// 로직 블럭이 쓰는 색상(hue): 입력(파랑)과 출력(보라) 근처인 205~320도를 뺀 320도부터 245도
+const LOGIC_HUE_FROM = 320;
+
+const LOGIC_HUE_SPAN = 245;
+
+const GOLDEN = (Math.sqrt(5) - 1) / 2;
+
+// 로직 색의 밝기와 채도. 밝은 단계는 화면에 담을 수 있게 채도를 낮춘다
+const TONES = [
+  [0.74, 0.16],
+  [0.6, 0.16],
+  [0.86, 0.11]
+] as const;
+
+/**
+ * n번째(0부터) 로직 블럭의 색. 색상을 황금비 간격으로 뽑아 앞 색들과 먼 쪽에 놓으므로 번호가 몇이든
+ * 같은 색이 다시 나오지 않는다. 번호로만 정해져서 블럭을 더해도 있던 블럭의 색은 그대로다.
+ * 황금비 간격은 5, 8, 13번째 뒤 색상이 가까워지므로 밝기를 세 단계로 돌려 써서 그런 짝도 구분되게
+ * 한다. 첫 로직은 노랑(70도)에서 시작한다
+ */
+function logicColor(n: number): string {
+  const hue = (LOGIC_HUE_FROM + ((0.449 + n * GOLDEN) % 1) * LOGIC_HUE_SPAN) % 360;
+  const [lightness, chroma] = TONES[n % TONES.length];
+
+  return `oklch(${lightness} ${chroma} ${hue.toFixed(1)})`;
+}
+
+function paint(color: string): BlockColor {
+  return { style: `--block: ${color}`, fill: FILL, strong: STRONG, bar: BAR };
+}
 
 /** 블럭 색은 이름(blockLabels)을 따른다: 입력과 출력은 늘 같은 색, 로직 n은 n번째 색 */
 export function blockColors(blocks: { kind: BlockKind }[]): BlockColor[] {
   let logic = 0;
 
   return blocks.map((b) => {
-    if (b.kind === 'input') return INPUT_COLOR;
+    if (b.kind === 'input') return paint(INPUT_COLOR);
 
-    if (b.kind === 'output') return OUTPUT_COLOR;
+    if (b.kind === 'output') return paint(OUTPUT_COLOR);
 
-    return LOGIC_COLORS[logic++ % LOGIC_COLORS.length];
+    return paint(logicColor(logic++));
   });
 }
 
