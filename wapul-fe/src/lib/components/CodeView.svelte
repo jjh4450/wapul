@@ -55,6 +55,11 @@
 
   let drag = $state<Drag | null>(null);
 
+  /** 마우스를 올린 문장이나 블럭 이름의 블럭. 그 블럭의 문장을 모두 진하게 칠한다 */
+  let hovered = $state<number | null>(null);
+
+  let root = $state<HTMLDivElement>();
+
   /** 줄마다(0번이 1줄) 글자 */
   const lines = $derived(
     code
@@ -165,6 +170,8 @@
 
     if (block === null) return undefined;
 
+    if (block === hovered) return colors[block].strong;
+
     if (focus !== null && block !== focus) return undefined;
 
     return colors[block].fill;
@@ -215,6 +222,24 @@
     if (kind !== undefined && kind !== blocks[block].kind) onkind?.(block, kind);
   }
 
+  /** 마우스가 이 코드 뷰 밖으로 나가면 다른 곳의 pointerover가 하이라이트를 끈다 */
+  function hover(event: PointerEvent) {
+    if (drag !== null || !(event.target instanceof Element)) return;
+
+    if (!root?.contains(event.target)) {
+      hovered = null;
+
+      return;
+    }
+
+    const block = event.target.closest('[data-block]')?.getAttribute('data-block');
+    const unit = event.target.closest('[data-unit]')?.getAttribute('data-unit');
+
+    if (block != null) hovered = Number(block);
+    else if (unit != null) hovered = owner[Number(unit)];
+    else hovered = null;
+  }
+
   /** 키보드로 누른 문장 하나를 고른다. 마우스와 터치는 끌기(start, end)가 맡는다 */
   function press(event: MouseEvent, unit: number) {
     if (event.detail === 0) onselect?.([unit]);
@@ -227,13 +252,27 @@
 )}{#each runs(number, piece) as run, k (k)}{#if run.color}<span class={run.color}>{run.text}</span
       >{:else}{run.text}{/if}{/each}{/snippet}
 
-<svelte:window onpointermove={move} onpointerup={end} onpointercancel={() => (drag = null)} />
+<svelte:window
+  onpointerover={hover}
+  onpointermove={move}
+  onpointerup={end}
+  onpointercancel={() => (drag = null)}
+/>
 
-<div class={cn('overflow-hidden rounded-2xl border bg-muted/40 text-sm', className)}>
+<div
+  bind:this={root}
+  class={cn('overflow-hidden rounded-2xl border bg-muted/40 text-sm', className)}
+>
   {#if blocks.length > 0}
     <div class="flex flex-wrap items-center gap-2 border-b bg-background px-3 py-2 text-xs">
       {#each labels as label, i (i)}
-        <span class={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5', colors[i].fill)}>
+        <span
+          class={cn(
+            'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5',
+            i === hovered ? colors[i].strong : colors[i].fill
+          )}
+          data-block={i}
+        >
           <span class={cn('size-2 rounded-full', colors[i].bar)}></span>
           {#if onkind}
             <DropdownMenu.Root>
@@ -311,12 +350,17 @@
                   'rounded-sm',
                   fill(unit),
                   unit !== null && highlighted.has(unit) && 'ring-2 ring-primary'
-                )}>{@render colored(number, piece)}</span
+                )}
+                data-unit={unit}>{@render colored(number, piece)}</span
               >{/if}{/each}</span
         >
         {#each startsAt[number] ?? [] as block (block)}
-          <span class={cn('mr-3 shrink-0 rounded-md px-1.5 font-sans text-xs', colors[block].fill)}
-            >{labels[block]}</span
+          <span
+            class={cn(
+              'mr-3 shrink-0 rounded-md px-1.5 font-sans text-xs',
+              block === hovered ? colors[block].strong : colors[block].fill
+            )}
+            data-block={block}>{labels[block]}</span
           >
         {/each}
       </div>

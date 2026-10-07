@@ -92,6 +92,27 @@ print(count)
 />
 
 <Story
+  name="HoverBlock"
+  args={{ units, blocks, focus: 2 }}
+  play={async ({ canvas, userEvent }) => {
+    const condition = canvas.getByText('if s >= end:');
+
+    // 문장에 마우스를 올리면 떨어진 문장까지 그 블럭 전부를 진하게 칠한다. 칠하지 않던 블럭도
+    await userEvent.hover(canvas.getByText('count, end = 0, 0'));
+    await expect(condition).toHaveClass('bg-amber-500/50');
+
+    await userEvent.unhover(canvas.getByText('count, end = 0, 0'));
+    await userEvent.hover(canvas.getByText('n = int(input())'));
+    await expect(condition).not.toHaveClass('bg-amber-500/50');
+    await expect(canvas.getByText(/^meetings = /)).toHaveClass('bg-sky-500/45');
+
+    // 범례의 블럭 이름에 올려도 같다
+    await userEvent.hover(canvas.getAllByText('로직 1')[0]);
+    await expect(condition).toHaveClass('bg-amber-500/50');
+  }}
+/>
+
+<Story
   name="DragStatements"
   args={{ units, blocks, onselect: fn() }}
   play={async ({ canvas, userEvent, args }) => {

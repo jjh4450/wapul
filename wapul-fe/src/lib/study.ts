@@ -29,20 +29,23 @@ export function blockLabels(blocks: { kind: BlockKind }[]): string[] {
   return blocks.map((b) => (b.kind === 'logic' ? `로직 ${++logic}` : BLOCK_KIND_LABEL[b.kind]));
 }
 
-/** 블럭 색. fill은 문장 바탕, bar는 줄 번호 옆 띠. Tailwind가 찾을 수 있게 클래스 이름을 통째로 적는다 */
-export type BlockColor = { fill: string; bar: string };
+/**
+ * 블럭 색. fill은 문장 바탕, strong은 마우스를 올린 블럭의 바탕, bar는 줄 번호 옆 띠.
+ * Tailwind가 찾을 수 있게 클래스 이름을 통째로 적는다
+ */
+export type BlockColor = { fill: string; strong: string; bar: string };
 
-const INPUT_COLOR = { fill: 'bg-sky-500/20', bar: 'bg-sky-500' };
+const INPUT_COLOR = { fill: 'bg-sky-500/20', strong: 'bg-sky-500/45', bar: 'bg-sky-500' };
 
-const OUTPUT_COLOR = { fill: 'bg-violet-500/20', bar: 'bg-violet-500' };
+const OUTPUT_COLOR = { fill: 'bg-violet-500/20', strong: 'bg-violet-500/45', bar: 'bg-violet-500' };
 
 // 로직 블럭은 순번대로 돌려 쓴다. 입력·출력의 파랑·보라와 헷갈리지 않는 색만 둔다
 const LOGIC_COLORS = [
-  { fill: 'bg-amber-500/25', bar: 'bg-amber-500' },
-  { fill: 'bg-emerald-500/20', bar: 'bg-emerald-500' },
-  { fill: 'bg-rose-500/20', bar: 'bg-rose-500' },
-  { fill: 'bg-lime-500/25', bar: 'bg-lime-500' },
-  { fill: 'bg-fuchsia-500/20', bar: 'bg-fuchsia-500' }
+  { fill: 'bg-amber-500/25', strong: 'bg-amber-500/50', bar: 'bg-amber-500' },
+  { fill: 'bg-emerald-500/20', strong: 'bg-emerald-500/45', bar: 'bg-emerald-500' },
+  { fill: 'bg-rose-500/20', strong: 'bg-rose-500/45', bar: 'bg-rose-500' },
+  { fill: 'bg-lime-500/25', strong: 'bg-lime-500/50', bar: 'bg-lime-500' },
+  { fill: 'bg-fuchsia-500/20', strong: 'bg-fuchsia-500/45', bar: 'bg-fuchsia-500' }
 ];
 
 /** 블럭 색은 이름(blockLabels)을 따른다: 입력과 출력은 늘 같은 색, 로직 n은 n번째 색 */
