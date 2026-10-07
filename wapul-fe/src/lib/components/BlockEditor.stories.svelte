@@ -26,6 +26,10 @@
   ]);
 
   const missing = new FakeApi([['GET /v1/records/:id', reply({ detail: 'x' }, 404)]]);
+
+  /** 메뉴를 고른 뒤 페이지가 다시 눌릴 때까지. bits-ui는 메뉴가 닫히고도 잠깐 body의 클릭을 막는다 */
+  const menuClosed = () =>
+    waitFor(() => expect(document.body).not.toHaveStyle({ pointerEvents: 'none' }));
 </script>
 
 <Story
@@ -125,6 +129,42 @@
     await expect(blockNames()).toHaveLength(3);
     await userEvent.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
     await expect(blockNames()).toHaveLength(2);
+  }}
+/>
+
+<Story
+  name="ChangeKind"
+  beforeEach={() => editing.install()}
+  play={async ({ canvas, userEvent, args }) => {
+    const body = within(document.body);
+
+    const blockNames = () =>
+      canvas
+        .getAllByRole('button', { name: /블럭 빼기$/ })
+        .map((b) => b.getAttribute('aria-label'));
+
+    // 출력을 로직으로 바꾸면 로직 블럭이 하나 는다
+    await userEvent.click(await canvas.findByRole('button', { name: '출력 종류 바꾸기' }));
+    await userEvent.click(await body.findByRole('menuitemradio', { name: '로직' }));
+    await menuClosed();
+    await expect(blockNames()).toEqual(['입력 블럭 빼기', '로직 1 블럭 빼기', '로직 2 블럭 빼기']);
+
+    // 출력은 하나뿐이라, 로직 블럭을 출력으로 바꾸면 이미 있는 출력과 합친다
+    await userEvent.click(canvas.getByRole('button', { name: '되돌리기' }));
+    await userEvent.click(canvas.getByRole('button', { name: '로직 1 종류 바꾸기' }));
+    await userEvent.click(await body.findByRole('menuitemradio', { name: '출력' }));
+    await menuClosed();
+    await expect(blockNames()).toEqual(['입력 블럭 빼기', '출력 블럭 빼기']);
+
+    await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
+    await waitFor(() => expect(args.onsaved).toHaveBeenCalledOnce());
+
+    const [call] = editing.callsTo('PUT', '/v1/records/record-1/blocks');
+
+    await expect(JSON.parse(call.body).blocks).toEqual([
+      { kind: 'input', units: [3, 4, 5, 6, 7] },
+      { kind: 'output', units: [8, 9, 10, 11, 12, 13, 14] }
+    ]);
   }}
 />
 

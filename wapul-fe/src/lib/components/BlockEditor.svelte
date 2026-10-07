@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { IconArrowBackUp, IconArrowForwardUp } from '@tabler/icons-svelte';
-  import { api, type BlockIn, type RecordOut } from '#lib/api/client.js';
+  import { api, type BlockIn, type BlockKind, type RecordOut } from '#lib/api/client.js';
   import CodeView from '#lib/components/CodeView.svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { blockFacts, buildQuestions, keepQuestions } from '#lib/questions.js';
@@ -144,6 +144,17 @@
     change(next);
   }
 
+  /** 블럭 하나의 종류를 바꾼다. 입력과 출력은 하나씩이라, 이미 있으면 그 블럭에 합친다 */
+  function setKind(i: number, kind: BlockKind) {
+    const next = $state.snapshot(blocks);
+    const into = kind === 'logic' ? -1 : next.findIndex((b) => b.kind === kind);
+
+    if (into === -1) next[i] = { kind, units: next[i].units };
+    else next[into].units.push(...next.splice(i, 1)[0].units);
+
+    change(next);
+  }
+
   function removeBlock(i: number) {
     change($state.snapshot(blocks).filter((_, j) => j !== i));
   }
@@ -217,7 +228,7 @@
   <h1 class="text-2xl font-semibold">{record.problem}</h1>
   <p class="mt-1 mb-6 text-sm text-muted-foreground">
     코드를 끌어서 문장을 고른 뒤 넣을 블럭을 고르세요. 줄 번호를 끌면 그 줄의 문장을 모두 골라요. 한
-    블럭의 문장이 떨어져 있어도 괜찮아요.
+    블럭의 문장이 떨어져 있어도 괜찮아요. 블럭의 종류는 위의 블럭 이름을 눌러 바꿔요.
   </p>
 
   <div class="grid max-w-4xl gap-3">
@@ -240,6 +251,7 @@
       {blocks}
       {selected}
       onselect={(picked) => (selected = picked)}
+      onkind={setKind}
       onremove={removeBlock}
       after={picker}
     />

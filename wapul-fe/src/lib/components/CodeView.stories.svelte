@@ -1,6 +1,6 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
-  import { expect, fn } from 'storybook/test';
+  import { expect, fn, waitFor, within } from 'storybook/test';
   import CodeView from './CodeView.svelte';
 
   const code = `n = int(input())
@@ -138,5 +138,21 @@ print(count)
   play={async ({ canvas, userEvent, args }) => {
     await userEvent.click(canvas.getByRole('button', { name: '로직 1 블럭 빼기' }));
     await expect(args.onremove).toHaveBeenCalledWith(1);
+  }}
+/>
+
+<Story
+  name="KindMenu"
+  args={{ units, blocks, onkind: fn() }}
+  play={async ({ canvas, userEvent, args }) => {
+    // 블럭 이름을 누르면 종류 메뉴가 뜬다. 메뉴는 포털로 body에 그려진다
+    const body = within(document.body);
+
+    await userEvent.click(canvas.getByRole('button', { name: '로직 1 종류 바꾸기' }));
+    await expect(await body.findByRole('menuitemradio', { name: '로직' })).toBeChecked();
+    await userEvent.click(body.getByRole('menuitemradio', { name: '출력' }));
+    await expect(args.onkind).toHaveBeenCalledWith(1, 'output');
+    // bits-ui는 메뉴가 닫히고도 잠깐 body의 클릭을 막는다. 다음 story로 새지 않게 풀릴 때까지 기다린다
+    await waitFor(() => expect(document.body).not.toHaveStyle({ pointerEvents: 'none' }));
   }}
 />

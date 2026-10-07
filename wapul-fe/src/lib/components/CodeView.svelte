@@ -1,14 +1,17 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-  import { IconX } from '@tabler/icons-svelte';
+  import { IconChevronDown, IconX } from '@tabler/icons-svelte';
   import type { BlockKind, Span } from '#lib/api/client.js';
-  import { blockColors, blockLabels } from '#lib/study.js';
+  import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
+  import { BLOCK_KIND_LABEL, blockColors, blockLabels } from '#lib/study.js';
   import { cn } from '#lib/utils.js';
 
   type Piece = { text: string; unit: number | null };
 
   /** 끌어서 고르는 중. 문장에서 시작하면 걸친 문장만, 줄 번호에서 시작하면 그 줄들의 문장을 모두 고른다 */
   type Drag = { by: 'unit' | 'line'; from: number; to: number };
+
+  const kinds: BlockKind[] = ['input', 'logic', 'output'];
 
   let {
     code,
@@ -17,6 +20,7 @@
     focus = null,
     selected = [],
     onselect,
+    onkind,
     onremove,
     after,
     class: className
@@ -32,6 +36,8 @@
     selected?: number[];
     /** 주면 문장이나 줄 번호를 끌어서(키보드로는 문장을 눌러서) 문장을 고를 수 있다 */
     onselect?: (units: number[]) => void;
+    /** 주면 범례의 블럭 이름을 눌러 종류를 바꿀 수 있다 */
+    onkind?: (block: number, kind: BlockKind) => void;
     /** 주면 범례에서 블럭을 뺄 수 있다 */
     onremove?: (block: number) => void;
     /** 줄 아래에 끼울 내용 (질문 스레드, 블럭 고르는 창). 줄 번호를 받는다 */
@@ -162,6 +168,12 @@
     onselect?.(picked);
   }
 
+  function changeKind(block: number, value: string) {
+    const kind = kinds.find((k) => k === value);
+
+    if (kind !== undefined && kind !== blocks[block].kind) onkind?.(block, kind);
+  }
+
   /** 키보드로 누른 문장 하나를 고른다. 마우스와 터치는 끌기(start, end)가 맡는다 */
   function press(event: MouseEvent, unit: number) {
     if (event.detail === 0) onselect?.([unit]);
@@ -176,7 +188,32 @@
       {#each labels as label, i (i)}
         <span class={cn('inline-flex items-center gap-1.5 rounded-md px-2 py-0.5', colors[i].fill)}>
           <span class={cn('size-2 rounded-full', colors[i].bar)}></span>
-          {label}
+          {#if onkind}
+            <DropdownMenu.Root>
+              <DropdownMenu.Trigger
+                class="-mx-1 inline-flex cursor-pointer items-center gap-0.5 rounded-sm px-1 hover:bg-foreground/10"
+                aria-label="{label} 종류 바꾸기"
+                >{label}<IconChevronDown class="size-3" /></DropdownMenu.Trigger
+              >
+              <DropdownMenu.Content class="w-32" align="start">
+                <DropdownMenu.Group>
+                  <DropdownMenu.Label>종류</DropdownMenu.Label>
+                  <DropdownMenu.RadioGroup
+                    value={blocks[i].kind}
+                    onValueChange={(value) => changeKind(i, value)}
+                  >
+                    {#each kinds as kind (kind)}
+                      <DropdownMenu.RadioItem value={kind} closeOnSelect
+                        >{BLOCK_KIND_LABEL[kind]}</DropdownMenu.RadioItem
+                      >
+                    {/each}
+                  </DropdownMenu.RadioGroup>
+                </DropdownMenu.Group>
+              </DropdownMenu.Content>
+            </DropdownMenu.Root>
+          {:else}
+            {label}
+          {/if}
           {#if onremove}
             <button
               type="button"
