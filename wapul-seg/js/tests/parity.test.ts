@@ -106,6 +106,7 @@ describe.each(cases)('$id', (c) => {
   test('kind features', async () => {
     const tree = await parsed();
     const us = units(tree, c.code);
+
     const feats = withNgrams(
       unitFeatures(c.code, c.language, us, analyze(tree, us, c.language), literalSpans(tree))
     );
@@ -118,9 +119,11 @@ describe.each(cases)('$id', (c) => {
     const m = await model(assets);
     const tree = await parsed();
     const us = units(tree, c.code);
+
     const feats = withNgrams(
       unitFeatures(c.code, c.language, us, analyze(tree, us, c.language), literalSpans(tree))
     );
+
     const kinds = [...m.kinds(featureText(feats))].map((k) => KINDS[k]);
 
     tree.delete();
