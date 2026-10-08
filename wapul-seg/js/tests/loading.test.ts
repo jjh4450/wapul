@@ -1,5 +1,6 @@
-// Loading failures: a failed fetch is retried on the next call, and a tree parsed while the
-// model failed to load is freed. Each test imports the modules afresh, so no load is cached yet.
+// Loading failures and limits: a failed fetch is retried on the next call, a tree parsed while the
+// model failed to load is freed, and code over MAX_UNITS statements is refused. Each test
+// imports the modules afresh, so no load is cached yet.
 
 import { beforeEach, expect, test, vi } from 'vitest';
 
@@ -61,4 +62,14 @@ test('the tree is freed when the model fails to load', async () => {
 
   await expect(segment(CODE, 'python', noModel)).rejects.toThrow('offline');
   expect(freed).toHaveBeenCalledOnce();
+});
+
+test('code over MAX_UNITS statements is refused', async () => {
+  const { MAX_UNITS, segment } = await import('../src/index.ts');
+  const code = Array.from({ length: MAX_UNITS + 1 }, (_, i) => `a = a + ${i}`).join('\n');
+
+  await expect(segment(code, 'python', assets)).rejects.toThrow(RangeError);
+  expect(
+    await segment(code.split('\n').slice(0, MAX_UNITS).join('\n'), 'python', assets)
+  ).toHaveLength(MAX_UNITS);
 });

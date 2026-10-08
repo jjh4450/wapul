@@ -51,6 +51,7 @@ const labeled = await segment(code, 'cpp', fetchAssets('/seg/'));
 - 패키지는 npm의 `wapul-seg`입니다. 모듈과 타입 선언 외에 WASM, 문법 `.wasm`, 모델 파일이 `dist/`에 그대로 들어 있고 `wapul-seg/grammars/tree-sitter-cpp.wasm`처럼 경로로 import할 수 있습니다. 이 파일들은 번들에 못 들어가므로 프론트엔드 빌드가 정적 파일로 복사해야 합니다.
 - `assets`는 그 파일들이 있는 곳입니다. 생략하면 모듈 파일과 같은 폴더를 씁니다(번들러를 거치면 맞지 않으므로 보통 넘깁니다). 처음 부를 때 WASM, 모델 파일, web-tree-sitter 런타임을 받고, 문법 `.wasm`은 언어마다 처음 쓸 때 받습니다.
 - 위치는 `normalize(code)` 기준입니다. 줄은 1부터, 칸은 0부터 문자(코드 포인트) 단위, 끝은 포함하지 않습니다. `normalize`도 내보내므로 프론트엔드가 같은 문자열을 보여줄 수 있습니다.
+- 문장이 `MAX_UNITS`(1,000개)를 넘으면 `RangeError`를 던집니다. 블럭 묶기는 logic 문장 쌍을 모두 비교해 시간이 문장 수의 제곱으로 늘기 때문입니다(4,000문장에 약 5초). 실제 풀이는 corpus 표본에서 99.9%가 187문장 이하입니다.
 
 패키지 `dist/`의 모양:
 

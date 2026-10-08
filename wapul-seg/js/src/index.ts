@@ -23,6 +23,10 @@ export const KINDS = ['input', 'output', 'logic', 'none'] as const;
 
 export type Kind = (typeof KINDS)[number];
 
+/** The most statements `segment` takes. Block grouping compares every pair of logic units, so
+ * time grows with the square of the count; real solutions stay under a few hundred. */
+export const MAX_UNITS = 1000;
+
 /** One statement unit, as wapul-ml's labels.jsonl holds it, with the questions it raises
  * (Tags: a condition or comparison, a loop header, a recursive call). */
 export interface Labeled extends Tags {
@@ -39,7 +43,8 @@ export interface Labeled extends Tags {
 let defaultAssets: Assets | undefined;
 
 /** Every statement of `code` with its kind and, for logic, its block. `code` is normalized
- * first; the positions refer to `normalize(code)`. */
+ * first; the positions refer to `normalize(code)`. Throws a RangeError for code of more than
+ * MAX_UNITS statements. */
 export async function segment(
   code: string,
   language: Language,
@@ -71,6 +76,11 @@ export async function segment(
 
   try {
     const us = units(tree, code);
+
+    if (us.length > MAX_UNITS) {
+      throw new RangeError(`code has ${us.length} statements; segment takes at most ${MAX_UNITS}`);
+    }
+
     const asts = analyze(tree, us, language);
     const feats = withNgrams(unitFeatures(code, language, us, asts, literalSpans(tree)));
     const kinds = m.kinds(featureText(feats));
