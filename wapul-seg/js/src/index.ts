@@ -51,7 +51,23 @@ export async function segment(
   }
 
   code = normalize(code);
-  const [m, tree] = await Promise.all([model(assets), parse(code, language, assets)]);
+  // Both load at once; settled rather than all, so a tree parsed while the model failed is freed
+  const [loaded, parsed] = await Promise.allSettled([model(assets), parse(code, language, assets)]);
+
+  if (loaded.status === 'rejected') {
+    if (parsed.status === 'fulfilled') {
+      parsed.value.delete();
+    }
+
+    throw loaded.reason;
+  }
+
+  if (parsed.status === 'rejected') {
+    throw parsed.reason;
+  }
+
+  const m = loaded.value;
+  const tree = parsed.value;
 
   try {
     const us = units(tree, code);
