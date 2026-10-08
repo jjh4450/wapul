@@ -40,8 +40,8 @@
   const kinds: BlockKind[] = ['input', 'logic', 'output'];
 
   /**
-   * 돋보기 창이 화면과 겹쳐 보여 주는 줄 수. 위 창은 화면 첫 줄부터, 아래 창은 화면 끝 줄까지 이만큼
-   * 더 담아, 창 끝이 지금 보는 코드와 이어진다는 것을 알 수 있다
+   * 돋보기 창이 둘일 때 화면과 겹쳐 보여 주는 줄 수. 위 창은 화면 첫 줄부터, 아래 창은 화면 끝 줄까지
+   * 이만큼 더 담아, 창 끝이 지금 보는 코드와 이어진다는 것을 알 수 있다
    */
   const PADDING = 2;
 
@@ -236,8 +236,9 @@
   const lensWidth = $derived(Math.min(LENS_MAX, room - 32));
 
   /**
-   * 돋보기 창. peek 블럭의 문장이 걸친 줄이 화면보다 위에 있으면 위 창(above)에 1줄부터 화면 첫 줄까지,
-   * 아래에 있으면 아래 창(below)에 화면 끝 줄부터 마지막 줄까지 띄운다
+   * 돋보기 창. peek 블럭의 문장이 걸친 줄이 화면보다 위에 있으면 위 창(above)을, 아래에 있으면 아래
+   * 창(below)을 띄운다. 창이 하나면 코드 전체를 담고, 둘이면 화면을 사이에 두고 나눠 위 창은 1줄부터
+   * 화면 첫 줄까지, 아래 창은 화면 끝 줄부터 마지막 줄까지 담는다
    */
   const lens = $derived.by((): Lens => {
     if (peek === null || peek >= blocks.length) return { above: null, below: null };
@@ -260,16 +261,17 @@
     const below = away.filter((n) => n > last);
 
     const end = lines.length;
+    const both = above.length > 0 && below.length > 0;
 
     return {
       above:
         above.length === 0
           ? null
-          : paneFor(own, 1, Math.min(end, first + PADDING - 1), Math.max(...above)),
+          : paneFor(own, 1, both ? Math.min(end, first + PADDING - 1) : end, Math.max(...above)),
       below:
         below.length === 0
           ? null
-          : paneFor(own, Math.max(1, last - PADDING + 1), end, Math.min(...below))
+          : paneFor(own, both ? Math.max(1, last - PADDING + 1) : 1, end, Math.min(...below))
     };
   });
 
@@ -461,11 +463,13 @@
   }
 
   /**
-   * 창 안을 굴리다 화면 쪽 끝(위 창은 아래 끝, 아래 창은 위 끝)에 닿으면 페이지로 넘기지 않고 저항을
-   * 건다
+   * 창이 둘일 때, 창 안을 굴리다 화면 쪽 끝(위 창은 아래 끝, 아래 창은 위 끝)에 닿으면 페이지로 넘기지
+   * 않고 저항을 건다. 창이 하나면 코드 전체를 담아 화면과 맞닿는 끝이 없다
    */
-  function resist(side: 'top' | 'bottom') {
+  function resist(side: 'top' | 'bottom', both: boolean) {
     return (scroller: HTMLDivElement) => {
+      if (!both) return;
+
       function wheel(event: WheelEvent) {
         const atEdge =
           side === 'top'
@@ -513,10 +517,15 @@
   function watch(row: HTMLDivElement) {
     const number = Number(row.getAttribute('data-line'));
 
-    watcher ??= new IntersectionObserver((entries) => {
-      for (const entry of entries)
-        onscreen.set(Number(entry.target.getAttribute('data-line')), entry.isIntersecting);
-    });
+    // 화면 끝에 닿기만 한 줄(보이는 높이 0)은 보이는 줄로 치지 않는다. 닿을 때와 보이기 시작할 때 모두
+    // 알림이 오게 문턱을 둘 둔다. 기준은 이 문서의 화면이다 (기본값은 최상위 창이라, iframe 안에서 다르다)
+    watcher ??= new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries)
+          onscreen.set(Number(entry.target.getAttribute('data-line')), entry.intersectionRatio > 0);
+      },
+      { root: document, threshold: [0, 0.01] }
+    );
     watcher.observe(row);
 
     return () => {
@@ -702,7 +711,7 @@
         both ? 'max-h-[calc(50dvh-1.5rem)]' : 'max-h-[calc(100dvh-2rem)]'
       )}
       data-lens-scroller
-      {@attach resist(side)}
+      {@attach resist(side, both)}
       {@attach anchor(side)}
       {@attach follow(side)}
     >

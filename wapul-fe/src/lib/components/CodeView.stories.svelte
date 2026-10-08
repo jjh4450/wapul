@@ -261,14 +261,18 @@ print(count)
     await expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장');
     await expect(pane('화면 위')).toBeNull();
 
-    // 아래 창은 화면 끝 두 줄부터 마지막 줄까지, 블럭이 아닌 줄도 다 담는다
+    // 창이 하나면 코드 전체(1~120줄)를 블럭이 아닌 줄까지 다 담는다. 화면에 보이는 줄은 흐리게 둔다
     const below = rows('화면 아래');
 
+    await expect(below[0]).toBe(1);
     await expect(below.at(-1)).toBe(120);
-    await expect(seen(below[0])).toBe(true);
-    await expect(seen(below[1])).toBe(true);
-    await expect(seen(below[2])).toBe(false);
     await expect(shows('화면 아래', 'v100 = 100')).toBeInTheDocument();
+    await expect(
+      pane('화면 아래')?.querySelector('[data-lens-line="1"]')?.classList.contains('opacity-40')
+    ).toBe(true);
+    await expect(
+      pane('화면 아래')?.querySelector('[data-lens-line="100"]')?.classList.contains('opacity-40')
+    ).toBe(false);
 
     // 칠하는 것은 본문과 같다
     await expect(shows('화면 아래', 'v94 = 94')).toHaveClass('bg-(--block)/25');
@@ -313,41 +317,54 @@ print(count)
     await expect(scroller?.scrollTop).toBeGreaterThan(100);
 
     // 칠하는 블럭(답 쓰기에서 펼친 질문의 블럭)이 있으면 다른 블럭에 마우스를 올려도 창은 그대로다
-    await userEvent.hover(canvas.getByText('v2 = 2'));
+    await userEvent.hover(canvasElement.querySelector('[data-unit="2"]') ?? document.body);
     await expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장');
     await userEvent.hover(canvasElement);
 
-    // 아래 창의 화면 쪽 끝(위)에서 더 굴리면 페이지로 넘기지 않고, 창이 조금 끌려갔다 돌아온다
+    // 창이 하나면 화면과 맞닿는 끝이 없어 저항을 걸지 않는다
     if (scroller) scroller.scrollTop = 0;
+    await expect(wheel(pane('화면 아래'), -100)).toBe(true);
+
+    // 가운데로 내리면 위아래 두 창을 띄우고, 화면을 사이에 두고 나눈다.
+    // 위 창은 1줄부터 화면 첫 두 줄까지, 아래 창은 화면 끝 두 줄부터 마지막 줄까지 담는다
+    window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) / 2);
+    await waitFor(() => expect(shows('화면 위', 'v0 = 0')).toBeInTheDocument());
+    await expect(shows('화면 아래', 'v119 = 119')).toBeInTheDocument();
+    await waitFor(() => {
+      const above = rows('화면 위');
+      const under = rows('화면 아래');
+
+      expect(above[0]).toBe(1);
+      expect(seen(above.at(-1))).toBe(true);
+      expect(seen(above.at(-2))).toBe(true);
+      expect(seen(above.at(-3))).toBe(false);
+      expect(under.at(-1)).toBe(120);
+      expect(seen(under[0])).toBe(true);
+      expect(seen(under[1])).toBe(true);
+      expect(seen(under[2])).toBe(false);
+    });
+
+    // 아래 창의 화면 쪽 끝(위)에서 더 굴리면 페이지로 넘기지 않고, 창이 조금 끌려갔다 돌아온다
+    const lower = pane('화면 아래')?.firstElementChild;
+
+    if (lower) lower.scrollTop = 0;
     await expect(wheel(pane('화면 아래'), -100)).toBe(false);
     await expect(pulled(pane('화면 아래'))).toMatch(/translateY\([1-9]/);
     await waitFor(() => expect(pulled(pane('화면 아래'))).toContain('translateY(0px)'));
     // 반대쪽으로는 막지 않는다
     await expect(wheel(pane('화면 아래'), 100)).toBe(true);
 
-    // 가운데로 내리면 위아래 두 창을 다 띄운다. 위 창은 1줄부터 화면 첫 두 줄까지 담는다
-    window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) / 2);
-    await waitFor(() => expect(shows('화면 위', 'v0 = 0')).toBeInTheDocument());
-    await expect(shows('화면 아래', 'v119 = 119')).toBeInTheDocument();
-    await waitFor(() => {
-      const above = rows('화면 위');
-
-      expect(above[0]).toBe(1);
-      expect(seen(above.at(-1))).toBe(true);
-      expect(seen(above.at(-2))).toBe(true);
-      expect(seen(above.at(-3))).toBe(false);
-    });
-
     // 위 창의 화면 쪽 끝은 아래다
-    const top = pane('화면 위')?.firstElementChild;
+    const upper = pane('화면 위')?.firstElementChild;
 
-    if (top) top.scrollTop = top.scrollHeight;
+    if (upper) upper.scrollTop = upper.scrollHeight;
     await expect(wheel(pane('화면 위'), 100)).toBe(false);
     await expect(pulled(pane('화면 위'))).toMatch(/translateY\(-[1-9]/);
 
-    // 끝까지 내리면 위 창만 남는다
+    // 끝까지 내리면 위 창만 남고, 다시 코드 전체를 담는다
     window.scrollTo(0, document.documentElement.scrollHeight);
     await waitFor(() => expect(pane('화면 아래')).toBeNull());
+    await waitFor(() => expect(rows('화면 위').at(-1)).toBe(120));
     await expect(shows('화면 위', 'v1 = 1')).toBeInTheDocument();
     window.scrollTo(0, 0);
   }}
