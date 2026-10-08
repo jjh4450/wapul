@@ -39,6 +39,56 @@ print(count)
 
   const colors = blockColors(blocks);
 
+  // 화면보다 긴 코드: 120줄, 줄마다 문장 하나
+  const longLines = Array.from({ length: 120 }, (_, i) => `v${i} = ${i}`);
+
+  const longUnits = longLines.map((line, i) => at(i + 1, 0, line.length));
+
+  // 로직 1은 1~2줄, 105~106줄, 119~120줄로 떨어져 있고, 로직 2는 3~4줄
+  const farBlocks = [
+    { kind: 'logic' as const, units: [0, 1, 104, 105, 118, 119] },
+    { kind: 'logic' as const, units: [2, 3] }
+  ];
+
+  // 두 블럭이 서로 끼어 있는 코드: 111줄에는 두 블럭의 문장이 하나씩 있다
+  const mixedLines = longLines.map((line, i) => (i === 110 ? 'x = 1; y = 2' : line));
+
+  const mixedUnits = mixedLines.flatMap((line, i) =>
+    i === 110 ? [at(111, 0, 5), at(111, 7, 12)] : [at(i + 1, 0, line.length)]
+  );
+
+  // 문장 번호: 111줄 앞까지는 줄 번호 - 1, 111줄의 x = 1이 110, y = 2가 111, 그 뒤는 줄 번호
+  const mixedBlocks = [
+    { kind: 'logic' as const, units: [0, 110, 120] },
+    { kind: 'logic' as const, units: [2, 111, 116] }
+  ];
+
+  // 화면 밖의 아주 긴 줄 (100줄)
+  const wideLine = `w = [${Array.from({ length: 120 }, (_, i) => i).join(', ')}]`;
+
+  const wideLines = longLines.map((line, i) => (i === 99 ? wideLine : line));
+
+  const wideUnits = wideLines.map((line, i) => at(i + 1, 0, line.length));
+
+  /** 돋보기 창의 위나 아래 창 */
+  const paneIn = (canvas: HTMLElement, name: '화면 위' | '화면 아래') =>
+    within(canvas).queryByRole('group', { name });
+
+  /** 그 창에 글이 있으면 그 요소 */
+  const inPane = (canvas: HTMLElement, name: '화면 위' | '화면 아래', text: string) => {
+    const pane = paneIn(canvas, name);
+
+    return pane === null ? null : within(pane).queryByText(text);
+  };
+
+  /** 창의 굴리는 칸을 굴린다. 막혔으면(페이지로 넘기지 않으면) false */
+  const wheel = (pane: HTMLElement | null, deltaY: number) =>
+    pane?.firstElementChild?.dispatchEvent(new WheelEvent('wheel', { deltaY, cancelable: true }));
+
+  /** 창의 굴리는 칸 안에서 끌려가는 내용의 style */
+  const pulled = (pane: HTMLElement | null) =>
+    pane?.firstElementChild?.firstElementChild?.getAttribute('style');
+
   /** 요소가 칠해진 블럭 색 (--block 값) */
   const colorOf = (el: HTMLElement | null) => el?.style.getPropertyValue('--block').trim();
 
@@ -120,6 +170,177 @@ print(count)
     // 범례의 블럭 이름에 올려도 같다
     await userEvent.hover(canvas.getAllByText('로직 1')[0]);
     await expect(condition).toHaveClass('bg-(--block)/50');
+  }}
+/>
+
+<Story
+  name="Lens"
+  args={{
+    code: longLines.join('\n'),
+    units: longUnits,
+    blocks: farBlocks,
+    focus: 0,
+    class: 'max-w-2xl'
+  }}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    const lens = () => canvas.queryByRole('complementary');
+    const pane = (name: '화면 위' | '화면 아래') => paneIn(canvasElement, name);
+    const shows = (name: '화면 위' | '화면 아래', text: string) =>
+      inPane(canvasElement, name, text);
+
+    // 칠하는 블럭의 문장 중 화면보다 아래인 105, 106, 119, 120줄을 화면 아래쪽 창에 띄운다
+    await waitFor(() => expect(shows('화면 아래', 'v119 = 119')).toBeInTheDocument());
+    await expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장');
+    await expect(shows('화면 아래', 'v104 = 104')).toBeInTheDocument();
+    await expect(shows('화면 아래', 'v0 = 0')).toBeNull();
+    await expect(pane('화면 위')).toBeNull();
+
+    // 마우스를 올린 블럭이 먼저다. 그 블럭이 다 화면 안에 있으면 창을 띄우지 않는다
+    await userEvent.hover(canvas.getByText('v2 = 2'));
+    await expect(lens()).toBeNull();
+    await userEvent.hover(canvasElement);
+    await expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장');
+
+    // 떨어진 줄 사이는 ^를 누를 때마다 아래 묶음 바로 위부터 열 줄씩 펼친다
+    await userEvent.click(canvas.getByRole('button', { name: '109~118줄 펼치기' }));
+    await expect(shows('화면 아래', 'v108 = 108')).toBeInTheDocument();
+    await expect(shows('화면 아래', 'v117 = 117')).toBeInTheDocument();
+    await expect(shows('화면 아래', 'v107 = 107')).toBeNull();
+    await expect(canvas.getByRole('button', { name: '107~108줄 펼치기' })).toBeInTheDocument();
+
+    // 화면과 창 사이에 숨은 줄도 ^로 펼친다. 아래 창에서는 맨 위에 있다
+    await expect(canvas.getByRole('button', { name: /^\d+~104줄 펼치기$/ })).toBeInTheDocument();
+
+    // 아래 창의 화면 쪽 끝(위)에서 더 굴리면 페이지로 넘기지 않고, 창이 조금 끌려갔다 돌아온다
+    await expect(wheel(pane('화면 아래'), -100)).toBe(false);
+    await expect(pulled(pane('화면 아래'))).toMatch(/translateY\([1-9]/);
+    await waitFor(() => expect(pulled(pane('화면 아래'))).toContain('translateY(0px)'));
+    // 반대쪽으로는 막지 않는다
+    await expect(wheel(pane('화면 아래'), 100)).toBe(true);
+
+    // 가운데로 내리면 위아래 두 창을 다 띄운다. 위 창의 화면 쪽 끝은 아래다
+    window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) / 2);
+    await waitFor(() => expect(shows('화면 위', 'v0 = 0')).toBeInTheDocument());
+    await expect(shows('화면 아래', 'v119 = 119')).toBeInTheDocument();
+    await expect(wheel(pane('화면 위'), 100)).toBe(false);
+    await expect(pulled(pane('화면 위'))).toMatch(/translateY\(-[1-9]/);
+
+    // 끝까지 내리면 위 창만 남는다
+    window.scrollTo(0, document.documentElement.scrollHeight);
+    await waitFor(() => expect(pane('화면 아래')).toBeNull());
+    await expect(shows('화면 위', 'v1 = 1')).toBeInTheDocument();
+    window.scrollTo(0, 0);
+  }}
+/>
+
+<Story
+  name="LensKeepsLastHovered"
+  args={{
+    code: longLines.join('\n'),
+    units: longUnits,
+    blocks: farBlocks,
+    class: 'max-w-2xl'
+  }}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    const lens = () => canvas.queryByRole('complementary');
+
+    // 칠하는 블럭이 없으면 마우스를 올린 블럭을 띄운다
+    await expect(lens()).toBeNull();
+    await userEvent.hover(canvas.getByText('v0 = 0'));
+    await waitFor(() => expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장'));
+
+    // 코드의 빈 곳을 지나 창으로 가는 동안에도 남고, 코드와 창 밖으로 나가면 닫는다
+    await userEvent.hover(canvasElement.querySelector('[data-line="5"]') ?? document.body);
+    await expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장');
+    await userEvent.hover(canvasElement);
+    await expect(lens()).toBeNull();
+  }}
+/>
+
+<Story
+  name="LensManyBlocks"
+  args={{
+    code: mixedLines.join('\n'),
+    units: mixedUnits,
+    blocks: mixedBlocks,
+    class: 'max-w-2xl'
+  }}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    const lens = () => canvas.queryByRole('complementary');
+    const shows = (text: string) => inPane(canvasElement, '화면 아래', text);
+    const unit = (n: number) => canvasElement.querySelector(`[data-unit="${n}"]`) ?? document.body;
+
+    // 창에는 한 번에 블럭 하나만 띄운다. 로직 1은 1, 111, 120줄, 로직 2는 3, 111, 116줄이다
+    await userEvent.hover(unit(0));
+    await waitFor(() => expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장'));
+
+    // 한 줄에 두 블럭의 문장이 있으면 줄은 통째로 띄우고, 띄운 블럭의 문장만 칠한다
+    await expect(shows('x = 1')).toHaveClass('bg-(--block)/25');
+    await expect(shows('y = 2')).not.toHaveClass('bg-(--block)/25');
+
+    // 펼친 줄에 든 다른 블럭의 문장도 칠하지 않는다
+    await userEvent.click(canvas.getByRole('button', { name: '112~119줄 펼치기' }));
+    await expect(shows('v115 = 115')).not.toHaveClass('bg-(--block)/25');
+
+    // 다른 블럭으로 바꾸면 그 블럭의 줄을 띄운다. 펼친 줄은 블럭마다 따로다
+    await userEvent.hover(unit(2));
+    await waitFor(() => expect(lens()).toHaveAttribute('aria-label', '로직 2 화면 밖 문장'));
+    await expect(shows('y = 2')).toHaveClass('bg-(--block)/25');
+    await expect(shows('x = 1')).not.toHaveClass('bg-(--block)/25');
+    await expect(shows('v115 = 115')).toHaveClass('bg-(--block)/25');
+    await expect(canvas.getByRole('button', { name: '112~115줄 펼치기' })).toBeInTheDocument();
+
+    // 돌아오면 그 블럭에서 펼쳐 둔 줄이 그대로다
+    await userEvent.hover(unit(0));
+    await waitFor(() => expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장'));
+    await expect(shows('v114 = 114')).toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: '112~119줄 펼치기' })).toBeNull();
+  }}
+/>
+
+<Story
+  name="LensWideLine"
+  args={{
+    code: wideLines.join('\n'),
+    units: wideUnits,
+    blocks: [{ kind: 'logic' as const, units: [0, 99] }],
+    focus: 0,
+    class: 'max-w-2xl'
+  }}
+  play={async ({ canvasElement }) => {
+    const pane = () => paneIn(canvasElement, '화면 아래');
+
+    await waitFor(() => expect(inPane(canvasElement, '화면 아래', wideLine)).toBeInTheDocument());
+
+    // 창 너비는 코드 오른쪽 빈자리에 맞추되 정한 범위를 넘지 않는다
+    const width = pane()?.getBoundingClientRect().width ?? 0;
+
+    await expect(width).toBeGreaterThanOrEqual(240);
+    await expect(width).toBeLessThanOrEqual(480);
+
+    // 아주 긴 줄은 창 안에서 줄을 바꿔, 창도 페이지도 가로로 넓어지지 않는다
+    const row = inPane(canvasElement, '화면 아래', wideLine)?.getBoundingClientRect().height ?? 0;
+    const scroller = pane()?.firstElementChild;
+
+    await expect(row).toBeGreaterThan(60);
+    await expect(scroller?.scrollWidth).toBe(scroller?.clientWidth);
+    await expect(document.documentElement.scrollWidth).toBe(document.documentElement.clientWidth);
+  }}
+/>
+
+<Story
+  name="LensNoRoom"
+  args={{
+    code: longLines.join('\n'),
+    units: longUnits,
+    blocks: farBlocks,
+    focus: 0
+  }}
+  play={async ({ canvas }) => {
+    // 코드가 화면 너비를 다 쓰면 창을 둘 빈자리가 없다. 창을 띄우지 않고 가로 스크롤도 생기지 않는다
+    await expect(canvas.getByText('v119 = 119')).toBeInTheDocument();
+    await expect(canvas.queryByRole('complementary')).toBeNull();
+    await expect(document.documentElement.scrollWidth).toBe(document.documentElement.clientWidth);
   }}
 />
 
