@@ -85,6 +85,32 @@ print(count)
   const wheel = (pane: HTMLElement | null, deltaY: number) =>
     pane?.firstElementChild?.dispatchEvent(new WheelEvent('wheel', { deltaY, cancelable: true }));
 
+  /** 창에 담긴 줄 번호 */
+  const rowsIn = (canvas: HTMLElement, name: '화면 위' | '화면 아래') =>
+    [...(paneIn(canvas, name)?.querySelectorAll('[data-lens-line]') ?? [])].map((row) =>
+      Number(row.getAttribute('data-lens-line'))
+    );
+
+  /** 본문의 그 줄이 화면에 (조금이라도) 보이는지 */
+  const onScreen = (canvas: HTMLElement, line: number | undefined) => {
+    const rect = canvas.querySelector(`[data-line="${line}"]`)?.getBoundingClientRect();
+
+    return rect !== undefined && rect.bottom > 0 && rect.top < window.innerHeight;
+  };
+
+  /** 창 안에서 그 줄이 다 보이는지 */
+  const inView = (canvas: HTMLElement, name: '화면 위' | '화면 아래', line: number) => {
+    const scroller = paneIn(canvas, name)?.firstElementChild;
+    const row = scroller?.querySelector(`[data-lens-line="${line}"]`);
+
+    if (!scroller || !row) return false;
+
+    const box = scroller.getBoundingClientRect();
+    const { top, bottom } = row.getBoundingClientRect();
+
+    return top >= box.top && bottom <= box.bottom;
+  };
+
   /** 창의 굴리는 칸 안에서 끌려가는 내용의 style */
   const pulled = (pane: HTMLElement | null) =>
     pane?.firstElementChild?.firstElementChild?.getAttribute('style');
@@ -187,60 +213,65 @@ print(count)
     const pane = (name: '화면 위' | '화면 아래') => paneIn(canvasElement, name);
     const shows = (name: '화면 위' | '화면 아래', text: string) =>
       inPane(canvasElement, name, text);
+    const rows = (name: '화면 위' | '화면 아래') => rowsIn(canvasElement, name);
+    const seen = (line: number | undefined) => onScreen(canvasElement, line);
 
-    // 칠하는 블럭의 문장 중 화면보다 아래인 95, 96, 119, 120줄을 화면 아래쪽 창에 띄운다.
-    // 위치를 짐작하게 위아래 두 줄(93~98, 117~120줄)도 함께 띄운다
+    // 칠하는 블럭의 줄 중 화면보다 아래인 줄(95, 96, 119, 120줄)이 있으면 화면 아래쪽 창을 띄운다
     await waitFor(() => expect(shows('화면 아래', 'v119 = 119')).toBeInTheDocument());
     await expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장');
-    await expect(shows('화면 아래', 'v94 = 94')).toBeInTheDocument();
-    await expect(shows('화면 아래', 'v92 = 92')).toBeInTheDocument();
-    await expect(shows('화면 아래', 'v92 = 92')).not.toHaveClass('bg-(--block)/25');
-    await expect(shows('화면 아래', 'v91 = 91')).toBeNull();
-    await expect(shows('화면 아래', 'v116 = 116')).toBeInTheDocument();
-    await expect(shows('화면 아래', 'v0 = 0')).toBeNull();
     await expect(pane('화면 위')).toBeNull();
 
-    // 마우스를 올린 블럭이 먼저다. 그 블럭이 다 화면 안에 있으면 창을 띄우지 않는다
+    // 아래 창은 화면 끝 두 줄부터 마지막 줄까지, 블럭이 아닌 줄도 다 담는다
+    const below = rows('화면 아래');
+
+    await expect(below.at(-1)).toBe(120);
+    await expect(seen(below[0])).toBe(true);
+    await expect(seen(below[1])).toBe(true);
+    await expect(seen(below[2])).toBe(false);
+    await expect(shows('화면 아래', 'v100 = 100')).toBeInTheDocument();
+
+    // 칠하는 것은 본문과 같다
+    await expect(shows('화면 아래', 'v94 = 94')).toHaveClass('bg-(--block)/25');
+    await expect(shows('화면 아래', 'v100 = 100')).not.toHaveClass('bg-(--block)/25');
+
+    // 창이 뜨면 그 블럭에서 화면에 가장 가까운 줄(95줄)이 보인다. 떨어진 줄은 눈금을 눌러 찾아간다
+    await expect(inView(canvasElement, '화면 아래', 95)).toBe(true);
+    await expect(inView(canvasElement, '화면 아래', 120)).toBe(false);
+    await userEvent.click(canvas.getByRole('button', { name: '119줄로 가기' }));
+    await waitFor(() => expect(inView(canvasElement, '화면 아래', 119)).toBe(true));
+
+    // 칠하는 블럭(답 쓰기에서 펼친 질문의 블럭)이 있으면 다른 블럭에 마우스를 올려도 창은 그대로다
     await userEvent.hover(canvas.getByText('v2 = 2'));
-    await expect(lens()).toBeNull();
-    await userEvent.hover(canvasElement);
     await expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장');
-
-    // 떨어진 줄 사이(99~116줄)는 ↑로 아래 덩어리에 이어 위로, ↓로 위 덩어리에 이어 아래로 열 줄씩
-    // 펼친다
-    await expect(canvas.getByRole('button', { name: '99~108줄 펼치기' })).toBeInTheDocument();
-    await userEvent.click(canvas.getByRole('button', { name: '107~116줄 펼치기' }));
-    await expect(shows('화면 아래', 'v106 = 106')).toBeInTheDocument();
-    await expect(shows('화면 아래', 'v115 = 115')).toBeInTheDocument();
-    await expect(shows('화면 아래', 'v105 = 105')).toBeNull();
-
-    // 남은 줄이 열 줄 이하면 한 번에 다 펼친다
-    await expect(canvas.queryByRole('button', { name: '99~108줄 펼치기' })).toBeNull();
-    await userEvent.click(canvas.getByRole('button', { name: '99~106줄 펼치기' }));
-    await expect(shows('화면 아래', 'v98 = 98')).toBeInTheDocument();
-
-    // 화면과 창 사이에 숨은 줄도 펼친다. 아래 창에서는 맨 위에 있고, ↓는 화면 바로 아래부터 펼친다
-    const upward = canvas.getByRole('button', { name: /^\d+~92줄 펼치기$/ });
-    const downward = upward.previousElementSibling ?? upward;
-    const [first] = (downward.getAttribute('aria-label') ?? '').split('~').map(Number);
-
-    await userEvent.click(downward);
-    await expect(shows('화면 아래', `v${first - 1} = ${first - 1}`)).toBeInTheDocument();
-    await expect(shows('화면 아래', `v${first - 2} = ${first - 2}`)).toBeNull();
+    await userEvent.hover(canvasElement);
 
     // 아래 창의 화면 쪽 끝(위)에서 더 굴리면 페이지로 넘기지 않고, 창이 조금 끌려갔다 돌아온다
+    const scroller = pane('화면 아래')?.firstElementChild;
+
+    if (scroller) scroller.scrollTop = 0;
     await expect(wheel(pane('화면 아래'), -100)).toBe(false);
     await expect(pulled(pane('화면 아래'))).toMatch(/translateY\([1-9]/);
     await waitFor(() => expect(pulled(pane('화면 아래'))).toContain('translateY(0px)'));
     // 반대쪽으로는 막지 않는다
     await expect(wheel(pane('화면 아래'), 100)).toBe(true);
 
-    // 가운데로 내리면 위아래 두 창을 다 띄운다. 위 창의 화면 쪽 끝은 아래다
+    // 가운데로 내리면 위아래 두 창을 다 띄운다. 위 창은 1줄부터 화면 첫 두 줄까지 담는다
     window.scrollTo(0, (document.documentElement.scrollHeight - window.innerHeight) / 2);
     await waitFor(() => expect(shows('화면 위', 'v0 = 0')).toBeInTheDocument());
-    await expect(shows('화면 위', 'v3 = 3')).toBeInTheDocument();
-    await expect(shows('화면 위', 'v4 = 4')).toBeNull();
     await expect(shows('화면 아래', 'v119 = 119')).toBeInTheDocument();
+    await waitFor(() => {
+      const above = rows('화면 위');
+
+      expect(above[0]).toBe(1);
+      expect(seen(above.at(-1))).toBe(true);
+      expect(seen(above.at(-2))).toBe(true);
+      expect(seen(above.at(-3))).toBe(false);
+    });
+
+    // 위 창의 화면 쪽 끝은 아래다
+    const top = pane('화면 위')?.firstElementChild;
+
+    if (top) top.scrollTop = top.scrollHeight;
     await expect(wheel(pane('화면 위'), 100)).toBe(false);
     await expect(pulled(pane('화면 위'))).toMatch(/translateY\(-[1-9]/);
 
@@ -289,32 +320,27 @@ print(count)
     const shows = (text: string) => inPane(canvasElement, '화면 아래', text);
     const unit = (n: number) => canvasElement.querySelector(`[data-unit="${n}"]`) ?? document.body;
 
-    // 창에는 한 번에 블럭 하나만 띄운다. 로직 1은 1, 111, 120줄, 로직 2는 3, 111, 116줄이다
+    // 칠하는 블럭이 없으면(블럭 편집) 마우스를 올린 블럭을 띄운다.
+    // 로직 1은 1, 111, 120줄, 로직 2는 3, 111, 116줄이다
     await userEvent.hover(unit(0));
     await waitFor(() => expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장'));
 
-    // 한 줄에 두 블럭의 문장이 있으면 줄은 통째로 띄우고, 띄운 블럭의 문장만 칠한다
-    await expect(shows('x = 1')).toHaveClass('bg-(--block)/25');
-    await expect(shows('y = 2')).not.toHaveClass('bg-(--block)/25');
+    // 창은 본문처럼 칠한다. 띄운 블럭은 진하게, 다른 블럭은 옅게. 한 줄에 두 블럭이 있어도 같다
+    await expect(shows('x = 1')).toHaveClass('bg-(--block)/50');
+    await expect(shows('y = 2')).toHaveClass('bg-(--block)/25');
+    await expect(shows('v115 = 115')).toHaveClass('bg-(--block)/25');
 
-    // 펼친 줄에 든 다른 블럭의 문장도 칠하지 않는다
-    await userEvent.click(canvas.getByRole('button', { name: '114~117줄 펼치기' }));
-    await expect(shows('v115 = 115')).not.toHaveClass('bg-(--block)/25');
+    // 눈금은 띄운 블럭의 줄에만 단다
+    await expect(canvas.getByRole('button', { name: '120줄로 가기' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: '116줄로 가기' })).toBeNull();
 
-    // 다른 블럭으로 바꾸면 그 블럭의 줄을 띄운다. 펼친 줄은 블럭마다 따로다
+    // 다른 블럭에 올리면 그 블럭을 띄운다
     await userEvent.hover(unit(2));
     await waitFor(() => expect(lens()).toHaveAttribute('aria-label', '로직 2 화면 밖 문장'));
-    await expect(shows('y = 2')).toHaveClass('bg-(--block)/25');
-    await expect(shows('x = 1')).not.toHaveClass('bg-(--block)/25');
-    await expect(shows('v115 = 115')).toHaveClass('bg-(--block)/25');
-    await expect(shows('v117 = 117')).toBeInTheDocument();
-    await expect(shows('v118 = 118')).toBeNull();
-
-    // 돌아오면 그 블럭에서 펼쳐 둔 줄이 그대로다
-    await userEvent.hover(unit(0));
-    await waitFor(() => expect(lens()).toHaveAttribute('aria-label', '로직 1 화면 밖 문장'));
-    await expect(shows('v114 = 114')).toBeInTheDocument();
-    await expect(canvas.queryByRole('button', { name: '114~117줄 펼치기' })).toBeNull();
+    await expect(shows('y = 2')).toHaveClass('bg-(--block)/50');
+    await expect(shows('x = 1')).toHaveClass('bg-(--block)/25');
+    await expect(canvas.getByRole('button', { name: '116줄로 가기' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('button', { name: '120줄로 가기' })).toBeNull();
   }}
 />
 

@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
+  import { untrack, type Snippet } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
-  import { IconChevronDown, IconChevronUp, IconSelector, IconX } from '@tabler/icons-svelte';
+  import { IconChevronDown, IconX } from '@tabler/icons-svelte';
   import type { BlockKind, Language, Span } from '#lib/api/client.js';
   import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
   import { highlight, type Tint } from '#lib/highlight.js';
@@ -23,10 +23,10 @@
   type Block = { kind: BlockKind; units: number[]; wrong?: boolean };
 
   /**
-   * 화면 위나 아래의 돋보기 창. groups는 이어진 줄끼리 묶은 줄, edge는 창과 화면 사이에 숨은 줄
-   * [첫 줄, 끝 줄]이다
+   * 화면 위나 아래의 돋보기 창. 줄 from~to를 모두 담고, target은 창이 뜰 때 가운데에 둘 줄, marks는
+   * 띄운 블럭의 줄을 이어진 줄끼리 묶은 것(스크롤 눈금)이다
    */
-  type Pane = { groups: number[][]; edge: [number, number] | null };
+  type Pane = { from: number; to: number; target: number; marks: number[][] };
 
   /** 화면보다 위(above)와 아래(below)의 돋보기 창. 띄울 줄이 없으면 null */
   type Lens = { above: Pane | null; below: Pane | null };
@@ -34,13 +34,10 @@
   const kinds: BlockKind[] = ['input', 'logic', 'output'];
 
   /**
-   * 돋보기 창에서 블럭 줄 위아래로 함께 띄우는 줄 수. 한 줄짜리 문장도 CONTEXT * 2 + 1줄(5줄)이 보여
-   * 코드의 어디쯤인지 짐작할 수 있다
+   * 돋보기 창이 화면과 겹쳐 보여 주는 줄 수. 위 창은 화면 첫 줄부터, 아래 창은 화면 끝 줄까지 이만큼
+   * 더 담아, 창 끝이 지금 보는 코드와 이어진다는 것을 알 수 있다
    */
-  const CONTEXT = 2;
-
-  /** 돋보기 창에서 ↑나 ↓를 한 번 누를 때 펼치는 줄 수 */
-  const UNFOLD_STEP = 10;
+  const PADDING = 2;
 
   /** 돋보기 창 너비(px). 코드 오른쪽 빈자리에 맞추고, LENS_MIN보다 좁으면 창을 띄우지 않는다 */
   const LENS_MIN = 240;
@@ -147,12 +144,6 @@
   /** 마지막으로 마우스를 올린 블럭. 마우스가 틀 안에 있는 동안 돋보기 창에 남겨 창까지 갈 수 있게 한다 */
   let held = $state<number | null>(null);
 
-  /** 돋보기 창에서 펼친 줄. 블럭마다 따로 두고, 블럭이 바뀌면(편집) 모두 접힌다 */
-  const opened = new SvelteMap<number, number[]>();
-
-  /** opened를 펼칠 때의 블럭 */
-  let openedFor = $state.raw<Block[]>([]);
-
   /** 코드 오른쪽 빈자리의 너비(px) */
   let room = $state(0);
 
@@ -226,15 +217,18 @@
     return at;
   });
 
-  /** 돋보기 창에 띄울 블럭: 마우스를 올린 블럭, 없으면 칠하는 블럭, 없으면 마지막으로 올린 블럭 */
-  const peek = $derived(hovered ?? focus ?? held);
+  /**
+   * 돋보기 창에 띄울 블럭: 칠하는 블럭(답 쓰기에서 펼친 질문의 블럭), 없으면 마우스를 올린 블럭, 없으면
+   * 마지막으로 올린 블럭. 답을 쓰는 동안에는 마우스가 다른 블럭을 지나가도 창이 바뀌지 않는다
+   */
+  const peek = $derived(focus ?? hovered ?? held);
 
   /** 돋보기 창 너비 (코드와 띄움 16px, 화면 끝과 띄움 16px을 뺀다) */
   const lensWidth = $derived(Math.min(LENS_MAX, room - 32));
 
   /**
-   * 돋보기 창. peek 블럭의 문장이 걸친 줄 중 화면 밖의 줄을, 화면보다 위(above)와 아래(below)로
-   * 나눠 띄운다
+   * 돋보기 창. peek 블럭의 문장이 걸친 줄이 화면보다 위에 있으면 위 창(above)에 1줄부터 화면 첫 줄까지,
+   * 아래에 있으면 아래 창(below)에 화면 끝 줄부터 마지막 줄까지 띄운다
    */
   const lens = $derived.by((): Lens => {
     if (peek === null || peek >= blocks.length) return { above: null, below: null };
@@ -256,22 +250,19 @@
     const above = away.filter((n) => n < first);
     const below = away.filter((n) => n > last);
 
+    const end = lines.length;
+
     return {
-      above: above.length === 0 ? null : paneFor(peek, 'top', above, 1, first - 1),
-      below: below.length === 0 ? null : paneFor(peek, 'bottom', below, last + 1, lines.length)
+      above:
+        above.length === 0
+          ? null
+          : paneFor(own, 1, Math.min(end, first + PADDING - 1), Math.max(...above)),
+      below:
+        below.length === 0
+          ? null
+          : paneFor(own, Math.max(1, last - PADDING + 1), end, Math.min(...below))
     };
   });
-
-  /** 돋보기 창에서 덜어 낼 들여쓰기 칸 수: 띄우는 줄 중 가장 얕은 들여쓰기 */
-  const indent = $derived(
-    Math.min(
-      ...[...(lens.above?.groups ?? []), ...(lens.below?.groups ?? [])].flat().map((n) => {
-        const at = (lines[n - 1] ?? []).findIndex((c) => c.trim() !== '');
-
-        return at === -1 ? Infinity : at;
-      })
-    )
-  );
 
   const highlighted = $derived(new Set(drag === null ? selected : dragged(drag)));
 
@@ -331,58 +322,39 @@
     return out;
   }
 
-  /** block을 펼친 줄 */
-  function openedOf(block: number): number[] {
-    return (openedFor === blocks ? opened.get(block) : undefined) ?? [];
-  }
+  /** 줄 from~to를 담는 창. 블럭의 줄(own) 중 창에 든 줄을 이어진 줄끼리 묶어 눈금으로 단다 */
+  function paneFor(own: Set<number>, from: number, to: number, target: number): Pane {
+    const marks: number[][] = [];
 
-  /**
-   * 줄 from~to(화면 밖의 한쪽)를 비추는 창. 블럭의 화면 밖 줄(away)과 그 위아래 CONTEXT줄, 펼친 줄을
-   * 이어진 줄끼리 묶고, 화면 쪽 끝(위 창은 아래, 아래 창은 위)과 화면 사이에 숨은 줄을 edge로 둔다.
-   * to가 Infinity면 화면과 맞닿은 줄을 모르는 것이다
-   */
-  function paneFor(
-    block: number,
-    side: 'top' | 'bottom',
-    away: number[],
-    from: number,
-    to: number
-  ): Pane {
-    const end = Math.min(to, lines.length);
+    for (const n of [...own].filter((n) => n >= from && n <= to).sort((a, b) => a - b)) {
+      const mark = marks.at(-1);
 
-    const around = away
-      .flatMap((n) => Array.from({ length: CONTEXT * 2 + 1 }, (_, k) => n - CONTEXT + k))
-      .filter((n) => n >= from && n <= end);
-
-    const unfolded = openedOf(block).filter((n) => n >= from && n <= end);
-    const rows = [...new Set([...around, ...unfolded])].sort((a, b) => a - b);
-    const groups: number[][] = [];
-
-    for (const n of rows) {
-      const group = groups.at(-1);
-
-      if (group?.at(-1) === n - 1) group.push(n);
-      else groups.push([n]);
+      if (mark?.at(-1) === n - 1) mark.push(n);
+      else marks.push([n]);
     }
 
-    const [low, high] = [rows[0], rows[rows.length - 1]];
-
-    if (side === 'top')
-      return { groups, edge: high < to && to !== Infinity ? [high + 1, to] : null };
-
-    return { groups, edge: low > from ? [from, low - 1] : null };
+    return { from, to, target, marks };
   }
 
-  /** 돋보기 창에서 숨은 줄 start~end를 펼친다 */
-  function unfold(block: number, start: number, end: number) {
-    const kept = openedOf(block);
+  /** 창 안에서 그 줄이 가운데 오게 굴린다 */
+  function center(scroller: Element | null | undefined, line: number, smooth: boolean) {
+    const row = scroller?.querySelector(`[data-lens-line="${line}"]`);
 
-    if (openedFor !== blocks) {
-      opened.clear();
-      openedFor = blocks;
-    }
+    if (!scroller || !(row instanceof HTMLElement)) return;
 
-    opened.set(block, [...kept, ...Array.from({ length: end - start + 1 }, (_, k) => start + k)]);
+    scroller.scrollTo({
+      top: row.offsetTop - (scroller.clientHeight - row.offsetHeight) / 2,
+      behavior: smooth ? 'smooth' : 'instant'
+    });
+  }
+
+  /** 창이 뜨면 띄운 블럭에서 화면에 가장 가까운 줄을 가운데에 둔다. 페이지를 굴려도 다시 옮기지 않는다 */
+  function anchor(side: 'top' | 'bottom') {
+    return (scroller: HTMLDivElement) => {
+      const target = untrack(() => (side === 'top' ? lens.above : lens.below)?.target);
+
+      if (target !== undefined) center(scroller, target, false);
+    };
   }
 
   /** 끈 양(px)에 저항을 건 거리. 끌수록 덜 끌려가고 STRETCH_MAX를 넘지 않는다 */
@@ -392,12 +364,10 @@
 
   /**
    * 창 안을 굴리다 화면 쪽 끝(위 창은 아래 끝, 아래 창은 위 끝)에 닿으면 페이지로 넘기지 않고 저항을
-   * 건다. 위 창은 화면 쪽 끝에서 시작한다
+   * 건다
    */
   function resist(side: 'top' | 'bottom') {
     return (scroller: HTMLDivElement) => {
-      if (side === 'top') scroller.scrollTop = scroller.scrollHeight;
-
       function wheel(event: WheelEvent) {
         const atEdge =
           side === 'top'
@@ -439,13 +409,6 @@
       observer.disconnect();
       window.removeEventListener('resize', update);
     };
-  }
-
-  /** 돋보기 창의 줄 조각. 들여쓰기를 덜어 낸다 */
-  function dedented(number: number): Piece[] {
-    return pieces(number).flatMap((piece) =>
-      piece.to <= indent ? [] : [{ ...piece, from: Math.max(piece.from, indent) }]
-    );
   }
 
   /** 줄이 화면에 들어오고 나가는 것을 지켜본다 */
@@ -619,46 +582,9 @@
 )}{#each runs(number, piece) as run, k (k)}{#if run.color}<span class={run.color}>{run.text}</span
       >{:else}{run.text}{/if}{/each}{/snippet}
 
-<!-- 숨은 줄 from~to. ↓는 위 덩어리에 이어 아래로, ↑는 아래 덩어리에 이어 위로 UNFOLD_STEP줄씩 펼친다
-     (창과 화면 사이에서는 화면이 그 덩어리다). UNFOLD_STEP줄 이하면 ↕ 하나로 다 펼친다 -->
-{#snippet expander(block: number, from: number, to: number)}
-  {@const down = Math.min(to, from + UNFOLD_STEP - 1)}
-  {@const up = Math.max(from, to - UNFOLD_STEP + 1)}
-  {@const fold =
-    'flex w-full cursor-pointer justify-end pr-2 hover:bg-foreground/10 hover:text-foreground'}
-  <div class="flex items-center bg-foreground/5 text-muted-foreground">
-    <span class="flex w-10 shrink-0 flex-col">
-      {#if to - from + 1 <= UNFOLD_STEP}
-        <button
-          type="button"
-          class={cn(fold, 'py-0.5')}
-          title="모두 펼치기"
-          aria-label="{from}~{to}줄 펼치기"
-          onclick={() => unfold(block, from, to)}><IconSelector class="size-4" /></button
-        >
-      {:else}
-        <button
-          type="button"
-          class={fold}
-          title="아래로 펼치기"
-          aria-label="{from}~{down}줄 펼치기"
-          onclick={() => unfold(block, from, down)}><IconChevronDown class="size-4" /></button
-        >
-        <button
-          type="button"
-          class={fold}
-          title="위로 펼치기"
-          aria-label="{up}~{to}줄 펼치기"
-          onclick={() => unfold(block, up, to)}><IconChevronUp class="size-4" /></button
-        >
-      {/if}
-    </span>
-    {from}~{to}줄
-  </div>
-{/snippet}
-
 {#snippet lensPane(block: number, pane: Pane, side: 'top' | 'bottom', both: boolean)}
   {@const pulled = give(stretch[side])}
+  {@const count = pane.to - pane.from + 1}
   <!-- 물방울 같은 유리: 반투명 바탕, 비스듬한 반사광(before), 가장자리 굴절 띠, 맨 위의 테두리 빛과 그늘(after).
        바탕을 흐리게(backdrop-blur) 하면 굴절 띠가 반투명한 창 안만 보고 겹쳐 그려지므로 흐리지 않는다 -->
   <div
@@ -673,10 +599,12 @@
   >
     <div
       class={cn(
-        'relative overflow-y-auto overscroll-contain py-1',
+        'relative [scrollbar-width:thin] overflow-y-auto overscroll-contain py-1',
         both ? 'max-h-[calc(50dvh-1.5rem)]' : 'max-h-[calc(100dvh-2rem)]'
       )}
+      data-lens-scroller
       {@attach resist(side)}
+      {@attach anchor(side)}
     >
       <!-- 끌려간 만큼 화면 쪽 끝에서 멀어지고, 놓으면 살짝 지나쳤다 돌아온다 -->
       <div
@@ -688,35 +616,23 @@
         <p class="flex items-center gap-1.5 px-4 pt-2 pb-1">
           <span class={cn('size-2 rounded-full', colors[block].bar)}></span>{labels[block]}
         </p>
-        {#if side === 'bottom' && pane.edge}
-          {@render expander(block, pane.edge[0], pane.edge[1])}
-        {/if}
-        {#each pane.groups as group, g (group[0])}
-          {#if g > 0}
-            {@const prev = pane.groups[g - 1]}
-            {@render expander(block, prev[prev.length - 1] + 1, group[0] - 1)}
-          {/if}
-          <div class="py-1 font-mono leading-5">
-            {#each group as number (number)}
-              <div class="flex">
-                <span class="w-10 shrink-0 pr-2 text-right text-muted-foreground select-none"
-                  >{number}</span
-                >
-                <span class="min-w-0 flex-1 pr-4 wrap-anywhere whitespace-pre-wrap"
-                  >{#each dedented(number) as piece, i (i)}<span
-                      class={cn(
-                        'rounded-sm',
-                        piece.unit !== null && owner[piece.unit] === block && colors[block].fill
-                      )}>{@render colored(number, piece)}</span
-                    >{/each}</span
-                >
-              </div>
-            {/each}
-          </div>
-        {/each}
-        {#if side === 'top' && pane.edge}
-          {@render expander(block, pane.edge[0], pane.edge[1])}
-        {/if}
+        <!-- 본문과 똑같이 칠하고, 화면과 겹친 줄은 흐리게 둔다 -->
+        <div class="font-mono leading-5">
+          {#each Array.from({ length: count }, (_, k) => pane.from + k) as number (number)}
+            <div class={cn('flex', onscreen.get(number) && 'opacity-40')} data-lens-line={number}>
+              <span class={cn('w-1 shrink-0', bar(number))} style={barTint(number)}></span>
+              <span class="w-9 shrink-0 pr-2 text-right text-muted-foreground select-none"
+                >{number}</span
+              >
+              <span class="min-w-0 flex-1 pr-6 wrap-anywhere whitespace-pre-wrap"
+                >{#each pieces(number) as piece, i (i)}<span
+                    class={cn('rounded-sm', fill(piece.unit))}
+                    style={tint(piece.unit)}>{@render colored(number, piece)}</span
+                  >{/each}</span
+              >
+            </div>
+          {/each}
+        </div>
       </div>
     </div>
     <!-- 가장자리 띠마다 그 밑의 글자를 안쪽에서 끌어와 휘게 한다 (backdrop-filter의 SVG 필터는 Chromium만 그린다) -->
@@ -726,6 +642,24 @@
         style="backdrop-filter: url(#{uid}-{rim.edge})"
       ></span>
     {/each}
+    <!-- 띄운 블럭의 줄이 창 안 어디쯤 있는지 보여 주는 눈금. 누르면 그 줄로 굴린다 -->
+    <div class="pointer-events-none absolute inset-y-3 right-3.5 w-2">
+      {#each pane.marks as mark (mark[0])}
+        <button
+          type="button"
+          class="pointer-events-auto absolute inset-x-0 min-h-1.5 cursor-pointer rounded-full bg-(--block) opacity-60 hover:opacity-100"
+          style="top: {((mark[0] - pane.from) / count) * 100}%; height: {(mark.length / count) *
+            100}%"
+          aria-label="{mark[0]}줄로 가기"
+          onclick={(event) =>
+            center(
+              event.currentTarget.closest('[role="group"]')?.querySelector('[data-lens-scroller]'),
+              mark[0],
+              true
+            )}
+        ></button>
+      {/each}
+    </div>
   </div>
 {/snippet}
 
@@ -876,12 +810,15 @@
       style="width: {lensWidth + 16}px"
       aria-label="{labels[peek]} 화면 밖 문장"
     >
-      {#if lens.above}
-        {@render lensPane(peek, lens.above, 'top', lens.below !== null)}
-      {/if}
-      {#if lens.below}
-        {@render lensPane(peek, lens.below, 'bottom', lens.above !== null)}
-      {/if}
+      <!-- 블럭이 바뀌면 창을 새로 띄워 그 블럭의 줄로 굴린다 -->
+      {#key peek}
+        {#if lens.above}
+          {@render lensPane(peek, lens.above, 'top', lens.below !== null)}
+        {/if}
+        {#if lens.below}
+          {@render lensPane(peek, lens.below, 'bottom', lens.above !== null)}
+        {/if}
+      {/key}
       <svg class="pointer-events-none absolute size-0" aria-hidden="true">
         {#each RIMS as rim (rim.edge)}
           <filter
