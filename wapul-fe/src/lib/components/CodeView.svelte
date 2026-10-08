@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
-  import { IconChevronDown, IconChevronUp, IconX } from '@tabler/icons-svelte';
+  import { IconChevronDown, IconChevronUp, IconSelector, IconX } from '@tabler/icons-svelte';
   import type { BlockKind, Language, Span } from '#lib/api/client.js';
   import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
   import { highlight, type Tint } from '#lib/highlight.js';
@@ -33,7 +33,13 @@
 
   const kinds: BlockKind[] = ['input', 'logic', 'output'];
 
-  /** 돋보기 창에서 ^를 한 번 누를 때 펼치는 줄 수 */
+  /**
+   * 돋보기 창에서 블럭 줄 위아래로 함께 띄우는 줄 수. 한 줄짜리 문장도 CONTEXT * 2 + 1줄(5줄)이 보여
+   * 코드의 어디쯤인지 짐작할 수 있다
+   */
+  const CONTEXT = 2;
+
+  /** 돋보기 창에서 ↑나 ↓를 한 번 누를 때 펼치는 줄 수 */
   const UNFOLD_STEP = 10;
 
   /** 돋보기 창 너비(px). 코드 오른쪽 빈자리에 맞추고, LENS_MIN보다 좁으면 창을 띄우지 않는다 */
@@ -138,7 +144,7 @@
   /** 마지막으로 마우스를 올린 블럭. 마우스가 틀 안에 있는 동안 돋보기 창에 남겨 창까지 갈 수 있게 한다 */
   let held = $state<number | null>(null);
 
-  /** 돋보기 창에서 ^로 펼친 줄. 블럭마다 따로 두고, 블럭이 바뀌면(편집) 모두 접힌다 */
+  /** 돋보기 창에서 펼친 줄. 블럭마다 따로 두고, 블럭이 바뀌면(편집) 모두 접힌다 */
   const opened = new SvelteMap<number, number[]>();
 
   /** opened를 펼칠 때의 블럭 */
@@ -248,9 +254,8 @@
     const below = away.filter((n) => n > last);
 
     return {
-      above: above.length === 0 ? null : paneFor(peek, 'top', above, Math.min(...above), first - 1),
-      below:
-        below.length === 0 ? null : paneFor(peek, 'bottom', below, last + 1, Math.max(...below))
+      above: above.length === 0 ? null : paneFor(peek, 'top', above, 1, first - 1),
+      below: below.length === 0 ? null : paneFor(peek, 'bottom', below, last + 1, lines.length)
     };
   });
 
@@ -329,8 +334,9 @@
   }
 
   /**
-   * 줄 from~to를 비추는 창. 블럭의 화면 밖 줄(away)과 그 사이에서 펼친 줄을 이어진 줄끼리 묶고,
-   * 화면 쪽 끝(위 창은 아래, 아래 창은 위)과 화면 사이에 숨은 줄을 edge로 둔다
+   * 줄 from~to(화면 밖의 한쪽)를 비추는 창. 블럭의 화면 밖 줄(away)과 그 위아래 CONTEXT줄, 펼친 줄을
+   * 이어진 줄끼리 묶고, 화면 쪽 끝(위 창은 아래, 아래 창은 위)과 화면 사이에 숨은 줄을 edge로 둔다.
+   * to가 Infinity면 화면과 맞닿은 줄을 모르는 것이다
    */
   function paneFor(
     block: number,
@@ -339,8 +345,14 @@
     from: number,
     to: number
   ): Pane {
-    const unfolded = openedOf(block).filter((n) => n >= from && n <= to);
-    const rows = [...new Set([...away, ...unfolded])].sort((a, b) => a - b);
+    const end = Math.min(to, lines.length);
+
+    const around = away
+      .flatMap((n) => Array.from({ length: CONTEXT * 2 + 1 }, (_, k) => n - CONTEXT + k))
+      .filter((n) => n >= from && n <= end);
+
+    const unfolded = openedOf(block).filter((n) => n >= from && n <= end);
+    const rows = [...new Set([...around, ...unfolded])].sort((a, b) => a - b);
     const groups: number[][] = [];
 
     for (const n of rows) {
@@ -358,9 +370,8 @@
     return { groups, edge: low > from ? [from, low - 1] : null };
   }
 
-  /** 돋보기 창에서 숨은 줄 from~to 중 아래쪽 UNFOLD_STEP줄을 펼친다 (아래 것 바로 위부터 위로) */
-  function unfold(block: number, from: number, to: number) {
-    const start = Math.max(from, to - UNFOLD_STEP + 1);
+  /** 돋보기 창에서 숨은 줄 start~end를 펼친다 */
+  function unfold(block: number, start: number, end: number) {
     const kept = openedOf(block);
 
     if (openedFor !== blocks) {
@@ -368,7 +379,7 @@
       openedFor = blocks;
     }
 
-    opened.set(block, [...kept, ...Array.from({ length: to - start + 1 }, (_, k) => start + k)]);
+    opened.set(block, [...kept, ...Array.from({ length: end - start + 1 }, (_, k) => start + k)]);
   }
 
   /** 끈 양(px)에 저항을 건 거리. 끌수록 덜 끌려가고 STRETCH_MAX를 넘지 않는다 */
@@ -592,16 +603,42 @@
 )}{#each runs(number, piece) as run, k (k)}{#if run.color}<span class={run.color}>{run.text}</span
       >{:else}{run.text}{/if}{/each}{/snippet}
 
+<!-- 숨은 줄 from~to. ↓는 위 덩어리에 이어 아래로, ↑는 아래 덩어리에 이어 위로 UNFOLD_STEP줄씩 펼친다
+     (창과 화면 사이에서는 화면이 그 덩어리다). UNFOLD_STEP줄 이하면 ↕ 하나로 다 펼친다 -->
 {#snippet expander(block: number, from: number, to: number)}
-  <button
-    type="button"
-    class="flex w-full cursor-pointer items-center bg-foreground/5 py-0.5 text-muted-foreground hover:bg-foreground/10 hover:text-foreground"
-    aria-label="{Math.max(from, to - UNFOLD_STEP + 1)}~{to}줄 펼치기"
-    onclick={() => unfold(block, from, to)}
-  >
-    <span class="flex w-10 shrink-0 justify-end pr-2"><IconChevronUp class="size-4" /></span>
+  {@const down = Math.min(to, from + UNFOLD_STEP - 1)}
+  {@const up = Math.max(from, to - UNFOLD_STEP + 1)}
+  {@const fold =
+    'flex w-full cursor-pointer justify-end pr-2 hover:bg-foreground/10 hover:text-foreground'}
+  <div class="flex items-center bg-foreground/5 text-muted-foreground">
+    <span class="flex w-10 shrink-0 flex-col">
+      {#if to - from + 1 <= UNFOLD_STEP}
+        <button
+          type="button"
+          class={cn(fold, 'py-0.5')}
+          title="모두 펼치기"
+          aria-label="{from}~{to}줄 펼치기"
+          onclick={() => unfold(block, from, to)}><IconSelector class="size-4" /></button
+        >
+      {:else}
+        <button
+          type="button"
+          class={fold}
+          title="아래로 펼치기"
+          aria-label="{from}~{down}줄 펼치기"
+          onclick={() => unfold(block, from, down)}><IconChevronDown class="size-4" /></button
+        >
+        <button
+          type="button"
+          class={fold}
+          title="위로 펼치기"
+          aria-label="{up}~{to}줄 펼치기"
+          onclick={() => unfold(block, up, to)}><IconChevronUp class="size-4" /></button
+        >
+      {/if}
+    </span>
     {from}~{to}줄
-  </button>
+  </div>
 {/snippet}
 
 {#snippet lensPane(block: number, pane: Pane, side: 'top' | 'bottom', both: boolean)}
