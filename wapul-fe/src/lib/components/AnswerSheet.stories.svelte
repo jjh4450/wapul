@@ -107,6 +107,35 @@
 />
 
 <Story
+  name="PickBlockInCode"
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    const expanded = (label: string) =>
+      within(canvas.getByRole('region', { name: label })).queryByRole('button', { expanded: true });
+
+    // 코드에서 블럭의 문장을 누르면 그 블럭의 질문 묶음을 열고 그리로 옮긴다. 앞 묶음은 접힌다
+    await canvas.findByRole('region', { name: '출력' });
+    await userEvent.click(canvasElement.querySelector('[data-unit="14"]') ?? document.body);
+    await expect(expanded('출력')).toBeInTheDocument();
+    await expect(expanded('문제')).toBeNull();
+
+    const outputThread = canvas.getByRole('region', { name: '출력' });
+
+    await waitFor(() => {
+      const { top } = outputThread.getBoundingClientRect();
+
+      expect(top).toBeGreaterThanOrEqual(0);
+      expect(top).toBeLessThan(window.innerHeight);
+    });
+
+    // 블럭 이름을 눌러도 같다
+    await userEvent.click(canvasElement.querySelector('[data-block="1"]') ?? document.body);
+    await expect(expanded('로직 1')).toBeInTheDocument();
+    await expect(expanded('출력')).toBeNull();
+  }}
+/>
+
+<Story
   name="OneThreadAtATime"
   beforeEach={() => writing.install()}
   play={async ({ canvas, userEvent }) => {

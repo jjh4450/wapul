@@ -156,6 +156,13 @@
     focusBlank(false);
   }
 
+  /** 코드에서 누른 블럭의 질문 묶음을 펼치고 그리로 옮긴다 */
+  function pickBlock(block: number) {
+    const found = threads.find((t) => t.block === block);
+
+    if (found) open(found.key, true);
+  }
+
   /** 펼친 묶음을 닫는다. 묶음 머리로는 닫히지 않아서, 생각 없이 열고 닫는 대신 답하게 한다 */
   function close(t: Thread) {
     if (guard.close(hasBlank(t.questions))) current = '';
@@ -407,6 +414,7 @@
       units={record.units}
       blocks={record.blocks}
       {focus}
+      onpick={pickBlock}
       after={blockThreads}
     />
 

@@ -450,6 +450,24 @@ print(count)
 />
 
 <Story
+  name="PickBlock"
+  args={{ units, blocks, onpick: fn() }}
+  play={async ({ canvas, canvasElement, userEvent, args }) => {
+    // 문장을 누르면 그 문장이 든 블럭을 고른다
+    await userEvent.click(canvas.getByText('if s >= end:'));
+    await expect(args.onpick).toHaveBeenLastCalledWith(1);
+
+    // 블럭 이름을 눌러도 같다
+    await userEvent.click(canvas.getAllByText('출력')[0]);
+    await expect(args.onpick).toHaveBeenLastCalledWith(2);
+
+    // 블럭에 들지 않은 곳(빈 줄)은 고르지 않는다
+    await userEvent.click(canvasElement.querySelector('[data-line="3"]') ?? document.body);
+    await expect(args.onpick).toHaveBeenCalledTimes(2);
+  }}
+/>
+
+<Story
   name="RemovableBlocks"
   args={{ units, blocks, onremove: fn() }}
   play={async ({ canvas, userEvent, args }) => {

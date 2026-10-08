@@ -103,6 +103,7 @@
     onkind,
     onwrong,
     onremove,
+    onpick,
     after,
     class: className
   }: {
@@ -126,6 +127,8 @@
     onwrong?: (block: number, wrong: boolean) => void;
     /** 주면 범례에서 블럭을 뺄 수 있다 */
     onremove?: (block: number) => void;
+    /** 주면 문장이나 블럭 이름을 눌러 그 블럭을 고를 수 있다 (답 쓰기에서 그 블럭의 질문 묶음을 연다) */
+    onpick?: (block: number) => void;
     /** 줄 아래에 끼울 내용 (질문 스레드, 블럭 고르는 창). 줄 번호를 받는다 */
     after?: Snippet<[number]>;
     class?: string;
@@ -591,6 +594,19 @@
     if (hovered !== null) held = hovered;
   }
 
+  /** 문장이나 블럭 이름을 누르면 그 블럭을 고른다. 글자를 끌어 고른 끝의 클릭은 고르지 않는다 */
+  function pick(event: MouseEvent) {
+    if (!onpick || !(event.target instanceof Element) || !root?.contains(event.target)) return;
+
+    if (!(window.getSelection()?.isCollapsed ?? true)) return;
+
+    const block = event.target.closest('[data-block]')?.getAttribute('data-block');
+    const unit = event.target.closest('[data-unit]')?.getAttribute('data-unit');
+    const picked = block != null ? Number(block) : unit != null ? owner[Number(unit)] : null;
+
+    if (picked !== null) onpick(picked);
+  }
+
   /** 키보드로 누른 문장 하나를 고른다. 마우스와 터치는 끌기(start, end)가 맡는다 */
   function press(event: MouseEvent, unit: number) {
     if (event.detail === 0) onselect?.([unit]);
@@ -719,6 +735,7 @@
   onpointermove={move}
   onpointerup={end}
   onpointercancel={() => (drag = null)}
+  onclick={pick}
 />
 
 <div bind:this={frame} class={cn('relative', className)} {@attach measure}>
@@ -729,7 +746,8 @@
           <span
             class={cn(
               'inline-flex items-center gap-1.5 rounded-md px-2 py-0.5',
-              i === hovered ? colors[i].strong : colors[i].fill
+              i === hovered ? colors[i].strong : colors[i].fill,
+              onpick && 'cursor-pointer'
             )}
             style={colors[i].style}
             data-block={i}
@@ -824,7 +842,8 @@
                   class={cn(
                     'rounded-sm',
                     fill(unit),
-                    unit !== null && highlighted.has(unit) && 'ring-2 ring-primary'
+                    unit !== null && highlighted.has(unit) && 'ring-2 ring-primary',
+                    onpick && unit !== null && owner[unit] !== null && 'cursor-pointer'
                   )}
                   style={tint(unit)}
                   data-unit={unit}
@@ -836,7 +855,8 @@
             <span
               class={cn(
                 'mr-3 shrink-0 rounded-md px-1.5 font-sans text-xs',
-                block === hovered ? colors[block].strong : colors[block].fill
+                block === hovered ? colors[block].strong : colors[block].fill,
+                onpick && 'cursor-pointer'
               )}
               style={colors[block].style}
               data-block={block}>{labels[block]}</span
