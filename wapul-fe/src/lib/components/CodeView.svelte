@@ -31,6 +31,12 @@
   /** 화면보다 위(above)와 아래(below)의 돋보기 창. 띄울 줄이 없으면 null */
   type Lens = { above: Pane | null; below: Pane | null };
 
+  /**
+   * 창의 스크롤 막대. 손잡이는 창에 보이는 부분의 위치(top)와 길이(size), 눈금(marks)은 띄운 블럭의 줄이
+   * 있는 곳. 모두 창 내용 전체 길이에 대한 비율이다
+   */
+  type Track = { top: number; size: number; marks: { line: number; top: number; size: number }[] };
+
   const kinds: BlockKind[] = ['input', 'logic', 'output'];
 
   /**
@@ -153,6 +159,9 @@
   let stretching = $state(false);
 
   let settle: ReturnType<typeof setTimeout> | undefined;
+
+  /** 위 창과 아래 창의 스크롤 막대 */
+  let tracks = $state<{ top: Track | null; bottom: Track | null }>({ top: null, bottom: null });
 
   /** 돋보기 창의 굴절 필터 id 앞부분 */
   const uid = $props.id();
@@ -360,6 +369,95 @@
   /** 끈 양(px)에 저항을 건 거리. 끌수록 덜 끌려가고 STRETCH_MAX를 넘지 않는다 */
   function give(pulled: number): number {
     return (STRETCH_MAX * pulled) / (pulled + STRETCH_MAX * 3);
+  }
+
+  /** 창의 스크롤 막대를 잰다. 눈금은 줄 수가 아니라 실제 높이로 재어, 줄이 접혀 길어져도 맞는다 */
+  function gauge(side: 'top' | 'bottom', scroller: HTMLDivElement) {
+    const { scrollTop, scrollHeight, clientHeight } = scroller;
+    const pane = untrack(() => (side === 'top' ? lens.above : lens.below));
+    const row = (line: number | undefined) => scroller.querySelector(`[data-lens-line="${line}"]`);
+
+    const marks = (pane?.marks ?? []).flatMap((mark) => {
+      const first = row(mark[0]);
+      const last = row(mark.at(-1));
+
+      if (!(first instanceof HTMLElement) || !(last instanceof HTMLElement)) return [];
+
+      const bottom = last.offsetTop + last.offsetHeight;
+
+      return [
+        {
+          line: mark[0],
+          top: first.offsetTop / scrollHeight,
+          size: (bottom - first.offsetTop) / scrollHeight
+        }
+      ];
+    });
+
+    tracks[side] = { top: scrollTop / scrollHeight, size: clientHeight / scrollHeight, marks };
+  }
+
+  /** 창을 굴리거나 창의 크기나 내용이 바뀔 때마다 스크롤 막대를 다시 잰다 */
+  function follow(side: 'top' | 'bottom') {
+    return (scroller: HTMLDivElement) => {
+      const update = () => gauge(side, scroller);
+
+      const observer = new ResizeObserver(update);
+
+      observer.observe(scroller);
+
+      if (scroller.firstElementChild) observer.observe(scroller.firstElementChild);
+
+      scroller.addEventListener('scroll', update);
+
+      return () => {
+        observer.disconnect();
+        scroller.removeEventListener('scroll', update);
+        tracks[side] = null;
+      };
+    };
+  }
+
+  /** 스크롤 막대의 손잡이를 끌면 끈 만큼 창을 굴린다 */
+  function grab(thumb: HTMLDivElement) {
+    let from: { y: number; scrollTop: number } | null = null;
+
+    const scroller = () =>
+      thumb.closest('[role="group"]')?.querySelector('[data-lens-scroller]') ?? null;
+
+    function move(event: PointerEvent) {
+      const target = scroller();
+      const track = thumb.parentElement;
+
+      if (from === null || target === null || track === null) return;
+
+      target.scrollTop =
+        from.scrollTop + ((event.clientY - from.y) * target.scrollHeight) / track.clientHeight;
+    }
+
+    function up() {
+      from = null;
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    }
+
+    function down(event: PointerEvent) {
+      const target = scroller();
+
+      if (target === null) return;
+
+      event.preventDefault();
+      from = { y: event.clientY, scrollTop: target.scrollTop };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+    }
+
+    thumb.addEventListener('pointerdown', down);
+
+    return () => {
+      thumb.removeEventListener('pointerdown', down);
+      up();
+    };
   }
 
   /**
@@ -585,6 +683,7 @@
 {#snippet lensPane(block: number, pane: Pane, side: 'top' | 'bottom', both: boolean)}
   {@const pulled = give(stretch[side])}
   {@const count = pane.to - pane.from + 1}
+  {@const track = tracks[side]}
   <!-- 물방울 같은 유리: 반투명 바탕, 비스듬한 반사광(before), 가장자리 굴절 띠, 맨 위의 테두리 빛과 그늘(after).
        바탕을 흐리게(backdrop-blur) 하면 굴절 띠가 반투명한 창 안만 보고 겹쳐 그려지므로 흐리지 않는다 -->
   <div
@@ -599,12 +698,13 @@
   >
     <div
       class={cn(
-        'relative [scrollbar-width:thin] overflow-y-auto overscroll-contain py-1',
+        'relative [scrollbar-width:none] overflow-y-auto overscroll-contain py-1',
         both ? 'max-h-[calc(50dvh-1.5rem)]' : 'max-h-[calc(100dvh-2rem)]'
       )}
       data-lens-scroller
       {@attach resist(side)}
       {@attach anchor(side)}
+      {@attach follow(side)}
     >
       <!-- 끌려간 만큼 화면 쪽 끝에서 멀어지고, 놓으면 살짝 지나쳤다 돌아온다 -->
       <div
@@ -642,24 +742,35 @@
         style="backdrop-filter: url(#{uid}-{rim.edge})"
       ></span>
     {/each}
-    <!-- 띄운 블럭의 줄이 창 안 어디쯤 있는지 보여 주는 눈금. 누르면 그 줄로 굴린다 -->
-    <div class="pointer-events-none absolute inset-y-3 right-3.5 w-2">
-      {#each pane.marks as mark (mark[0])}
-        <button
-          type="button"
-          class="pointer-events-auto absolute inset-x-0 min-h-1.5 cursor-pointer rounded-full bg-(--block) opacity-60 hover:opacity-100"
-          style="top: {((mark[0] - pane.from) / count) * 100}%; height: {(mark.length / count) *
-            100}%"
-          aria-label="{mark[0]}줄로 가기"
-          onclick={(event) =>
-            center(
-              event.currentTarget.closest('[role="group"]')?.querySelector('[data-lens-scroller]'),
-              mark[0],
-              true
-            )}
-        ></button>
-      {/each}
-    </div>
+    <!-- 스크롤 막대 (브라우저 막대는 숨긴다). 손잡이 길이는 창에 보이는 만큼이고, 끌어서 굴린다.
+         눈금은 띄운 블럭의 줄이 있는 곳이고, 누르면 그 줄로 굴린다 -->
+    {#if track && track.size < 1}
+      <div class="absolute inset-y-3 right-1.5 w-2 rounded-full bg-foreground/5">
+        {#each track.marks as mark (mark.line)}
+          <button
+            type="button"
+            class="absolute inset-x-0.5 min-h-0.75 cursor-pointer rounded-full bg-(--block)"
+            style="top: {mark.top * 100}%; height: {mark.size * 100}%"
+            aria-label="{mark.line}줄로 가기"
+            onclick={(event) =>
+              center(
+                event.currentTarget
+                  .closest('[role="group"]')
+                  ?.querySelector('[data-lens-scroller]'),
+                mark.line,
+                true
+              )}
+          ></button>
+        {/each}
+        <div
+          class="absolute inset-x-0 min-h-4 cursor-grab touch-none rounded-full bg-foreground/20 hover:bg-foreground/35 active:cursor-grabbing"
+          style="top: {track.top * 100}%; height: {track.size * 100}%"
+          aria-hidden="true"
+          data-lens-thumb
+          {@attach grab}
+        ></div>
+      </div>
+    {/if}
   </div>
 {/snippet}
 

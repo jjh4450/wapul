@@ -111,6 +111,46 @@ print(count)
     return top >= box.top && bottom <= box.bottom;
   };
 
+  /**
+   * 창 스크롤 막대에서 손잡이가 차지하는 [위치, 길이]와, 창 내용에서 보이는 부분의 [위치, 길이].
+   * 모두 전체에 대한 비율
+   */
+  const thumbVsView = (canvas: HTMLElement, name: '화면 위' | '화면 아래') => {
+    const pane = paneIn(canvas, name);
+    const scroller = pane?.firstElementChild;
+    const thumb = pane?.querySelector('[data-lens-thumb]');
+    const track = thumb?.parentElement?.getBoundingClientRect();
+
+    if (!scroller || !thumb || !track) return null;
+
+    const { top, height } = thumb.getBoundingClientRect();
+    const { scrollTop, scrollHeight, clientHeight } = scroller;
+
+    return {
+      thumb: [(top - track.top) / track.height, height / track.height],
+      view: [scrollTop / scrollHeight, clientHeight / scrollHeight]
+    };
+  };
+
+  /** 그 줄 눈금의 트랙 위 위치와, 창 내용에서 그 줄의 위치. 모두 전체에 대한 비율 */
+  const markVsRow = (canvas: HTMLElement, name: '화면 위' | '화면 아래', line: number) => {
+    const pane = paneIn(canvas, name);
+    const scroller = pane?.firstElementChild;
+    const row = scroller?.querySelector(`[data-lens-line="${line}"]`);
+
+    const mark =
+      pane === null ? null : within(pane).queryByRole('button', { name: `${line}줄로 가기` });
+
+    const track = mark?.parentElement?.getBoundingClientRect();
+
+    if (!scroller || !(row instanceof HTMLElement) || !mark || !track) return null;
+
+    return [
+      (mark.getBoundingClientRect().top - track.top) / track.height,
+      row.offsetTop / scroller.scrollHeight
+    ];
+  };
+
   /** 창의 굴리는 칸 안에서 끌려가는 내용의 style */
   const pulled = (pane: HTMLElement | null) =>
     pane?.firstElementChild?.firstElementChild?.getAttribute('style');
@@ -237,8 +277,40 @@ print(count)
     // 창이 뜨면 그 블럭에서 화면에 가장 가까운 줄(95줄)이 보인다. 떨어진 줄은 눈금을 눌러 찾아간다
     await expect(inView(canvasElement, '화면 아래', 95)).toBe(true);
     await expect(inView(canvasElement, '화면 아래', 120)).toBe(false);
+
+    // 스크롤 막대 손잡이의 위치와 길이는 창에 보이는 부분과 같다. 눈금은 그 줄이 있는 곳에 있다
+    const matches = () => {
+      const bar = thumbVsView(canvasElement, '화면 아래');
+
+      expect(bar?.thumb[0]).toBeCloseTo(bar?.view[0] ?? -1, 2);
+      expect(bar?.thumb[1]).toBeCloseTo(bar?.view[1] ?? -1, 2);
+    };
+
+    await waitFor(matches);
+    await canvas.findByRole('button', { name: '119줄로 가기' });
+
+    const [mark, row] = markVsRow(canvasElement, '화면 아래', 119) ?? [-1, 1];
+
+    await expect(mark).toBeCloseTo(row, 2);
+
     await userEvent.click(canvas.getByRole('button', { name: '119줄로 가기' }));
     await waitFor(() => expect(inView(canvasElement, '화면 아래', 119)).toBe(true));
+    await waitFor(matches);
+
+    // 손잡이를 끌면 끈 만큼 창이 굴러간다
+    const scroller = pane('화면 아래')?.firstElementChild;
+
+    if (scroller) scroller.scrollTop = 0;
+
+    const thumb = pane('화면 아래')?.querySelector('[data-lens-thumb]') ?? document.body;
+    const grip = thumb.getBoundingClientRect().top + 5;
+
+    await userEvent.pointer([
+      { keys: '[MouseLeft>]', target: thumb, coords: { clientY: grip } },
+      { target: thumb, coords: { clientY: grip + 100 } },
+      { keys: '[/MouseLeft]' }
+    ]);
+    await expect(scroller?.scrollTop).toBeGreaterThan(100);
 
     // 칠하는 블럭(답 쓰기에서 펼친 질문의 블럭)이 있으면 다른 블럭에 마우스를 올려도 창은 그대로다
     await userEvent.hover(canvas.getByText('v2 = 2'));
@@ -246,8 +318,6 @@ print(count)
     await userEvent.hover(canvasElement);
 
     // 아래 창의 화면 쪽 끝(위)에서 더 굴리면 페이지로 넘기지 않고, 창이 조금 끌려갔다 돌아온다
-    const scroller = pane('화면 아래')?.firstElementChild;
-
     if (scroller) scroller.scrollTop = 0;
     await expect(wheel(pane('화면 아래'), -100)).toBe(false);
     await expect(pulled(pane('화면 아래'))).toMatch(/translateY\([1-9]/);
@@ -330,8 +400,8 @@ print(count)
     await expect(shows('y = 2')).toHaveClass('bg-(--block)/25');
     await expect(shows('v115 = 115')).toHaveClass('bg-(--block)/25');
 
-    // 눈금은 띄운 블럭의 줄에만 단다
-    await expect(canvas.getByRole('button', { name: '120줄로 가기' })).toBeInTheDocument();
+    // 눈금은 띄운 블럭의 줄에만 단다 (창 크기를 잰 뒤에 그린다)
+    await expect(await canvas.findByRole('button', { name: '120줄로 가기' })).toBeInTheDocument();
     await expect(canvas.queryByRole('button', { name: '116줄로 가기' })).toBeNull();
 
     // 다른 블럭에 올리면 그 블럭을 띄운다
@@ -339,7 +409,7 @@ print(count)
     await waitFor(() => expect(lens()).toHaveAttribute('aria-label', '로직 2 화면 밖 문장'));
     await expect(shows('y = 2')).toHaveClass('bg-(--block)/50');
     await expect(shows('x = 1')).toHaveClass('bg-(--block)/25');
-    await expect(canvas.getByRole('button', { name: '116줄로 가기' })).toBeInTheDocument();
+    await expect(await canvas.findByRole('button', { name: '116줄로 가기' })).toBeInTheDocument();
     await expect(canvas.queryByRole('button', { name: '120줄로 가기' })).toBeNull();
   }}
 />
