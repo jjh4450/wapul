@@ -46,7 +46,6 @@ export const record: RecordOut = {
   created_at: '2026-10-05T09:00:00+0000',
   updated_at: '2026-10-05T09:30:00+0000',
   code,
-  initially_wrong: true,
   units: [
     at(1, 0, 24),
     at(2, 0, 20),
