@@ -138,14 +138,19 @@
   <form class="grid max-w-3xl gap-6" onsubmit={submit}>
     <div class="grid gap-2">
       <Label for="problem">1. 어떤 문제인가요?</Label>
-      <Input id="problem" bind:value={problem} placeholder="문제 제목이나 링크" />
+      <Input
+        id="problem"
+        bind:value={problem}
+        maxlength={__LIMITS__.problem}
+        placeholder="문제 제목이나 링크"
+      />
     </div>
 
     <div class="grid gap-2">
       <Label for="key-idea"
         >2. 코드를 붙여넣기 전에, 풀이의 핵심 아이디어를 한 줄로 적어 주세요</Label
       >
-      <Input id="key-idea" bind:value={keyIdea} />
+      <Input id="key-idea" bind:value={keyIdea} maxlength={__LIMITS__.keyIdea} />
     </div>
 
     {#if ideaWritten}
@@ -159,7 +164,14 @@
             {/each}
           </NativeSelect.Root>
         </div>
-        <Textarea id="code" bind:value={code} rows={16} class="font-mono" spellcheck={false} />
+        <Textarea
+          id="code"
+          bind:value={code}
+          maxlength={__LIMITS__.code}
+          rows={16}
+          class="font-mono"
+          spellcheck={false}
+        />
       </div>
     {/if}
 

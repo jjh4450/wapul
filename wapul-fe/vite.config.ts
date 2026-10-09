@@ -19,8 +19,8 @@ const versionFile = path.join(dirname, 'VERSION');
 
 const appVersion = existsSync(versionFile) ? readFileSync(versionFile, 'utf8').trim() : undefined;
 
-// API 계약(openapi.json). 저장 링크를 열 때 검사할 스키마(src/lib/share.ts)를 빌드할 때 여기서 뽑는다.
-// 계약이 바뀌면 함께 바뀌고, 쓰는 값이 계약에 없으면 빌드가 멈춘다
+// API 계약(openapi.json). 저장 링크를 열 때 검사할 스키마(src/lib/share.ts)와 입력 칸의 글자 수 한도를
+// 빌드할 때 여기서 뽑는다. 계약이 바뀌면 함께 바뀌고, 쓰는 값이 계약에 없으면 빌드가 멈춘다
 const schemas: Record<string, Schema> = JSON.parse(
   readFileSync(path.join(dirname, '../openapi/openapi.json'), 'utf8')
 ).components.schemas;
@@ -51,6 +51,19 @@ function contractSchemas(roots: string[]) {
   return { components: { schemas: picked } };
 }
 
+function maxLength(name: string, field: string): number {
+  const property = schema(name).properties?.[field];
+
+  const limit =
+    property === undefined || property === true || property === false
+      ? undefined
+      : property.maxLength;
+
+  if (limit === undefined) throw new Error(`API 계약의 ${name}.${field}에 maxLength가 없다`);
+
+  return limit;
+}
+
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
   plugins: [
@@ -73,7 +86,14 @@ export default defineConfig({
     })
   ],
   define: {
-    __CONTRACT__: JSON.stringify(contractSchemas(['RecordCreate']))
+    __CONTRACT__: JSON.stringify(contractSchemas(['RecordCreate'])),
+    __LIMITS__: JSON.stringify({
+      problem: maxLength('RecordCreate', 'problem'),
+      keyIdea: maxLength('RecordCreate', 'key_idea'),
+      code: maxLength('RecordCreate', 'code'),
+      // 답은 저장할 때(AnswerIn)와 링크에 담을 때(QuestionIn) 모두 맞아야 한다
+      answer: Math.min(maxLength('AnswerIn', 'answer'), maxLength('QuestionIn', 'answer'))
+    })
   },
   // VITE_BACKEND=on으로 띄우면 개발 중 API 요청을 로컬 백엔드(wapul-be)로 넘긴다. 배포에서는 VITE_API_BASE_URL을 쓴다.
   server: {

@@ -37,6 +37,7 @@
     {id}
     bind:value
     {placeholder}
+    maxlength={__LIMITS__.answer}
     rows={3}
     aria-invalid={invalid || undefined}
     onblur={() => oncommit?.()}
