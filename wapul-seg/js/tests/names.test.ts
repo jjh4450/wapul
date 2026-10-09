@@ -166,6 +166,125 @@ echo solve(0), "YES";
   }
 ];
 
+// Functions defined with parameters, as definitions and as function values held by variables.
+// Types, default values, Swift's argument labels and Python's `self` are not parameter names.
+const DEFINITIONS: { language: Language; code: string; params: Record<string, string[]> }[] = [
+  {
+    language: 'cpp',
+    code: `int solve(int n, vector<int>& v, const string &s, int* a, int arr[MAX], long long k = 0) {
+  return n;
+}
+int main() {
+  auto dfs = [&](int u, int p) -> void {};
+  function<int(int)> f = [&](int x) { return x; };
+}
+`,
+    params: { solve: ['n', 'v', 's', 'a', 'arr', 'k'], dfs: ['u', 'p'], f: ['x'] }
+  },
+  {
+    language: 'c',
+    code: `void dfs(int);
+void dfs(int u) {}
+int h(void) { return 0; }
+`,
+    // The prototype names no parameters, the definition does
+    params: { dfs: ['u'], h: [] }
+  },
+  {
+    language: 'java',
+    code: `class Main {
+  static int solve(int n, int[] a, List<Integer> list) { return n; }
+  void f() { Comparator<int[]> cmp = (a, b) -> a[0] - b[0]; Function<Integer, Integer> g = x -> x; }
+}
+`,
+    params: { solve: ['n', 'a', 'list'], cmp: ['a', 'b'], g: ['x'] }
+  },
+  {
+    language: 'python',
+    code: `class Solution:
+    def climb(self, n: int, k=0, *args, **kw):
+        pass
+g = lambda a, b: a + b
+`,
+    params: { climb: ['n', 'k', 'args', 'kw'], g: ['a', 'b'] }
+  },
+  {
+    language: 'rust',
+    code: `fn solve(dp: &Vec<Vec<i64>>, mut n: usize) -> i64 { 0 }
+impl S { fn f(&self, x: i32) {} }
+fn main() { let g = |a: i32, b| a + b; }
+`,
+    params: { solve: ['dp', 'n'], f: ['x'], g: ['a', 'b'] }
+  },
+  {
+    language: 'kotlin',
+    code: `fun solve(n: Int, k: Int = MAX): Int = n
+val g = { a: Int, b: Int -> a + b }
+`,
+    params: { solve: ['n', 'k'], g: ['a', 'b'] }
+  },
+  {
+    language: 'javascript',
+    code: `function solve(n, k = 0, ...rest) {}
+const g = (a, b) => a + b;
+const h = x => x;
+class A { m(x, y) {} }
+`,
+    params: { solve: ['n', 'k', 'rest'], g: ['a', 'b'], h: ['x'], m: ['x', 'y'] }
+  },
+  {
+    language: 'go',
+    code: `package main
+
+func solve(n, k int, s string) int { return n }
+
+func (r *R) m(x int) {}
+
+func main() { g := func(a, b int) int { return a + b }; _ = g }
+`,
+    params: { solve: ['n', 'k', 's'], m: ['x'], g: ['a', 'b'] }
+  },
+  {
+    language: 'csharp',
+    code: `class P {
+  static int Solve(int n, ref int k, int m = MAX) { return n; }
+  void F() { Func<int, int> g = (x) => x; }
+}
+`,
+    params: { Solve: ['n', 'k', 'm'], g: ['x'] }
+  },
+  {
+    language: 'swift',
+    code: `func solve(_ n: Int, from start: Int = 0) -> Int { return n }
+`,
+    params: { solve: ['n', 'start'] }
+  },
+  {
+    language: 'ruby',
+    code: `def solve(n, k = 0, *rest, &blk)
+end
+g = ->(a, b) { a + b }
+`,
+    params: { solve: ['n', 'k', 'rest', 'blk'], g: ['a', 'b'] }
+  },
+  {
+    language: 'scala',
+    code: `object M { def solve(n: Int, k: Int = 0)(m: Int): Int = n; val g = (a: Int, b: Int) => a + b }
+`,
+    // Only the first parameter list
+    params: { solve: ['n', 'k'], g: ['a', 'b'] }
+  },
+  {
+    language: 'php',
+    code: `<?php
+function solve($n, int $k = 0, &$a) { return $n; }
+$g = function($a, $b) { return $a + $b; };
+$h = fn($x) => $x;
+`,
+    params: { solve: ['$n', '$k', '$a'], $g: ['$a', '$b'], $h: ['$x'] }
+  }
+];
+
 describe('names', () => {
   for (const { language, code, subscript, text } of SAMPLES) {
     it(`finds ${language} names, functions, subscripts and strings, and skips comments`, async () => {
@@ -198,5 +317,29 @@ describe('names', () => {
     expect(found.map((n) => n.text)).not.toContain('int');
     expect(found.map((n) => n.text)).not.toContain('std');
     expect(found.map((n) => n.text)).not.toContain('<bits/stdc++.h>');
+  });
+
+  for (const { language, code, params } of DEFINITIONS) {
+    it(`finds the parameters of ${language} functions and function values`, async () => {
+      const found = await names(code, language);
+
+      for (const [text, expected] of Object.entries(params)) {
+        const name = found.find((n) => n.text === text);
+
+        expect(name?.kind).toBe('function');
+        expect(name?.params).toEqual(expected);
+      }
+    });
+  }
+
+  it('gives no parameters to functions only called, nor to argument names', async () => {
+    const cpp = await names(SAMPLES[0].code, 'cpp');
+
+    expect(cpp.find((n) => n.text === 'push_back')?.params).toBeUndefined();
+
+    // key= names an argument, not a variable holding the lambda
+    const python = await names('xs.sort(key=lambda x: x[1])\n', 'python');
+
+    expect(python.find((n) => n.text === 'key')?.kind).toBe('name');
   });
 });
