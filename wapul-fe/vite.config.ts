@@ -9,6 +9,7 @@ import path from 'node:path';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
+import type { Schema } from '@cfworker/json-schema';
 
 const dirname =
   typeof __dirname !== 'undefined' ? __dirname : path.dirname(fileURLToPath(import.meta.url));
@@ -17,6 +18,38 @@ const dirname =
 const versionFile = path.join(dirname, 'VERSION');
 
 const appVersion = existsSync(versionFile) ? readFileSync(versionFile, 'utf8').trim() : undefined;
+
+// API 계약(openapi.json). 저장 링크를 열 때 검사할 스키마(src/lib/share.ts)를 빌드할 때 여기서 뽑는다.
+// 계약이 바뀌면 함께 바뀌고, 쓰는 값이 계약에 없으면 빌드가 멈춘다
+const schemas: Record<string, Schema> = JSON.parse(
+  readFileSync(path.join(dirname, '../openapi/openapi.json'), 'utf8')
+).components.schemas;
+
+function schema(name: string): Schema {
+  if (!(name in schemas)) throw new Error(`API 계약에 ${name} 스키마가 없다`);
+
+  return schemas[name];
+}
+
+/** roots와 그것이 가리키는 스키마만. 계약 전체를 넣지 않는다 */
+function contractSchemas(roots: string[]) {
+  const picked: Record<string, Schema> = {};
+
+  const pending = [...roots];
+
+  for (let name = pending.pop(); name !== undefined; name = pending.pop()) {
+    if (name in picked) continue;
+
+    picked[name] = schema(name);
+
+    for (const [, ref] of JSON.stringify(picked[name]).matchAll(
+      /"#\/components\/schemas\/([^"]+)"/g
+    ))
+      pending.push(ref);
+  }
+
+  return { components: { schemas: picked } };
+}
 
 // More info at: https://storybook.js.org/docs/next/writing-tests/integrations/vitest-addon
 export default defineConfig({
@@ -39,6 +72,9 @@ export default defineConfig({
       extensions: ['.svelte', '.svx', '.md']
     })
   ],
+  define: {
+    __CONTRACT__: JSON.stringify(contractSchemas(['RecordCreate']))
+  },
   // VITE_BACKEND=on으로 띄우면 개발 중 API 요청을 로컬 백엔드(wapul-be)로 넘긴다. 배포에서는 VITE_API_BASE_URL을 쓴다.
   server: {
     proxy: { '/v1': 'http://localhost:2614' }

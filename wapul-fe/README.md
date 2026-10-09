@@ -33,6 +33,6 @@ pnpm ui:add button  # shadcn 컴포넌트 추가 + 스토리 생성
 pnpm api:gen    # ../openapi/openapi.json → src/lib/api/schema.ts (백엔드 API 타입)
 ```
 
-빌드는 기본으로 백엔드 없이 동작합니다(기록은 브라우저 메모리에만 둡니다). 백엔드를 쓰려면 `VITE_BACKEND=on`을 넣고, 배포 빌드에서는 `VITE_API_BASE_URL`에 백엔드 주소도 넣어야 합니다.
+빌드는 기본으로 백엔드 없이 동작합니다(기록은 브라우저 메모리에 두고, 저장은 링크로). 백엔드를 쓰려면 `VITE_BACKEND=on`을 넣고, 배포 빌드에서는 `VITE_API_BASE_URL`에 백엔드 주소도 넣어야 합니다.
 
 자세한 내용은 문서 사이트의 [프론트엔드 문서](https://jjh4450.github.io/wapul/frontend/)를 참고하세요 (원본: `docs/frontend/`).

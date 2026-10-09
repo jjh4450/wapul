@@ -4,7 +4,7 @@
  * 백엔드를 끈 배포(hooks.client.ts)와 story·테스트가 같이 쓰므로, story가 보는 동작이 배포되는 동작이다.
  * 요청은 같은 계약 타입으로 묶인 API 클라이언트에서만 와서 런타임에 다시 검사하지 않는다. 대신 route마다
  * 본문과 답을 openapi에서 생성한 타입(schema.ts)에 묶어, 계약이 바뀌면 타입 검사(pnpm check)에서 걸린다.
- * 기록은 새로고침하면 사라지고, 그룹은 없다.
+ * 누구나 만들 수 있는 링크는 여는 쪽(share.ts)이 검사한다. 기록은 새로고침하면 사라지고, 그룹은 없다.
  */
 import { buildLayouts } from '#lib/layouts.js';
 import type { BlockIn, QuestionIn, RecordCreate, RecordOut, RecordSummary } from './client.js';

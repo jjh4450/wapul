@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
   import { BACKEND, api, type GroupOut, type LayoutOut, type RecordOut } from '#lib/api/client.js';
+  import SaveLinkDialog from '#lib/components/SaveLinkDialog.svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Checkbox } from '#lib/components/ui/checkbox/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
@@ -16,7 +17,7 @@
     id: string;
     /** 답을 다 쓰고 막 넘어왔을 때 완성 안내를 띄운다 */
     done?: boolean;
-    /** 백엔드를 쓰는지. 없으면 그룹 공유를 숨긴다 */
+    /** 백엔드를 쓰는지. 없으면 그룹 공유 대신 기록을 담은 링크로 저장한다 */
     backend?: boolean;
     ondeleted: () => void;
   } = $props();
@@ -35,9 +36,19 @@
 
   let status = $state('');
 
+  /** 백엔드가 없을 때 저장 대신 드리는 링크 */
+  let saveLink = $state('');
+
+  let saveOpen = $state(false);
+
+  /** 링크를 만들고 검사하는 코드. 백엔드가 없을 때만, 화면이 뜬 뒤 미리 받아 둔다 */
+  let sharing: Promise<typeof import('#lib/share.js')> | null = null;
+
   const current = $derived(layouts.find((l) => l.id === selected));
 
   onMount(async () => {
+    if (!backend) sharing = import('#lib/share.js');
+
     const [recordResult, layoutResult] = await Promise.all([api.getRecord(id), api.getLayouts(id)]);
 
     if (!recordResult.ok) {
@@ -89,6 +100,30 @@
     status = result.ok ? '공유 범위를 저장했어요.' : result.message;
   }
 
+  async function save() {
+    if (!record || !sharing) return;
+
+    let result;
+
+    // 코드를 못 받았거나(새로 배포됨) 브라우저가 압축을 못 하면 여기로 온다. 새로고침하면 기록이 사라진다
+    try {
+      result = await (await sharing).encodeShare(record);
+    } catch {
+      status = '링크를 만들지 못했어요. 새로고침하면 기록이 사라지니 md 받기로 먼저 남겨 두세요.';
+
+      return;
+    }
+
+    if (!result.ok) {
+      status = result.message;
+
+      return;
+    }
+
+    saveLink = `${new URL(resolve('/share'), location.origin).href}#${result.data}`;
+    saveOpen = true;
+  }
+
   async function remove() {
     if (!confirm('이 기록을 지울까요? 되돌릴 수 없어요.')) return;
     const result = await api.deleteRecord(id);
@@ -110,6 +145,9 @@
     </div>
     {#if record.is_owner}
       <div class="flex gap-2">
+        {#if !backend}
+          <Button size="sm" onclick={save}>저장</Button>
+        {/if}
         <Button variant="outline" size="sm" href={resolve(`/records/write?id=${id}`)}
           >답 고치기</Button
         >
@@ -171,3 +209,5 @@
 {:else}
   <p class="text-muted-foreground">불러오는 중...</p>
 {/if}
+
+<SaveLinkDialog link={saveLink} bind:open={saveOpen} />

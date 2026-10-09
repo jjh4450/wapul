@@ -1,10 +1,11 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
-  import { expect, fn, spyOn, waitFor, type MockInstance } from 'storybook/test';
+  import { expect, fn, spyOn, waitFor, within, type MockInstance } from 'storybook/test';
   import { reply, type FakeApi } from '#lib/api/fake.js';
   import { groups, record, sharedRecord } from '#lib/api/fixtures.js';
   import { localApi } from '#lib/api/local.js';
   import { buildLayouts } from '#lib/layouts.js';
+  import { decodeShare } from '#lib/share.js';
   import RecordResult from './RecordResult.svelte';
 
   const { Story } = defineMeta({
@@ -166,5 +167,34 @@
     await userEvent.click(remove);
     await waitFor(() => expect(args.ondeleted).toHaveBeenCalledOnce());
     await expect(owner.callsTo('DELETE', '/v1/records/record-1')).toHaveLength(1);
+  }}
+/>
+
+<Story
+  name="NoBackendSavesLink"
+  args={{ backend: false }}
+  beforeEach={withBrowserStubs(owner)}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '저장' }));
+
+    // 그룹 공유 대신 저장 링크를 준다. 그 링크를 열면 같은 기록이 나온다
+    const page = within(canvasElement.ownerDocument.body);
+
+    const link = await page.findByRole('textbox', { name: '저장 링크' });
+
+    if (!(link instanceof HTMLInputElement)) throw new Error('저장 링크 칸이 input이 아니다');
+
+    const [address, payload] = link.value.split('#');
+
+    await expect(address).toBe(new URL('/share', location.origin).href);
+
+    const opened = await decodeShare(payload);
+
+    await expect(opened.problem).toBe(record.problem);
+    await expect(opened.questions.map((q) => q.answer)).toEqual(
+      record.questions.map((q) => q.answer)
+    );
+    await expect(canvas.queryByText('그룹에 공유')).not.toBeInTheDocument();
+    await expect(owner.callsTo('GET', '/v1/groups')).toHaveLength(0);
   }}
 />
