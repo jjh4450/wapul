@@ -41,7 +41,7 @@ export function tokens(text: string): string[] {
 
 // String and character literals, outermost, across the supported grammars. Their contents
 // differ from problem to problem, so tokens see `""` in their place (kind_features.py LITERALS).
-const LITERALS = new Set([
+export const LITERALS = new Set([
   'string_literal',
   'raw_string_literal',
   'char_literal',

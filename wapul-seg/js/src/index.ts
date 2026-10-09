@@ -6,6 +6,7 @@ import { blockFeatures } from './blocks.ts';
 import { featureText, literalSpans, unitFeatures, withNgrams } from './kinds.ts';
 import { type Language, LANGUAGES } from './languages.ts';
 import { model } from './model.ts';
+import { collectNames, type Name } from './names.ts';
 import { normalize } from './normalize.ts';
 import { parse } from './parser.ts';
 import { type Tags, unitTags } from './tags.ts';
@@ -14,6 +15,8 @@ import { type Point, units } from './units.ts';
 export { type Assets, fetchAssets } from './assets.ts';
 
 export { type Language, LANGUAGES } from './languages.ts';
+
+export { type Name, type NameKind } from './names.ts';
 
 export { normalize } from './normalize.ts';
 
@@ -39,8 +42,19 @@ export interface Labeled extends Tags {
   block?: number;
 }
 
-/** The release files next to this module, unless `segment` is given other assets. */
+/** The release files next to this module, unless a function is given other assets. */
 let defaultAssets: Assets | undefined;
+
+function here(): Assets {
+  // The module's own directory, spelled so that the bundler leaves it alone
+  return (defaultAssets ??= fetchAssets(import.meta.url.replace(/[^/]*$/, '')));
+}
+
+function checkLanguage(language: Language): void {
+  if (!LANGUAGES.includes(language)) {
+    throw new Error(`language must be one of ${LANGUAGES.join(', ')}`);
+  }
+}
 
 /** Every statement of `code` with its kind and, for logic, its block. `code` is normalized
  * first; the positions refer to `normalize(code)`. Throws a RangeError for code of more than
@@ -48,13 +62,9 @@ let defaultAssets: Assets | undefined;
 export async function segment(
   code: string,
   language: Language,
-  // The module's own directory, spelled so that the bundler leaves it alone
-  assets: Assets = (defaultAssets ??= fetchAssets(import.meta.url.replace(/[^/]*$/, '')))
+  assets: Assets = here()
 ): Promise<Labeled[]> {
-  if (!LANGUAGES.includes(language)) {
-    throw new Error(`language must be one of ${LANGUAGES.join(', ')}`);
-  }
-
+  checkLanguage(language);
   code = normalize(code);
   // Both load at once; settled rather than all, so a tree parsed while the model failed is freed
   const [loaded, parsed] = await Promise.allSettled([model(assets), parse(code, language, assets)]);
@@ -100,6 +110,26 @@ export async function segment(
 
       return labeled;
     });
+  } finally {
+    tree.delete();
+  }
+}
+
+/** The names in `code` to complete while writing about it: identifiers, called and defined
+ * functions, subscripts like `dp[i][j]`, and short string literals, in order of first appearance.
+ * `code` is normalized first; the lines refer to `normalize(code)`. Only the parser and the
+ * language's grammar load, not the model. */
+export async function names(
+  code: string,
+  language: Language,
+  assets: Assets = here()
+): Promise<Name[]> {
+  checkLanguage(language);
+
+  const tree = await parse(normalize(code), language, assets);
+
+  try {
+    return collectNames(tree);
   } finally {
     tree.delete();
   }
