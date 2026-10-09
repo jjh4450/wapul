@@ -3,7 +3,13 @@
   import { SvelteMap } from 'svelte/reactivity';
   import { IconChevronDown, IconChevronRight } from '@tabler/icons-svelte';
   import { resolve } from '$app/paths';
-  import { api, type QuestionIn, type QuestionOut, type RecordOut } from '#lib/api/client.js';
+  import {
+    BACKEND,
+    api,
+    type QuestionIn,
+    type QuestionOut,
+    type RecordOut
+  } from '#lib/api/client.js';
   import { CloseGuard, hasBlank } from '#lib/closeGuard.svelte.js';
   import AnswerField from '#lib/components/AnswerField.svelte';
   import CodeView from '#lib/components/CodeView.svelte';
@@ -29,15 +35,21 @@
 
   let {
     id,
+    backend = BACKEND,
     onfinish,
     onnotowner
   }: {
     id: string;
+    /** 백엔드를 쓰는지. 없으면 답은 이 탭에만 있다가 새로고침하면 사라진다 */
+    backend?: boolean;
     /** 모든 답을 저장한 뒤 */
     onfinish: () => void;
     /** 작성자가 아닌 사람이 열었을 때 (답은 작성자만 쓴다) */
     onnotowner: () => void;
   } = $props();
+
+  /** 답을 보낸 뒤 알림. 백엔드가 없으면 저장된 것이 아니므로 저장했다고 하지 않는다 */
+  const kept = $derived(backend ? '저장했어요.' : '이 탭에만 담아 뒀어요. 새로고침하면 사라져요.');
 
   let record = $state<RecordOut | null>(null);
 
@@ -249,7 +261,7 @@
 
     if (opened !== -1) current = result.data.blocks[opened].id;
 
-    status = '저장했어요.';
+    status = kept;
   }
 
   async function commit(question: QuestionOut): Promise<boolean> {
@@ -263,7 +275,7 @@
     }
 
     saved.set(question.id, question.answer);
-    status = '저장했어요.';
+    status = kept;
 
     return true;
   }

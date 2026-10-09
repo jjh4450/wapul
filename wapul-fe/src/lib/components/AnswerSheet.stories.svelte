@@ -12,7 +12,7 @@
   const { Story } = defineMeta({
     title: 'Components/AnswerSheet',
     component: AnswerSheet,
-    args: { id: 'record-1', onfinish: fn(), onnotowner: fn() }
+    args: { id: 'record-1', backend: true, onfinish: fn(), onnotowner: fn() }
   });
 
   // 기록은 브라우저 안의 백엔드가 답한다. 블럭을 고치면 백엔드처럼 블럭과 질문에 새 id가 붙는다
@@ -298,6 +298,25 @@
 
     await waitFor(() => expect(args.onfinish).toHaveBeenCalledOnce());
     await expect(writing.callsTo('PATCH', '/v1/records/record-1/answers')).toHaveLength(1);
+  }}
+/>
+
+<Story
+  name="NoBackendKeepsInTab"
+  args={{ backend: false }}
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.type(
+      await canvas.findByLabelText(problemQuestion),
+      '끝나는 시간이 빠를수록 남는 시간이 넓다'
+    );
+    await userEvent.tab();
+
+    // 백엔드가 없으면 답은 이 탭에만 있으니 저장했다고 하지 않는다
+    await expect(
+      await canvas.findByText('이 탭에만 담아 뒀어요. 새로고침하면 사라져요.')
+    ).toBeInTheDocument();
+    await expect(canvas.queryByText('저장했어요.')).not.toBeInTheDocument();
   }}
 />
 
