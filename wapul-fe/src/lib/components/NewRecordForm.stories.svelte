@@ -38,7 +38,6 @@
     await userEvent.type(canvas.getByLabelText(/핵심 아이디어/), '끝나는 시간이 빠른 회의부터');
 
     await expect(await canvas.findByLabelText(/맞은 풀이 코드/)).toBeInTheDocument();
-    await expect(canvas.getByText('틀렸던 제출 코드는 받지 않아요.')).toBeInTheDocument();
     // 처음 제출에서 틀렸는지는 여기서 묻지 않는다 (블럭마다 표시한다)
     await expect(canvas.queryByRole('checkbox')).not.toBeInTheDocument();
     await expect(submit).toBeDisabled();

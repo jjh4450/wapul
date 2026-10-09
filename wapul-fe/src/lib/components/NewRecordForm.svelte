@@ -156,7 +156,6 @@
     {#if ideaWritten}
       <div class="grid gap-2">
         <Label for="code">3. 맞은 풀이 코드를 붙여넣어 주세요</Label>
-        <p class="text-xs text-muted-foreground">틀렸던 제출 코드는 받지 않아요.</p>
         <div class="flex items-center gap-4">
           <NativeSelect.Root size="sm" bind:value={language} aria-label="언어">
             {#each languages as lang (lang)}
