@@ -45,8 +45,21 @@ describe('suggest', () => {
 
   it('prefers words on the lines of the block being answered', () => {
     // max는 8번 줄에, map은 3번 줄에만 나온다
-    expect(suggest(words, 'ma').map((w) => w.text)).toEqual(['map', 'max', 'max_cost', 'maxValue']);
-    expect(suggest(words, 'ma', new Set([8]))[0].text).toBe('max');
+    expect(suggest(words, 'ma').map((w) => w.text)).toEqual([
+      'map()',
+      'max()',
+      'max_cost',
+      'maxValue'
+    ]);
+    expect(suggest(words, 'ma', new Set([8]))[0].text).toBe('max()');
+  });
+
+  it('offers a function with empty parentheses, then with its parameters when defined', () => {
+    const knapsack = [...words, { ...name('solve', 'function', [5, 9], 2), params: ['n', 'k'] }];
+
+    expect(suggest(knapsack, 'so').map((w) => w.text)).toEqual(['solve()', 'solve(n, k)']);
+    // 매개변수 이름은 맞춰 보지 않는다
+    expect(suggest(knapsack, 'nk').map((w) => w.text)).not.toContain('solve(n, k)');
   });
 
   it('finds string literals inside their quotes', () => {

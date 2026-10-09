@@ -28,7 +28,8 @@
     name('dp[i - 1][j]', 'subscript', [8], 2),
     name('dp[i][j]', 'subscript', [8]),
     name('max', 'function', [8]),
-    name('map', 'function', [3])
+    name('map', 'function', [3]),
+    { ...name('solve', 'function', [5, 9], 3), params: ['n', 'k'] }
   ];
 
   /** 목록은 body에 붙는다 */
@@ -126,7 +127,25 @@
     // 이미 백틱을 열고 쳤으면 그 백틱으로 감싼다
     await userEvent.type(field, '`ma');
     await userEvent.keyboard('{Tab}');
-    await expect(field).toHaveValue('`map`');
+    await expect(field).toHaveValue('`map()`');
+  }}
+/>
+
+<Story
+  name="CompletesFunctionCalls"
+  args={{ words }}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    const field = canvas.getByLabelText(question);
+
+    // 함수는 빈 괄호로도, 정의에 있는 매개변수까지로도 넣을 수 있다
+    await userEvent.type(field, 'so');
+
+    const options = list(canvasElement).getAllByRole('option');
+
+    await expect(options[0]).toHaveTextContent('solve()');
+    await expect(options[1]).toHaveTextContent('solve(n, k)');
+    await userEvent.keyboard('{ArrowDown}{Tab}');
+    await expect(field).toHaveValue('`solve(n, k)`');
   }}
 />
 

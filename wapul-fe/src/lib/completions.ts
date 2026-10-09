@@ -44,7 +44,22 @@ function tier(text: string, query: string): number | null {
 }
 
 /**
- * 친 글자에 맞는 후보. 잘 맞는 것, 이 블럭 줄(near)에 나온 것, 많이 나온 것, 짧은 것 순이다
+ * 함수는 괄호까지 넣는다. 코드에 정의가 있어 매개변수를 알면 매개변수까지 넣는 후보를 바로 뒤에 둔다:
+ * solve → solve(), solve(n, k)
+ */
+function forms(word: Name): Name[] {
+  if (word.kind !== 'function') return [word];
+
+  const call = { ...word, text: `${word.text}()` };
+
+  return word.params === undefined || word.params.length === 0
+    ? [call]
+    : [call, { ...word, text: `${word.text}(${word.params.join(', ')})` }];
+}
+
+/**
+ * 친 글자에 맞는 후보. 잘 맞는 것, 이 블럭 줄(near)에 나온 것, 많이 나온 것, 짧은 것 순이다.
+ * 맞춰 보기는 이름으로만 하고, 함수는 고른 뒤에 괄호 꼴로 편다
  */
 export function suggest(
   words: readonly Name[],
@@ -67,5 +82,5 @@ export function suggest(
       a.word.text.localeCompare(b.word.text)
   );
 
-  return ranked.slice(0, limit).map((r) => r.word);
+  return ranked.flatMap((r) => forms(r.word)).slice(0, limit);
 }
