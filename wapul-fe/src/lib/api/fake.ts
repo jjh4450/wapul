@@ -40,15 +40,16 @@ function matches(segments: string[], pathname: string): boolean {
 export class FakeApi {
   readonly calls: FakeCall[] = [];
 
-  readonly #routes: Route[];
+  readonly #make: () => [string, FakeHandler][];
 
-  /** routes: ['GET /v1/records/:id', handler] 꼴. ':'로 시작하는 조각은 아무 값과 맞는다 */
-  constructor(routes: [string, FakeHandler][]) {
-    this.#routes = routes.map(([route, handler]) => {
-      const [method, path] = route.split(' ');
+  #routes: Route[] = [];
 
-      return { method, segments: path.split('/'), handler };
-    });
+  /**
+   * routes: ['GET /v1/records/:id', handler] 꼴. ':'로 시작하는 조각은 아무 값과 맞고, 앞에 적은 것이 먼저다.
+   * 함수로 주면 install할 때마다 새로 만든다. 상태가 있는 route(local.ts)를 story마다 처음으로 돌린다
+   */
+  constructor(routes: [string, FakeHandler][] | (() => [string, FakeHandler][])) {
+    this.#make = Array.isArray(routes) ? () => routes : routes;
   }
 
   /** globalThis.fetch를 이 가짜로 바꾸고 되돌리는 함수를 돌려준다. story의 beforeEach에서 그대로 반환한다.
@@ -57,6 +58,11 @@ export class FakeApi {
     const original = globalThis.fetch;
 
     this.calls.length = 0;
+    this.#routes = this.#make().map(([route, handler]) => {
+      const [method, path] = route.split(' ');
+
+      return { method, segments: path.split('/'), handler };
+    });
     globalThis.fetch = (input, init) => {
       const request = new Request(input, init);
 
