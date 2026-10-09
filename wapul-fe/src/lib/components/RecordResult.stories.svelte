@@ -70,13 +70,17 @@
   play={async ({ canvas, userEvent }) => {
     await expect(await canvas.findByText('글감이 완성됐어요!')).toBeInTheDocument();
 
-    // 배치안 여러 개를 탭으로 바꿔 본다. 처음 배치안은 전체 코드부터 싣는다
+    // 배치안 여러 개를 탭으로 바꿔 본다. md는 그린 모습으로 보이고, 처음 배치안은 전체 코드부터 싣는다
+    const panel = () => within(canvas.getByRole('tabpanel'));
+
+    await expect(panel().getByRole('heading', { name: '내 구현' })).toBeInTheDocument();
     await expect(canvas.getByRole('tabpanel')).toHaveTextContent(
-      /## 내 구현 ```cpp #include <bits\/stdc\+\+\.h>/
+      /내 구현\s*#include <bits\/stdc\+\+\.h>/
     );
+    await expect(canvas.getByRole('tabpanel')).not.toHaveTextContent('```');
     await userEvent.click(canvas.getByRole('tab', { name: '블럭마다 코드와 설명' }));
     await expect(canvas.getByRole('tabpanel')).toHaveTextContent(
-      /### 입력 \(5~7줄\) ```cpp int n; cin >> n;/
+      /입력 \(5~7줄\)\s*int n; cin >> n;/
     );
   }}
 />
@@ -88,9 +92,18 @@
     await userEvent.click(await canvas.findByRole('tab', { name: '설명 먼저, 코드는 끝에' }));
     await userEvent.click(canvas.getByRole('button', { name: 'md 복사' }));
 
-    // 고른 배치안의 md가 그대로 복사된다
+    // 고른 배치안의 md가 그대로 복사되고, 무엇을 복사했는지 원문으로 보여 준다
     await expect(clipboardWrite).toHaveBeenCalledWith(buildLayouts(record)[2].markdown);
     await expect(await canvas.findByText('md를 복사했어요.')).toBeInTheDocument();
+    await expect(canvas.getByRole('tabpanel')).toHaveTextContent('## 내 구현');
+    await expect(canvas.getByRole('button', { name: 'md 원문' })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    // 다시 누르면 그린 모습으로 돌아간다
+    await userEvent.click(canvas.getByRole('button', { name: 'md 원문' }));
+    await expect(canvas.getByRole('tabpanel')).not.toHaveTextContent('## 내 구현');
 
     await userEvent.click(canvas.getByRole('button', { name: 'md 받기' }));
     await expect(anchorClick.mock.contexts[0]).toHaveProperty(
@@ -143,7 +156,10 @@
   name="GroupMemberView"
   beforeEach={() => viewer.install()}
   play={async ({ canvas }) => {
-    await expect(await canvas.findByText('BOJ 1931 회의실 배정')).toBeInTheDocument();
+    // 문제 제목은 페이지 제목과 그린 md 안에 함께 나온다. 페이지 제목은 맨 처음 것이다
+    const [title] = await canvas.findAllByRole('heading', { level: 1 });
+
+    await expect(title).toHaveTextContent('BOJ 1931 회의실 배정');
     await expect(canvas.getByRole('button', { name: 'md 받기' })).toBeInTheDocument();
 
     // 작성자가 아니면 고치기, 지우기, 공유가 없고 내 그룹 목록도 부르지 않는다

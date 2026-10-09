@@ -5,6 +5,7 @@
   import SaveLinkDialog from '#lib/components/SaveLinkDialog.svelte';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Checkbox } from '#lib/components/ui/checkbox/index.js';
+  import { MarkdownView } from '#lib/components/markdown-view/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
   import * as Tabs from '#lib/components/ui/tabs/index.js';
 
@@ -35,6 +36,9 @@
   let error = $state('');
 
   let status = $state('');
+
+  /** md 원문을 보여 주는지. 기본은 그린 모습이고, 복사하면 무엇을 복사했는지 원문으로 보여 준다 */
+  let raw = $state(false);
 
   /** 백엔드가 없을 때 저장 대신 드리는 링크 */
   let saveLink = $state('');
@@ -78,6 +82,7 @@
   async function copy() {
     if (!current) return;
     await navigator.clipboard.writeText(current.markdown);
+    raw = true;
     status = 'md를 복사했어요.';
   }
 
@@ -167,8 +172,14 @@
     </Tabs.List>
     {#each layouts as layout (layout.id)}
       <Tabs.Content value={layout.id}>
-        <pre
-          class="overflow-x-auto rounded-2xl bg-muted p-4 text-sm leading-6 whitespace-pre-wrap">{layout.markdown}</pre>
+        {#if raw}
+          <pre
+            class="overflow-x-auto rounded-2xl bg-muted p-4 text-sm leading-6 whitespace-pre-wrap">{layout.markdown}</pre>
+        {:else}
+          <div class="rounded-2xl border p-6">
+            <MarkdownView source={layout.markdown} />
+          </div>
+        {/if}
       </Tabs.Content>
     {/each}
   </Tabs.Root>
@@ -176,6 +187,7 @@
   <div class="mt-4 flex items-center gap-2">
     <Button onclick={download}>md 받기</Button>
     <Button variant="outline" onclick={copy}>md 복사</Button>
+    <Button variant="ghost" aria-pressed={raw} onclick={() => (raw = !raw)}>md 원문</Button>
     <span class="text-sm text-muted-foreground">{status}</span>
   </div>
 
