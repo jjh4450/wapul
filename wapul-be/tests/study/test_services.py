@@ -100,4 +100,4 @@ class TestLayouts:
             answer="고쳤다",
         )
         for lay in build_layouts(record, blocks, [revision]):
-            assert "### 처음 제출과 달라진 점\n\n#### 로직 1\n\n**R?**\n\n고쳤다" in lay.markdown
+            assert "### 처음 제출과의 차이\n\n#### 로직 1\n\n**R?**\n\n고쳤다" in lay.markdown

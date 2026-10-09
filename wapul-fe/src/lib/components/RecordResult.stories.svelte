@@ -73,9 +73,9 @@
     // 배치안 여러 개를 탭으로 바꿔 본다. md는 그린 모습으로 보이고, 처음 배치안은 전체 코드부터 싣는다
     const panel = () => within(canvas.getByRole('tabpanel'));
 
-    await expect(panel().getByRole('heading', { name: '내 구현' })).toBeInTheDocument();
+    await expect(panel().getByRole('heading', { name: '구현' })).toBeInTheDocument();
     await expect(canvas.getByRole('tabpanel')).toHaveTextContent(
-      /내 구현\s*#include <bits\/stdc\+\+\.h>/
+      /구현\s*#include <bits\/stdc\+\+\.h>/
     );
     await expect(canvas.getByRole('tabpanel')).not.toHaveTextContent('```');
     await userEvent.click(canvas.getByRole('tab', { name: '블럭마다 코드와 설명' }));
@@ -95,7 +95,7 @@
     // 고른 배치안의 md가 그대로 복사되고, 무엇을 복사했는지 원문으로 보여 준다
     await expect(clipboardWrite).toHaveBeenCalledWith(buildLayouts(record)[2].markdown);
     await expect(await canvas.findByText('md를 복사했어요.')).toBeInTheDocument();
-    await expect(canvas.getByRole('tabpanel')).toHaveTextContent('## 내 구현');
+    await expect(canvas.getByRole('tabpanel')).toHaveTextContent('## 구현');
     await expect(canvas.getByRole('button', { name: 'md 원문' })).toHaveAttribute(
       'aria-pressed',
       'true'
@@ -103,7 +103,7 @@
 
     // 다시 누르면 그린 모습으로 돌아간다
     await userEvent.click(canvas.getByRole('button', { name: 'md 원문' }));
-    await expect(canvas.getByRole('tabpanel')).not.toHaveTextContent('## 내 구현');
+    await expect(canvas.getByRole('tabpanel')).not.toHaveTextContent('## 구현');
 
     await userEvent.click(canvas.getByRole('button', { name: 'md 받기' }));
     await expect(anchorClick.mock.contexts[0]).toHaveProperty(

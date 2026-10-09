@@ -2,7 +2,7 @@
  * 결과물 md 배치안. wapul-be의 app/services/layouts.py를 옮긴 것으로, 브라우저 안의 백엔드(api/local.ts)가 쓴다.
  * 줄은 줄바꿈 문자로만 나눈다. 백엔드의 splitlines()는 폼 피드나 U+2028 같은 글자에서도 나눠서 그런 코드에서만 다르다.
  *
- * 구성: 어떤 문제인가 → 어떻게 접근했나 → 내 구현. 배치안끼리 다른 것은 순서뿐이고,
+ * 구성: 문제 → 접근 → 구현. 배치안끼리 다른 것은 순서뿐이고,
  * 사용자가 쓴 문장은 그대로 옮긴다. 답이 빈 질문은 싣지 않는다.
  */
 import type { BlockOut, LayoutOut, QuestionOut, RecordOut } from '#lib/api/client.js';
@@ -101,9 +101,9 @@ export function buildLayouts(record: RecordOut): LayoutOut[] {
 
   const head = [
     `# ${record.problem}`,
-    '## 어떤 문제인가',
+    '## 문제',
     record.problem,
-    '## 어떻게 접근했나',
+    '## 접근',
     `**핵심 아이디어**\n\n${record.key_idea}`,
     ...problem.map(qa)
   ].join('\n\n');
@@ -113,7 +113,7 @@ export function buildLayouts(record: RecordOut): LayoutOut[] {
     ...(revision.length === 0
       ? []
       : [
-          '### 처음 제출과 달라진 점',
+          '### 처음 제출과의 차이',
           // 달라진 점은 처음 제출에서 틀렸다고 표시한 블럭에 붙으므로 어느 블럭인지 함께 적는다
           ...revision.map((q) => {
             const label = q.block_id === null ? undefined : labels.get(q.block_id);
@@ -125,7 +125,7 @@ export function buildLayouts(record: RecordOut): LayoutOut[] {
 
   const codeFirst = [
     head,
-    '## 내 구현',
+    '## 구현',
     fullCode,
     ...parts.flatMap((p) => [p.heading, ...notes(p.block)]),
     ...tail
@@ -133,7 +133,7 @@ export function buildLayouts(record: RecordOut): LayoutOut[] {
 
   const interleaved = [
     head,
-    '## 내 구현',
+    '## 구현',
     ...parts.flatMap((p) => [p.heading, blockCode(p.blockRuns), ...notes(p.block)]),
     ...tail,
     '### 전체 코드',
@@ -142,7 +142,7 @@ export function buildLayouts(record: RecordOut): LayoutOut[] {
 
   const notesFirst = [
     head,
-    '## 내 구현',
+    '## 구현',
     ...parts.flatMap((p) => [p.heading, ...notes(p.block)]),
     ...tail,
     '### 전체 코드',

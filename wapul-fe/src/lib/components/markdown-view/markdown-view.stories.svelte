@@ -29,7 +29,7 @@
   play={async ({ canvasElement }) => {
     const view = within(canvasElement);
 
-    await expect(view.getByRole('heading', { name: '어떤 문제인가' })).toBeInTheDocument();
+    await expect(view.getByRole('heading', { name: '문제' })).toBeInTheDocument();
 
     // 블럭 코드는 코드 화면과 같은 색으로 칠한다
     const code = canvasElement.querySelector('pre');

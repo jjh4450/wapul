@@ -6,7 +6,7 @@
 
 """결과물 md 배치안
 
-구성: 어떤 문제인가 → 어떻게 접근했나 → 내 구현. 배치안끼리 다른 것은 순서뿐이고,
+구성: 문제 → 접근 → 구현. 배치안끼리 다른 것은 순서뿐이고,
 사용자가 쓴 문장은 그대로 옮긴다. 답이 빈 질문은 싣지 않는다.
 """
 
@@ -79,9 +79,9 @@ class _Parts:
         r = self.record
         parts = [
             f"# {r.problem}",
-            "## 어떤 문제인가",
+            "## 문제",
             r.problem,
-            "## 어떻게 접근했나",
+            "## 접근",
             f"**핵심 아이디어**\n\n{r.key_idea}",
         ]
         parts += [_qa(q) for q in self.problem]
@@ -110,7 +110,7 @@ class _Parts:
     def tail(self) -> list[str]:
         parts = [_qa(q) for q in self.loose]
         if self.revision:
-            parts.append("### 처음 제출과 달라진 점")
+            parts.append("### 처음 제출과의 차이")
             parts += [self._revision(q) for q in self.revision]
         return parts
 
@@ -123,18 +123,18 @@ class _Parts:
 def build_layouts(record: Record, blocks: list[Block], questions: list[Question]) -> list[Layout]:
     p = _Parts(record, blocks, questions)
 
-    code_first = [p.head(), "## 내 구현", p.full_code()]
+    code_first = [p.head(), "## 구현", p.full_code()]
     for block in blocks:
         code_first += [p.block_heading(block), *p.block_notes(block)]
     code_first += p.tail()
 
-    interleaved = [p.head(), "## 내 구현"]
+    interleaved = [p.head(), "## 구현"]
     for block in blocks:
         interleaved += [p.block_heading(block), p.block_code(block), *p.block_notes(block)]
     interleaved += p.tail()
     interleaved += ["### 전체 코드", p.full_code()]
 
-    notes_first = [p.head(), "## 내 구현"]
+    notes_first = [p.head(), "## 구현"]
     for block in blocks:
         notes_first += [p.block_heading(block), *p.block_notes(block)]
     notes_first += p.tail()
