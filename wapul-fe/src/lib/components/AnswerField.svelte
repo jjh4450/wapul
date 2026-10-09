@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { autoUpdate, computePosition, flip, hide, offset, shift, size } from '@floating-ui/dom';
   import { Portal } from 'bits-ui';
   import { InputRange } from 'dom-input-range';
   import { Label } from '#lib/components/ui/label/index.js';
@@ -47,10 +48,8 @@
 
   let textarea = $state<HTMLTextAreaElement | null>(null);
 
-  let innerHeight = $state(0);
-
-  /** 열린 후보 목록. start는 치고 있는 낱말이 시작하는 곳, at은 그 낱말이 화면에 있는 자리 */
-  let menu = $state<{ items: Name[]; active: number; start: number; at: DOMRect } | null>(null);
+  /** 열린 후보 목록. start는 치고 있는 낱말이 시작하는 곳 */
+  let menu = $state<{ items: Name[]; active: number; start: number } | null>(null);
 
   /** Esc로 닫은 낱말(시작 위치:글자). 그 낱말을 고치기 전에는 다시 열지 않는다 */
   let dismissed = '';
@@ -81,15 +80,51 @@
 
     const items = typing ? suggest(words, word, near) : [];
 
-    menu =
-      items.length === 0
-        ? null
-        : {
-            items,
-            active: 0,
-            start,
-            at: new InputRange(textarea, start, caret).getBoundingClientRect()
-          };
+    menu = items.length === 0 ? null : { items, active: 0, start };
+  }
+
+  /**
+   * 후보 목록을 친 낱말 아래에 띄우고, 자리가 모자라면 위로 올린다. 자리는 Floating UI가 visualViewport로 재서
+   * 모바일 키보드가 가린 곳을 빼고, 화면 옆으로 넘치면 안으로 민다. 스크롤하면 낱말을 따라가고 낱말이 화면
+   * 밖으로 나가면 숨는다
+   */
+  function place(popup: HTMLDivElement) {
+    if (!textarea || !menu) return;
+
+    const field = textarea;
+
+    const { start } = menu;
+
+    // 친 낱말의 자리를 기준 요소로 삼는다
+    const word = {
+      getBoundingClientRect: () =>
+        new InputRange(field, start, field.selectionEnd).getBoundingClientRect(),
+      contextElement: field
+    };
+
+    return autoUpdate(word, popup, () => {
+      void computePosition(word, popup, {
+        strategy: 'fixed',
+        placement: 'bottom-start',
+        middleware: [
+          offset(4),
+          // 옆으로 넘치면 정렬을 뒤집지 않고 shift로 민다. 뒤집으면 낱말에서 멀어진다
+          flip({ padding: 8, crossAxis: false }),
+          shift({ padding: 8 }),
+          size({
+            padding: 8,
+            apply: (state) => {
+              popup.style.maxHeight = `${Math.max(0, state.availableHeight)}px`;
+            }
+          }),
+          hide()
+        ]
+      }).then((position) => {
+        popup.style.left = `${position.x}px`;
+        popup.style.top = `${position.y}px`;
+        popup.style.visibility = position.middlewareData.hide?.referenceHidden ? 'hidden' : '';
+      });
+    });
   }
 
   /** 친 낱말을 고른 이름으로 바꿔 백틱으로 감싼다. 이미 백틱을 열고 쳤으면 그 백틱을 쓴다 */
@@ -127,11 +162,9 @@
     event.preventDefault();
   }
 
-  // 캐럿만 옮기는 키. 옮긴 자리의 낱말로 다시 찾는다
+  // 캐럿만 옮기는 키. 친 낱말을 벗어나므로 목록을 닫는다
   const MOVES = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
 </script>
-
-<svelte:window bind:innerHeight onscroll={() => (menu = null)} onresize={() => (menu = null)} />
 
 <div class="grid gap-2">
   <Label for={id} class="leading-snug">{question}</Label>
@@ -151,8 +184,8 @@
     aria-activedescendant={menu ? `${listId}-${menu.active}` : undefined}
     oninput={update}
     onkeydown={keydown}
-    onkeyup={(event) => MOVES.has(event.key) && update()}
-    onclick={update}
+    onkeyup={(event) => MOVES.has(event.key) && (menu = null)}
+    onclick={() => (menu = null)}
     onblur={() => {
       menu = null;
       oncommit?.();
@@ -164,15 +197,17 @@
 </div>
 
 {#if menu}
-  {@const below = menu.at.bottom + 320 < innerHeight}
   <Portal>
     <div
-      class="fixed z-50 w-72 overflow-hidden rounded-xl border bg-popover text-sm text-popover-foreground shadow-md"
-      style:left="{menu.at.left}px"
-      style:top={below ? `${menu.at.bottom + 4}px` : undefined}
-      style:bottom={below ? undefined : `${innerHeight - menu.at.top + 4}px`}
+      {@attach place}
+      class="fixed top-0 left-0 z-50 flex w-72 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border bg-popover text-sm text-popover-foreground shadow-md"
     >
-      <ul id={listId} role="listbox" aria-label="코드 속 이름" class="max-h-64 overflow-y-auto p-1">
+      <ul
+        id={listId}
+        role="listbox"
+        aria-label="코드 속 이름"
+        class="max-h-64 min-h-0 overflow-y-auto p-1"
+      >
         {#each menu.items as item, i (item.text)}
           <li
             id="{listId}-{i}"
@@ -180,11 +215,11 @@
             tabindex="-1"
             aria-selected={i === menu.active}
             class={cn(
-              'flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-1.5',
+              'flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-1.5 pointer-coarse:py-2.5',
               i === menu.active && 'bg-accent text-accent-foreground'
             )}
             onpointerdown={(event) => event.preventDefault()}
-            onpointermove={() => menu && (menu.active = i)}
+            onpointermove={(event) => event.pointerType === 'mouse' && menu && (menu.active = i)}
             onclick={() => accept(item)}
             onkeydown={keydown}
           >
@@ -193,7 +228,11 @@
           </li>
         {/each}
       </ul>
-      <p class="border-t px-3 py-1.5 text-xs text-muted-foreground" aria-hidden="true">
+      <!-- 터치 화면에는 키가 없어 누르는 것으로 충분하다 -->
+      <p
+        class="shrink-0 border-t px-3 py-1.5 text-xs text-muted-foreground pointer-coarse:hidden"
+        aria-hidden="true"
+      >
         Tab 넣기 · ↑↓ 고르기 · Esc 닫기
       </p>
     </div>

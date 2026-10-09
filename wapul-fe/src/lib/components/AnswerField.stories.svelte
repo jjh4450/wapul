@@ -145,3 +145,17 @@
     await expect(field).toHaveValue('ma\n');
   }}
 />
+
+<Story
+  name="ClickCloses"
+  args={{ words }}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    const field = canvas.getByLabelText(question);
+
+    // 목록은 칠 때만 연다. 칸을 눌러 캐럿을 옮기면 닫고, 낱말 끝을 눌러도 다시 열지 않는다 (모바일에서 칸을 누를 때마다 뜨지 않게)
+    await userEvent.type(field, 'ma');
+    await expect(list(canvasElement).getByRole('listbox')).toBeInTheDocument();
+    await userEvent.click(field);
+    await expect(list(canvasElement).queryByRole('listbox')).not.toBeInTheDocument();
+  }}
+/>

@@ -25,6 +25,7 @@
     "@cfworker/json-schema": "^4.1.1",
     "@chromatic-com/storybook": "latest",
     "@eslint/js": "^10.0.1",
+    "@floating-ui/dom": "1.8.0",
     "@fontsource-variable/noto-sans": "^5.3.0",
     "@internationalized/date": "^3.12.4",
     "@oxlint/plugins": "1.86.0",
