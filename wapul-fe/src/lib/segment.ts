@@ -4,7 +4,7 @@
  * 패키지의 WASM, 모델, 문법 파일은 번들에 못 들어가서 ?url로 빌드에 정적 파일로 싣는다.
  * 모듈과 파일은 처음 나눌 때 받고, 문법은 그 언어를 처음 쓸 때만 받는다.
  */
-import type { Assets, Labeled } from 'wapul-seg';
+import type { Assets, Labeled, Name } from 'wapul-seg';
 import model from 'wapul-seg/wapul-seg.model?url';
 import wasm from 'wapul-seg/wapul_seg_bg.wasm?url';
 import runtime from 'wapul-seg/web-tree-sitter.wasm?url';
@@ -114,4 +114,11 @@ export async function segmentCode(code: string, language: Language): Promise<Seg
     })),
     blocks: toBlocks(labeled)
   };
+}
+
+/** 답 칸 자동완성 후보: 코드 속 이름. wapul-seg가 트리에서 뽑고, 처음엔 그 언어의 문법을 받는다 */
+export async function codeNames(code: string, language: Language): Promise<Name[]> {
+  const { names } = await import('wapul-seg');
+
+  return names(code, language, assets);
 }

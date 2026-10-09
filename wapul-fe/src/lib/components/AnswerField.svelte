@@ -1,7 +1,12 @@
 <script lang="ts">
+  import { Portal } from 'bits-ui';
+  import { InputRange } from 'dom-input-range';
   import { Label } from '#lib/components/ui/label/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
+  import type { NameKind } from 'wapul-seg';
+  import { suggest, type Name } from '#lib/completions.js';
   import { truncate } from '#lib/study.js';
+  import { cn } from '#lib/utils.js';
 
   let {
     id,
@@ -10,6 +15,8 @@
     value = $bindable(''),
     note,
     invalid = false,
+    words = [],
+    near,
     oncommit
   }: {
     id: string;
@@ -21,12 +28,110 @@
     note?: string;
     /** 답해 달라고 강조한다 (설문의 필수 칸처럼) */
     invalid?: boolean;
+    /** 자동완성 후보: 코드에 나오는 이름 (completions.ts). 없으면 자동완성을 띄우지 않는다 */
+    words?: readonly Name[];
+    /** 이 질문이 묻는 블럭의 줄. 그 줄에 나온 이름을 먼저 보여준다 */
+    near?: ReadonlySet<number>;
     /** 칸을 벗어날 때 저장한다 */
     oncommit?: () => void;
   } = $props();
 
   const placeholder = $derived(truncate(example, 90));
+
+  const KIND_LABEL = {
+    name: '이름',
+    function: '함수',
+    subscript: '대괄호',
+    string: '문자열'
+  } satisfies Record<NameKind, string>;
+
+  let textarea = $state<HTMLTextAreaElement | null>(null);
+
+  let innerHeight = $state(0);
+
+  /** 열린 후보 목록. start는 치고 있는 낱말이 시작하는 곳, at은 그 낱말이 화면에 있는 자리 */
+  let menu = $state<{ items: Name[]; active: number; start: number; at: DOMRect } | null>(null);
+
+  /** Esc로 닫은 낱말(시작 위치:글자). 그 낱말을 고치기 전에는 다시 열지 않는다 */
+  let dismissed = '';
+
+  const listId = $derived(`${id}-words`);
+
+  /** 캐럿이 영문 낱말 끝에 있으면 그 낱말로 후보를 찾는다. IDE처럼 치는 대로 열고 닫는다 */
+  function update() {
+    if (!textarea || words.length === 0) {
+      menu = null;
+
+      return;
+    }
+
+    const { value: text, selectionStart: caret, selectionEnd } = textarea;
+
+    let start = caret;
+
+    while (start > 0 && /\w/.test(text[start - 1])) start -= 1;
+
+    const word = text.slice(start, caret);
+
+    const typing =
+      caret === selectionEnd &&
+      /^[A-Za-z_]/.test(word) &&
+      !/\w/.test(text[caret] ?? '') &&
+      dismissed !== `${start}:${word}`;
+
+    const items = typing ? suggest(words, word, near) : [];
+
+    menu =
+      items.length === 0
+        ? null
+        : {
+            items,
+            active: 0,
+            start,
+            at: new InputRange(textarea, start, caret).getBoundingClientRect()
+          };
+  }
+
+  /** 친 낱말을 고른 이름으로 바꿔 백틱으로 감싼다. 이미 백틱을 열고 쳤으면 그 백틱을 쓴다 */
+  function accept(word: Name) {
+    if (!textarea || !menu) return;
+
+    const text = textarea.value;
+    const caret = textarea.selectionStart;
+    const opened = text[menu.start - 1] === '`';
+    const from = opened ? menu.start - 1 : menu.start;
+    const to = opened && text[caret] === '`' ? caret + 1 : caret;
+    const insert = `\`${word.text}\``;
+
+    menu = null;
+    textarea.focus();
+    textarea.setRangeText(insert, from, to, 'end');
+    // bind:value가 바뀐 값을 알도록 입력 이벤트를 낸다
+    textarea.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  function keydown(event: KeyboardEvent) {
+    // 한글을 조합하는 중의 키는 입력기 몫이다. Safari는 조합을 끝내는 키에서 isComposing이 거짓이라 Process도 본다
+    if (!menu || event.isComposing || event.key === 'Process') return;
+
+    const { items, active } = menu;
+
+    if (event.key === 'ArrowDown') menu.active = (active + 1) % items.length;
+    else if (event.key === 'ArrowUp') menu.active = (active - 1 + items.length) % items.length;
+    else if (event.key === 'Tab' && !event.shiftKey) accept(items[active]);
+    else if (event.key === 'Escape') {
+      dismissed = `${menu.start}:${textarea?.value.slice(menu.start, textarea.selectionStart)}`;
+      menu = null;
+    } else return;
+
+    event.preventDefault();
+  }
+
+  // 캐럿만 옮기는 키. 옮긴 자리의 낱말로 다시 찾는다
+  const MOVES = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
 </script>
+
+<svelte:window bind:innerHeight onscroll={() => (menu = null)} onresize={() => (menu = null)} />
 
 <div class="grid gap-2">
   <Label for={id} class="leading-snug">{question}</Label>
@@ -34,12 +139,63 @@
     <p class="text-xs text-muted-foreground">{note}</p>
   {/if}
   <Textarea
+    bind:ref={textarea}
     {id}
     bind:value
     {placeholder}
     maxlength={__LIMITS__.answer}
     rows={3}
     aria-invalid={invalid || undefined}
-    onblur={() => oncommit?.()}
+    aria-autocomplete={words.length > 0 ? 'list' : undefined}
+    aria-controls={menu ? listId : undefined}
+    aria-activedescendant={menu ? `${listId}-${menu.active}` : undefined}
+    oninput={update}
+    onkeydown={keydown}
+    onkeyup={(event) => MOVES.has(event.key) && update()}
+    onclick={update}
+    onblur={() => {
+      menu = null;
+      oncommit?.();
+    }}
   />
+  <p class="sr-only" aria-live="polite">
+    {menu ? `코드 속 이름 ${menu.items.length}개. Tab으로 넣어요.` : ''}
+  </p>
 </div>
+
+{#if menu}
+  {@const below = menu.at.bottom + 320 < innerHeight}
+  <Portal>
+    <div
+      class="fixed z-50 w-72 overflow-hidden rounded-xl border bg-popover text-sm text-popover-foreground shadow-md"
+      style:left="{menu.at.left}px"
+      style:top={below ? `${menu.at.bottom + 4}px` : undefined}
+      style:bottom={below ? undefined : `${innerHeight - menu.at.top + 4}px`}
+    >
+      <ul id={listId} role="listbox" aria-label="코드 속 이름" class="max-h-64 overflow-y-auto p-1">
+        {#each menu.items as item, i (item.text)}
+          <li
+            id="{listId}-{i}"
+            role="option"
+            tabindex="-1"
+            aria-selected={i === menu.active}
+            class={cn(
+              'flex cursor-pointer items-center justify-between gap-3 rounded-lg px-2 py-1.5',
+              i === menu.active && 'bg-accent text-accent-foreground'
+            )}
+            onpointerdown={(event) => event.preventDefault()}
+            onpointermove={() => menu && (menu.active = i)}
+            onclick={() => accept(item)}
+            onkeydown={keydown}
+          >
+            <code class="truncate font-mono">{item.text}</code>
+            <span class="shrink-0 text-xs text-muted-foreground">{KIND_LABEL[item.kind]}</span>
+          </li>
+        {/each}
+      </ul>
+      <p class="border-t px-3 py-1.5 text-xs text-muted-foreground" aria-hidden="true">
+        Tab 넣기 · ↑↓ 고르기 · Esc 닫기
+      </p>
+    </div>
+  </Portal>
+{/if}

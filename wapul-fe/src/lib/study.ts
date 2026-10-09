@@ -95,6 +95,15 @@ export function lastLine(units: Span[], indices: number[]): number {
   return Math.max(...indices.map((i) => units[i].end[0]));
 }
 
+/** 문장들이 걸친 줄 */
+export function unitLines(units: Span[], indices: number[]): Set<number> {
+  const lines = new Set<number>();
+
+  for (const i of indices) for (let l = units[i].start[0]; l <= units[i].end[0]; l++) lines.add(l);
+
+  return lines;
+}
+
 /** 예제 답이 답 칸보다 길면 "..."로 줄인다 */
 export function truncate(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max).trimEnd()}...` : text;

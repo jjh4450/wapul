@@ -80,6 +80,9 @@ importers:
       cn:
         specifier: ^0.4.0
         version: 0.4.0
+      dom-input-range:
+        specifier: 2.0.1
+        version: 2.0.1
       eslint:
         specifier: ^10.4.1
         version: 10.11.0(jiti@2.7.0)(supports-color@10.2.2)
@@ -162,8 +165,8 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0(svelte@5.57.1(@typescript-eslint/types@8.71.0))(vitest@4.1.11)
       wapul-seg:
-        specifier: 1.2.1
-        version: 1.2.1
+        specifier: 1.2.4
+        version: 1.2.4
 
 packages:
 
@@ -1886,6 +1889,9 @@ packages:
   dom-accessibility-api@0.6.3:
     resolution: {integrity: sha512-7ZgogeTnjuHbo+ct10G9Ffp0mif17idi0IyWNVA/wcwcm7NPOD/WEHVP3n7n3MhXqxoIYm8d6MuZohYWIZ4T3w==}
 
+  dom-input-range@2.0.1:
+    resolution: {integrity: sha512-UMGnuQlEepIPCju5NrPe+8y52B+pRvSjIaSPW92KpukoDGSEVkI2iaCR4HxK7K6C7zmVsWE8PEjCYZaJMr3vpg==}
+
   enhanced-resolve@5.26.0:
     resolution: {integrity: sha512-9vhedylFonb2YGogzUKX6+Ja72gOJbN1QHAqdrvqLwhdl/QWbKopzoUC9EbQNVsAns/bx/4uyqalrQAoy1IByw==}
     engines: {node: '>=10.13.0'}
@@ -3252,8 +3258,8 @@ packages:
       jsdom:
         optional: true
 
-  wapul-seg@1.2.1:
-    resolution: {integrity: sha512-18DzZ5c+/KN1F3OVgItG5ymUeUbMrntySRsusdQ4CHw5d7IXsOkI5jPxrNUzQX1qLnZ8gtS0Te72jxJa9Q0AJw==}
+  wapul-seg@1.2.4:
+    resolution: {integrity: sha512-6W9QLmQn6Jb6UTIOr/F6hK6LGTQKUNackV9mqqgLGeg3FHTrPOuR1Pt2vtjzRLVuf6tOl9rz7q7YGbgfHEa8DQ==}
 
   web-tree-sitter@0.27.0:
     resolution: {integrity: sha512-XK08gj6RwTMQatAG7uVRP8MunqotL/XC19vHgkSPKmELgbGPBj4ECvB8haHOUnyj6ls2B8t42UTro14zxGgAHg==}
@@ -4727,6 +4733,8 @@ snapshots:
   dom-accessibility-api@0.5.16: {}
 
   dom-accessibility-api@0.6.3: {}
+
+  dom-input-range@2.0.1: {}
 
   enhanced-resolve@5.26.0:
     dependencies:
@@ -6245,7 +6253,7 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  wapul-seg@1.2.1:
+  wapul-seg@1.2.4:
     dependencies:
       web-tree-sitter: 0.27.0
 

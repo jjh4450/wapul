@@ -17,8 +17,10 @@
   import { Button } from '#lib/components/ui/button/index.js';
   import { Checkbox } from '#lib/components/ui/checkbox/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
+  import type { Name } from '#lib/completions.js';
   import { pickExample, revisionQuestion } from '#lib/questions.js';
-  import { blockColors, blockLabels, lastLine } from '#lib/study.js';
+  import { codeNames } from '#lib/segment.js';
+  import { blockColors, blockLabels, lastLine, unitLines } from '#lib/study.js';
   import { cn } from '#lib/utils.js';
 
   /**
@@ -113,6 +115,16 @@
   /** 펼친 묶음이 블럭 질문이면 그 블럭만 칠한다 */
   const focus = $derived(threads.find((t) => t.key === current)?.block ?? null);
 
+  /** 답 칸 자동완성 후보: 코드 속 이름. 기록을 불러온 뒤 받아 온다 */
+  let words = $state<Name[]>([]);
+
+  /** 블럭 id마다 그 블럭 문장이 걸친 줄. 그 블럭을 묻는 질문에서는 그 줄의 이름을 먼저 보여준다 */
+  const blockLines = $derived.by(() => {
+    const r = record;
+
+    return new Map(r?.blocks.map((b) => [b.id, unitLines(r.units, b.units)]) ?? []);
+  });
+
   onMount(async () => {
     const result = await api.getRecord(id);
 
@@ -129,6 +141,11 @@
     }
 
     record = result.data;
+    // 자동완성 후보는 화면을 띄운 뒤 받아 온다. 문법을 못 받으면 자동완성 없이 쓴다
+    void codeNames(result.data.code, result.data.language).then(
+      (found) => (words = found),
+      () => (words = [])
+    );
     examples = Object.fromEntries(result.data.questions.map((q) => [q.id, pickExample(q.kind)]));
 
     for (const q of result.data.questions) saved.set(q.id, q.answer);
@@ -297,6 +314,8 @@
     note={question.kind === 'revision' ? '건너뛸 수 있어요.' : undefined}
     invalid={guard.tries > 0 && question.kind !== 'revision' && question.answer.trim() === ''}
     bind:value={question.answer}
+    {words}
+    near={question.block_id === null ? undefined : blockLines.get(question.block_id)}
     oncommit={() => commit(question)}
   />
 {/snippet}

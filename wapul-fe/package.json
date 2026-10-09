@@ -46,6 +46,7 @@
     "@vitest/coverage-v8": "^4.1.8",
     "bits-ui": "^2.19.5",
     "cn": "^0.4.0",
+    "dom-input-range": "2.0.1",
     "eslint": "^10.4.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-storybook": "^10.6.1",
@@ -73,7 +74,7 @@
     "vite": "^8.3.0",
     "vitest": "^4.1.8",
     "vitest-browser-svelte": "^3.1.0",
-    "wapul-seg": "1.2.1"
+    "wapul-seg": "1.2.4"
   },
   "imports": {
     "#lib": "./src/lib/index.js",
