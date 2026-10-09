@@ -1,8 +1,10 @@
 /**
  * 백엔드 없이 화면을 돌리기 위한 가짜 API.
  *
- * story와 테스트에서 globalThis.fetch를 바꿔 끼운다. 화면은 실제 API 클라이언트를 그대로 쓰고
- * 응답만 여기서 정한다. 받은 요청은 calls에 남아서 화면이 무엇을 보냈는지 검사할 수 있다.
+ * globalThis.fetch를 바꿔 끼운다. 화면은 실제 API 클라이언트를 그대로 쓰고 응답만 여기서 정한다.
+ * 기록 API는 브라우저 안의 백엔드(local.ts)가 답하고, story와 테스트는 그 위에 불러오는 중·오류 같은
+ * 응답을 route로 덮어쓴다.
+ * 받은 요청은 calls에 남아서 화면이 무엇을 보냈는지 검사할 수 있다.
  */
 
 export type FakeCall = { method: string; path: string; body: string };

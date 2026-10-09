@@ -1,8 +1,8 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import { expect, fn, waitFor, within } from 'storybook/test';
-  import { FakeApi, reply } from '#lib/api/fake.js';
-  import { record } from '#lib/api/fixtures.js';
+  import { reply } from '#lib/api/fake.js';
+  import { localApi } from '#lib/api/local.js';
   import NewRecordForm from './NewRecordForm.svelte';
 
   const { Story } = defineMeta({
@@ -11,9 +11,10 @@
     args: { oncreated: fn(), onsaved: fn() }
   });
 
-  const created = new FakeApi([['POST /v1/records', reply(record, 201)]]);
+  // 새 기록은 브라우저 안의 백엔드가 새 id로 만든다
+  const created = localApi();
 
-  const rejected = new FakeApi([['POST /v1/records', reply({ detail: [] }, 422)]]);
+  const rejected = localApi([], [['POST /v1/records', reply({ detail: [] }, 422)]]);
 
   /** 모달이 닫히고 페이지가 다시 눌릴 때까지. bits-ui는 모달이 닫히고도 잠깐 body의 클릭을 막는다 */
   const modalClosed = () =>
@@ -58,9 +59,12 @@
     await userEvent.click(canvas.getByRole('button', { name: '블럭 나누기' }));
 
     // 브라우저에서 실제 모델로 나눈다. 처음에는 모델과 문법 파일을 받는다
-    await waitFor(() => expect(args.oncreated).toHaveBeenCalledWith('record-1'), {
-      timeout: 15000
-    });
+    await waitFor(
+      () => expect(args.oncreated).toHaveBeenCalledWith(expect.stringMatching(/^local-/)),
+      {
+        timeout: 15000
+      }
+    );
 
     const [call] = created.callsTo('POST', '/v1/records');
 
@@ -124,7 +128,9 @@
     await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
 
     // 블럭이 생긴 뒤에야 기록을 만들고, 바로 답을 쓰러 간다
-    await waitFor(() => expect(args.onsaved).toHaveBeenCalledWith('record-1'));
+    await waitFor(() =>
+      expect(args.onsaved).toHaveBeenCalledWith(expect.stringMatching(/^local-/))
+    );
     await expect(args.oncreated).not.toHaveBeenCalled();
 
     const [call] = created.callsTo('POST', '/v1/records');

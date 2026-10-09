@@ -1,8 +1,10 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import { expect, fn, spyOn, waitFor, type MockInstance } from 'storybook/test';
-  import { FakeApi, empty, reply } from '#lib/api/fake.js';
-  import { groups, layouts, record, sharedRecord } from '#lib/api/fixtures.js';
+  import { reply, type FakeApi } from '#lib/api/fake.js';
+  import { groups, record, sharedRecord } from '#lib/api/fixtures.js';
+  import { localApi } from '#lib/api/local.js';
+  import { buildLayouts } from '#lib/layouts.js';
   import RecordResult from './RecordResult.svelte';
 
   const { Story } = defineMeta({
@@ -11,30 +13,27 @@
     args: { id: 'record-1', ondeleted: fn() }
   });
 
+  // 기록과 배치안은 브라우저 안의 백엔드가 답하고, 그룹 응답만 여기서 정한다
   function ownerApi(groupList = groups) {
-    return new FakeApi([
-      ['GET /v1/records/:id', reply(record)],
-      ['GET /v1/records/:id/layouts', reply(layouts)],
-      ['GET /v1/groups', reply(groupList)],
-      ['PUT /v1/records/:id/groups', reply(['group-1'])],
-      ['DELETE /v1/records/:id', empty()]
-    ]);
+    return localApi(
+      [record],
+      [
+        ['GET /v1/groups', reply(groupList)],
+        ['PUT /v1/records/:id/groups', reply(['group-1'])]
+      ]
+    );
   }
 
   const owner = ownerApi();
 
   const ownerWithoutGroups = ownerApi([]);
 
-  const viewer = new FakeApi([
-    ['GET /v1/records/:id', reply(sharedRecord)],
-    ['GET /v1/records/:id/layouts', reply(layouts)]
-  ]);
+  const viewer = localApi([sharedRecord]);
 
-  const oddTitle = new FakeApi([
-    ['GET /v1/records/:id', reply({ ...record, problem: 'A/B: 회의실?' })],
-    ['GET /v1/records/:id/layouts', reply(layouts)],
-    ['GET /v1/groups', reply(groups)]
-  ]);
+  const oddTitle = localApi(
+    [{ ...record, problem: 'A/B: 회의실?' }],
+    [['GET /v1/groups', reply(groups)]]
+  );
 
   // 브라우저 기능(클립보드, 파일 받기, 확인 창)은 story마다 갈아 끼우고 끝나면 되돌린다
   let clipboardWrite: MockInstance<Clipboard['writeText']>;
@@ -70,13 +69,14 @@
   play={async ({ canvas, userEvent }) => {
     await expect(await canvas.findByText('글감이 완성됐어요!')).toBeInTheDocument();
 
-    // 배치안 여러 개를 탭으로 바꿔 본다
-    const codeFirst = canvas.getByText(/```cpp\s+int main\(\) \{\}/);
-
-    await expect(codeFirst).toBeVisible();
+    // 배치안 여러 개를 탭으로 바꿔 본다. 처음 배치안은 전체 코드부터 싣는다
+    await expect(canvas.getByRole('tabpanel')).toHaveTextContent(
+      /## 내 구현 ```cpp #include <bits\/stdc\+\+\.h>/
+    );
     await userEvent.click(canvas.getByRole('tab', { name: '블럭마다 코드와 설명' }));
-    await expect(canvas.getByText(/int n; cin >> n;/)).toBeVisible();
-    await expect(codeFirst).not.toBeVisible();
+    await expect(canvas.getByRole('tabpanel')).toHaveTextContent(
+      /### 입력 \(5~7줄\) ```cpp int n; cin >> n;/
+    );
   }}
 />
 
@@ -88,7 +88,7 @@
     await userEvent.click(canvas.getByRole('button', { name: 'md 복사' }));
 
     // 고른 배치안의 md가 그대로 복사된다
-    await expect(clipboardWrite).toHaveBeenCalledWith(layouts[2].markdown);
+    await expect(clipboardWrite).toHaveBeenCalledWith(buildLayouts(record)[2].markdown);
     await expect(await canvas.findByText('md를 복사했어요.')).toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole('button', { name: 'md 받기' }));

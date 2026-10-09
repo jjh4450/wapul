@@ -1,9 +1,10 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import { expect, fn, waitFor, within } from 'storybook/test';
-  import { FakeApi, empty, reply, type FakeHandler } from '#lib/api/fake.js';
-  import type { QuestionIn, RecordOut } from '#lib/api/client.js';
+  import type { QuestionIn } from '#lib/api/client.js';
+  import { reply } from '#lib/api/fake.js';
   import { record, sharedRecord } from '#lib/api/fixtures.js';
+  import { localApi } from '#lib/api/local.js';
   import { EXAMPLES } from '#lib/questions.js';
   import { truncate } from '#lib/study.js';
   import AnswerSheet from './AnswerSheet.svelte';
@@ -14,56 +15,30 @@
     args: { id: 'record-1', onfinish: fn(), onnotowner: fn() }
   });
 
-  /** 블럭 수정을 받은 대로 저장한 것처럼 돌려준다. 백엔드처럼 블럭과 질문에 새 id를 붙인다 */
-  const echoBlocks: FakeHandler = (call) => {
-    const body: { blocks: RecordOut['blocks']; questions: QuestionIn[] } = JSON.parse(call.body);
-
-    const saved: RecordOut = {
-      ...record,
-      blocks: body.blocks.map((b, i) => ({ ...b, id: `new-block-${i}` })),
-      questions: body.questions.map((q, i) => ({
-        id: `new-q-${i}`,
-        block_id: q.block == null ? null : `new-block-${q.block}`,
-        kind: q.kind,
-        text: q.text,
-        answer: q.answer
-      }))
-    };
-
-    return reply(saved)(call);
-  };
-
-  const writing = new FakeApi([
-    ['GET /v1/records/:id', reply(record)],
-    ['PUT /v1/records/:id/blocks', echoBlocks],
-    ['PATCH /v1/records/:id/answers', empty()]
-  ]);
+  // 기록은 브라우저 안의 백엔드가 답한다. 블럭을 고치면 백엔드처럼 블럭과 질문에 새 id가 붙는다
+  const writing = localApi([record]);
 
   // 문제 질문에 이미 답한 기록
-  const resumed = new FakeApi([
-    [
-      'GET /v1/records/:id',
-      reply({
-        ...record,
-        questions: record.questions.map((q) =>
-          q.kind === 'problem' ? { ...q, answer: '끝나는 시간이 빠를수록 남는 시간이 넓다' } : q
-        )
-      })
-    ]
+  const resumed = localApi([
+    {
+      ...record,
+      questions: record.questions.map((q) =>
+        q.kind === 'problem' ? { ...q, answer: '끝나는 시간이 빠를수록 남는 시간이 넓다' } : q
+      )
+    }
   ]);
 
-  const saveFails = new FakeApi([
-    ['GET /v1/records/:id', reply(record)],
-    ['PATCH /v1/records/:id/answers', reply({ detail: 'x' }, 500)]
-  ]);
+  const saveFails = localApi(
+    [record],
+    [['PATCH /v1/records/:id/answers', reply({ detail: 'x' }, 500)]]
+  );
 
-  const viewer = new FakeApi([['GET /v1/records/:id', reply(sharedRecord)]]);
+  const viewer = localApi([sharedRecord]);
 
-  const markFails = new FakeApi([
-    ['GET /v1/records/:id', reply(record)],
-    ['PUT /v1/records/:id/blocks', reply({ detail: 'x' }, 500)],
-    ['PATCH /v1/records/:id/answers', empty()]
-  ]);
+  const markFails = localApi(
+    [record],
+    [['PUT /v1/records/:id/blocks', reply({ detail: 'x' }, 500)]]
+  );
 
   const problemQuestion = record.questions[0].text;
 

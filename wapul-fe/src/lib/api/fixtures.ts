@@ -2,7 +2,7 @@
  * story에서 가짜 API(fake.ts)가 돌려줄 데이터. 백엔드 응답과 같은 타입으로 적어서
  * API 계약이 바뀌면 타입 검사(pnpm check)에서 바로 드러난다.
  */
-import type { GroupDetail, GroupOut, LayoutOut, RecordOut, RecordSummary } from './client.js';
+import type { GroupDetail, GroupOut, RecordOut, RecordSummary } from './client.js';
 
 const code = `#include <bits/stdc++.h>
 using namespace std;
@@ -160,26 +160,6 @@ export const records: RecordSummary[] = [
     owner_name: '김코딩',
     created_at: '2026-10-03T12:00:00+0000',
     updated_at: '2026-10-04T08:00:00+0000'
-  }
-];
-
-export const layouts: LayoutOut[] = [
-  {
-    id: 'code-first',
-    title: '전체 코드 먼저',
-    markdown:
-      '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n```cpp\nint main() {}\n```\n\n### 입력 (5~7줄)\n'
-  },
-  {
-    id: 'interleaved',
-    title: '블럭마다 코드와 설명',
-    markdown:
-      '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n### 입력 (5~7줄)\n\n```cpp\nint n; cin >> n;\n```\n'
-  },
-  {
-    id: 'notes-first',
-    title: '설명 먼저, 코드는 끝에',
-    markdown: '# BOJ 1931 회의실 배정\n\n## 내 구현\n\n### 입력 (5~7줄)\n\n### 전체 코드\n'
   }
 ];
 

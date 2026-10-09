@@ -1,8 +1,9 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import { expect, fn, waitFor, within } from 'storybook/test';
-  import { FakeApi, reply } from '#lib/api/fake.js';
+  import { reply } from '#lib/api/fake.js';
   import { record } from '#lib/api/fixtures.js';
+  import { localApi } from '#lib/api/local.js';
   import BlockEditor from './BlockEditor.svelte';
 
   const { Story } = defineMeta({
@@ -11,23 +12,19 @@
     args: { id: 'record-1', onsaved: fn() }
   });
 
-  const editing = new FakeApi([
-    ['GET /v1/records/:id', reply(record)],
-    ['PUT /v1/records/:id/blocks', reply(record)]
-  ]);
+  // 기록은 브라우저 안의 백엔드가 답한다. 없는 기록은 404, 새 기록은 새 id로 만든다
+  const editing = localApi([record]);
 
-  const oneBlock = new FakeApi([
-    ['GET /v1/records/:id', reply({ ...record, blocks: [record.blocks[1]] })]
-  ]);
+  const oneBlock = localApi([{ ...record, blocks: [record.blocks[1]] }]);
 
-  const rejected = new FakeApi([
-    ['GET /v1/records/:id', reply(record)],
-    ['PUT /v1/records/:id/blocks', reply({ detail: 'overlap' }, 422)]
-  ]);
+  const rejected = localApi(
+    [record],
+    [['PUT /v1/records/:id/blocks', reply({ detail: 'overlap' }, 422)]]
+  );
 
-  const missing = new FakeApi([['GET /v1/records/:id', reply({ detail: 'x' }, 404)]]);
+  const missing = localApi();
 
-  const creating = new FakeApi([['POST /v1/records', reply(record, 201)]]);
+  const creating = localApi();
 
   const { problem, key_idea, language, code, units } = record;
 
@@ -308,7 +305,10 @@
     await userEvent.click(canvas.getByRole('button', { name: '+ 출력' }));
     await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
 
-    await waitFor(() => expect(args.onsaved).toHaveBeenCalledWith('record-1'));
+    // 새 기록은 백엔드가 새 id를 붙인다
+    await waitFor(() =>
+      expect(args.onsaved).toHaveBeenCalledWith(expect.stringMatching(/^local-/))
+    );
 
     const [call] = creating.callsTo('POST', '/v1/records');
 
