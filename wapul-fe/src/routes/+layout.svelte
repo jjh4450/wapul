@@ -2,6 +2,7 @@
   import './layout.css';
   import favicon from '#lib/assets/favicon.svg';
   import { resolve } from '$app/paths';
+  import { BACKEND } from '#lib/api/client.js';
   import type { LayoutProps } from './$types';
 
   let { children }: LayoutProps = $props();
@@ -17,7 +18,9 @@
     <a href={resolve('/')} class="font-semibold">wapul</a>
     <a href={resolve('/records/new')} class="text-muted-foreground hover:text-foreground">새 기록</a
     >
-    <a href={resolve('/groups')} class="text-muted-foreground hover:text-foreground">그룹</a>
+    {#if BACKEND}
+      <a href={resolve('/groups')} class="text-muted-foreground hover:text-foreground">그룹</a>
+    {/if}
   </nav>
 </header>
 

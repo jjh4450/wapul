@@ -10,7 +10,7 @@
   const { Story } = defineMeta({
     title: 'Components/RecordResult',
     component: RecordResult,
-    args: { id: 'record-1', ondeleted: fn() }
+    args: { id: 'record-1', backend: true, ondeleted: fn() }
   });
 
   // 기록과 배치안은 브라우저 안의 백엔드가 답하고, 그룹 응답만 여기서 정한다

@@ -39,6 +39,12 @@ export type GroupDetail = Schemas['GroupDetail'];
 
 export type Result<T> = { ok: true; data: T } | { ok: false; message: string };
 
+/**
+ * 백엔드를 쓰는지. 기본은 꺼짐이고, 백엔드와 같이 낼 때 VITE_BACKEND=on으로 빌드한다.
+ * 꺼지면 브라우저 안의 백엔드(local.ts)가 /v1 요청을 받는다
+ */
+export const BACKEND = import.meta.env.VITE_BACKEND === 'on';
+
 // 개발 중에는 빈 baseUrl로 두고 vite 프록시가 /v1 요청을 백엔드로 넘긴다.
 // fetch는 호출할 때마다 globalThis에서 읽는다. story와 테스트가 가짜 API(fake.ts)로 바꿔 끼울 수 있게 하려는 것.
 const client = createClient<paths>({

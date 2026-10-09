@@ -3,7 +3,7 @@
  *
  * globalThis.fetch를 바꿔 끼운다. 화면은 실제 API 클라이언트를 그대로 쓰고 응답만 여기서 정한다.
  * 기록 API는 브라우저 안의 백엔드(local.ts)가 답하고, story와 테스트는 그 위에 불러오는 중·오류 같은
- * 응답을 route로 덮어쓴다.
+ * 응답을 route로 덮어쓴다. 백엔드를 끈 배포도 같은 것을 끼운다.
  * 받은 요청은 calls에 남아서 화면이 무엇을 보냈는지 검사할 수 있다.
  */
 
@@ -46,6 +46,8 @@ export class FakeApi {
 
   #routes: Route[] = [];
 
+  #record = true;
+
   /**
    * routes: ['GET /v1/records/:id', handler] 꼴. ':'로 시작하는 조각은 아무 값과 맞고, 앞에 적은 것이 먼저다.
    * 함수로 주면 install할 때마다 새로 만든다. 상태가 있는 route(local.ts)를 story마다 처음으로 돌린다
@@ -55,10 +57,12 @@ export class FakeApi {
   }
 
   /** globalThis.fetch를 이 가짜로 바꾸고 되돌리는 함수를 돌려준다. story의 beforeEach에서 그대로 반환한다.
-   * API(/v1/) 요청만 가로채고, 분할 모델 파일 같은 그 밖의 요청은 원래 fetch로 보낸다 */
-  install(): () => void {
+   * API(/v1/) 요청만 가로채고, 분할 모델 파일 같은 그 밖의 요청은 원래 fetch로 보낸다.
+   * record: false면 calls에 남기지 않는다. 배포에서는 아무도 읽지 않는데 요청 본문이 계속 쌓인다 */
+  install({ record = true }: { record?: boolean } = {}): () => void {
     const original = globalThis.fetch;
 
+    this.#record = record;
     this.calls.length = 0;
     this.#routes = this.#make().map(([route, handler]) => {
       const [method, path] = route.split(' ');
@@ -88,7 +92,7 @@ export class FakeApi {
 
     const call = { method: request.method, path: pathname, body: await request.text() };
 
-    this.calls.push(call);
+    if (this.#record) this.calls.push(call);
 
     const route = this.#routes.find(
       (r) => r.method === call.method && matches(r.segments, pathname)

@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { resolve } from '$app/paths';
-  import { api, type GroupOut, type LayoutOut, type RecordOut } from '#lib/api/client.js';
+  import { BACKEND, api, type GroupOut, type LayoutOut, type RecordOut } from '#lib/api/client.js';
   import { Button } from '#lib/components/ui/button/index.js';
   import { Checkbox } from '#lib/components/ui/checkbox/index.js';
   import { Label } from '#lib/components/ui/label/index.js';
@@ -10,11 +10,14 @@
   let {
     id,
     done = false,
+    backend = BACKEND,
     ondeleted
   }: {
     id: string;
     /** 답을 다 쓰고 막 넘어왔을 때 완성 안내를 띄운다 */
     done?: boolean;
+    /** 백엔드를 쓰는지. 없으면 그룹 공유를 숨긴다 */
+    backend?: boolean;
     ondeleted: () => void;
   } = $props();
 
@@ -54,7 +57,7 @@
     selected = layouts[0]?.id ?? '';
     shared = [...recordResult.data.group_ids];
 
-    if (recordResult.data.is_owner) {
+    if (backend && recordResult.data.is_owner) {
       const groupResult = await api.listGroups();
 
       if (groupResult.ok) groups = groupResult.data;
@@ -138,7 +141,7 @@
     <span class="text-sm text-muted-foreground">{status}</span>
   </div>
 
-  {#if record.is_owner}
+  {#if backend && record.is_owner}
     <section class="mt-10 grid max-w-xl gap-3">
       <h2 class="font-medium">그룹에 공유</h2>
       {#if groups.length === 0}
