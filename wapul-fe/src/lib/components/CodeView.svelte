@@ -6,7 +6,7 @@
   import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
   import { highlight, type Tint } from '#lib/highlight.js';
   import { BLOCK_KIND_LABEL, blockColors, blockLabels } from '#lib/study.js';
-  import { lensVariants } from '#lib/components/lens/index.js';
+  import { Lens } from '#lib/components/lens/index.js';
   import { cn } from '#lib/utils.js';
 
   /** 줄을 문장 경계로 자른 조각. from, to는 칸 */
@@ -30,7 +30,7 @@
   type Pane = { from: number; to: number; target: number; marks: number[][] };
 
   /** 화면보다 위(above)와 아래(below)의 돋보기 창. 띄울 줄이 없으면 null */
-  type Lens = { above: Pane | null; below: Pane | null };
+  type LensPanes = { above: Pane | null; below: Pane | null };
 
   /**
    * 창의 스크롤 막대. 손잡이는 창에 보이는 부분의 위치(top)와 길이(size), 눈금(marks)은 띄운 블럭의 줄이
@@ -241,7 +241,7 @@
    * 창(below)을 띄운다. 창이 하나면 코드 전체를 담고, 둘이면 화면을 사이에 두고 나눠 위 창은 1줄부터
    * 화면 첫 줄까지, 아래 창은 화면 끝 줄부터 마지막 줄까지 담는다
    */
-  const lens = $derived.by((): Lens => {
+  const lens = $derived.by((): LensPanes => {
     if (peek === null || peek >= blocks.length) return { above: null, below: null };
 
     const own = new Set(
@@ -695,12 +695,9 @@
   {@const count = pane.to - pane.from + 1}
   {@const track = tracks[side]}
   <!-- 물방울 같은 유리(Lens). 붙어 다니도록 relative 대신 sticky다 -->
-  <div
-    class={cn(
-      lensVariants({ size: 'pane' }),
-      'sticky text-xs',
-      side === 'top' ? 'top-4' : 'bottom-4 mt-auto'
-    )}
+  <Lens
+    size="pane"
+    class={cn('sticky text-xs', side === 'top' ? 'top-4' : 'bottom-4 mt-auto')}
     style={colors[block].style}
     role="group"
     aria-label={side === 'top' ? '화면 위' : '화면 아래'}
@@ -782,7 +779,7 @@
         ></div>
       </div>
     {/if}
-  </div>
+  </Lens>
 {/snippet}
 
 <svelte:window
