@@ -1,5 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { CloseGuard, hasBlank, SHAKE_MS } from './closeGuard.svelte.js';
+import { CloseGuard, hasBlank, SHAKE_MS, skippable } from './closeGuard.svelte.js';
+
+describe('skippable', () => {
+  it('lets only the revision question go unanswered', () => {
+    expect(skippable({ kind: 'revision' })).toBe(true);
+    expect(skippable({ kind: 'logic' })).toBe(false);
+  });
+});
 
 describe('hasBlank', () => {
   it('counts an empty or whitespace answer, but not of a revision question', () => {

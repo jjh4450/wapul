@@ -12,9 +12,14 @@ const PLEAS = [
 // 시간으로 풀어서, 이벤트를 놓쳐도 닫기가 막힌 채로 남지 않는다
 export const SHAKE_MS = 400;
 
-/** 답하지 않은 칸이 있는지. 건너뛸 수 있는 달라진 점 질문은 세지 않는다 */
+/** 건너뛸 수 있는 질문(처음 제출과 달라진 점). 빈 칸으로 치지 않고 진행도에도 세지 않는다 */
+export function skippable(q: { kind: QuestionKind }): boolean {
+  return q.kind === 'revision';
+}
+
+/** 답하지 않은 칸이 있는지. 건너뛸 수 있는 질문은 세지 않는다 */
 export function hasBlank(questions: { kind: QuestionKind; answer: string }[]): boolean {
-  return questions.some((q) => q.kind !== 'revision' && q.answer.trim() === '');
+  return questions.some((q) => !skippable(q) && q.answer.trim() === '');
 }
 
 /**
