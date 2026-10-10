@@ -693,13 +693,12 @@
   {@const pulled = give(stretch[side])}
   {@const count = pane.to - pane.from + 1}
   {@const track = tracks[side]}
-  <!-- 물방울 같은 유리: 반투명 바탕, 비스듬한 반사광(before), 가장자리 굴절 띠, 맨 위의 테두리 빛과 그늘(after).
-       바탕을 흐리게(backdrop-blur) 하면 굴절 띠가 반투명한 창 안만 보고 겹쳐 그려지므로 흐리지 않는다 -->
+  <!-- 물방울 같은 유리 (layout.css의 glass) -->
   <div
     class={cn(
       'sticky',
       side === 'top' ? 'top-4' : 'bottom-4 mt-auto',
-      'overflow-hidden rounded-2xl bg-white/30 text-xs shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35),0_1px_2px_rgb(0_0_0/0.08)] before:pointer-events-none before:absolute before:inset-0 before:bg-linear-to-br before:from-white/60 before:via-white/0 before:via-35% before:to-(--block)/10 after:pointer-events-none after:absolute after:inset-0 after:rounded-[inherit] after:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.75),inset_0_1px_0_rgb(255_255_255),inset_0_0_16px_rgb(0_0_0/0.08),inset_8px_8px_12px_-10px_rgb(255_255_255),inset_-1px_-1px_0_rgb(0_0_0/0.06)] dark:bg-white/5 dark:before:from-white/15 dark:after:shadow-[inset_0_0_0_1px_rgb(255_255_255/0.15),inset_0_1px_0_rgb(255_255_255/0.3),inset_0_0_16px_rgb(0_0_0/0.4)]'
+      'glass overflow-hidden rounded-2xl bg-white/30 text-xs shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35),0_1px_2px_rgb(0_0_0/0.08)] dark:bg-white/5'
     )}
     style={colors[block].style}
     role="group"
