@@ -89,6 +89,28 @@
   /** '다 썼어요'가 끝났을 때 마지막으로 저장된 답 */
   let finishedWith = '';
 
+  // 입력 블럭의 마지막 문장(7줄의 두 번째 문장)을 따로 뗀 기록. 두 블럭이 7줄에서 끝나 막대가 이어 나온다
+  const stacked = localApi([
+    {
+      ...record,
+      blocks: [
+        { id: 'block-input', kind: 'input', units: [3, 4, 5, 6] },
+        { id: 'block-read', kind: 'logic', units: [7] },
+        ...record.blocks.slice(1)
+      ],
+      questions: [
+        ...record.questions,
+        {
+          id: 'q-read',
+          block_id: 'block-read',
+          kind: 'logic',
+          text: '이 부분이 끝나면 무엇이 보장되고, 그게 왜 성립하나요?',
+          answer: ''
+        }
+      ]
+    }
+  ]);
+
   /** 모달이 닫히고 페이지가 다시 눌릴 때까지. bits-ui는 모달이 닫히고도 잠깐 body의 클릭을 막는다 */
   const modalClosed = () =>
     waitFor(() => {
@@ -448,6 +470,30 @@
       expect(input().queryByRole('textbox', { name: /^처음 제출/ })).not.toBeInTheDocument()
     );
     await waitFor(() => expect(mark()).toHaveFocus());
+  }}
+/>
+
+<Story
+  name="StackedBarsKeepTheirArea"
+  beforeEach={() => stacked.install()}
+  play={async ({ canvas, canvasElement }) => {
+    const upper = await canvas.findByRole('button', { name: /^입력, 질문/ });
+
+    const lower = rule(canvasElement, '로직 1');
+
+    // 두 블럭이 같은 줄에서 끝나면 막대가 이어 나온다. 넓힌 만큼 띄워서, 위 막대 바로 아래를 눌러도
+    // 위 막대가, 아래 막대 바로 위를 눌러도 아래 막대가 눌린다
+    await expect(lower.closest('h2')?.previousElementSibling).toBe(upper.closest('h2'));
+    upper.scrollIntoView({ block: 'center' });
+
+    const a = upper.getBoundingClientRect();
+
+    const b = lower.getBoundingClientRect();
+
+    const x = a.left + a.width / 2;
+
+    await expect(document.elementFromPoint(x, a.bottom + 1)).toBe(upper);
+    await expect(document.elementFromPoint(x, b.top - 1)).toBe(lower);
   }}
 />
 

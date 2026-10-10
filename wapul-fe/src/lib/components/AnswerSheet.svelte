@@ -514,11 +514,12 @@
 
 <!-- 묶음 막대: 돋보기 창과 같은 유리에 필수 질문마다 한 마디를 두고, 답한 마디를 블럭 색으로 칠한다.
      누르면 펼치고, 펼친 막대를 누르면 접는다(빈 칸이 있으면 바로 접히지 않는다). 막대는 얇아서 누르는 곳을
-     위아래로 넓힌다(after): 24px, 터치는 32px. 터치에서 더 넓히면 코드 글자와 붙은 막대를 덮는다 -->
+     위아래로 넓힌다(after): 24px, 터치는 32px. 터치에서 더 넓히면 코드 글자를 덮는다. 같은 줄에서 끝나 이어
+     나오는 막대는 넓힌 만큼 띄워 서로의 자리를 덮지 않는다 -->
 {#snippet rule(t: Thread)}
   {@const expanded = t.key === current}
   {@const name = progressName(t.label, progress(t.questions))}
-  <h2 class={cn('flex', t.block !== null && 'pr-3 pl-11')}>
+  <h2 class={cn('flex [h2+&]:mt-1 pointer-coarse:[h2+&]:mt-3', t.block !== null && 'pr-3 pl-11')}>
     <button
       type="button"
       id="rule-{t.key}"
