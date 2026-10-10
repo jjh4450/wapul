@@ -304,9 +304,9 @@
 
   /**
    * 저장 중인 틀렸다 표시. 끝나면 질문 id가 모두 바뀌어 있을 수 있어서, 답 저장과 '다 썼어요'는 이것이
-   * 끝난 뒤에 한다
+   * 끝난 뒤에 한다. 값은 표시를 저장했는지
    */
-  let marked: Promise<void> | null = null;
+  let marked: Promise<boolean> | null = null;
 
   /** 체크를 바꿨다. 표시를 저장하는 동안 marked에 둔다 */
   function setWrong(block: number, wrong: boolean) {
@@ -323,10 +323,11 @@
 
   /**
    * 블럭에 처음 제출에서 틀렸다는 표시를 켜거나 끈다. 표시는 그 블럭의 달라진 점 질문이라, 질문을
-   * 넣거나 빼고 블럭과 질문을 통째로 다시 저장한다. 아직 저장하지 않은 답도 함께 보낸다
+   * 넣거나 빼고 블럭과 질문을 통째로 다시 저장한다. 아직 저장하지 않은 답도 함께 보낸다. 저장하지 못했으면
+   * false (바꿀 것이 없었으면 true)
    */
-  async function markWrong(block: number, wrong: boolean) {
-    if (!record) return;
+  async function markWrong(block: number, wrong: boolean): Promise<boolean> {
+    if (!record) return true;
 
     const { blocks, questions } = record;
 
@@ -334,7 +335,8 @@
       (q) => q.kind === 'revision' && q.block_id === blocks[block].id
     );
 
-    if (!wrong && revision?.answer.trim() && !confirm('쓴 답이 지워져요. 표시를 끌까요?')) return;
+    if (!wrong && revision?.answer.trim() && !confirm('쓴 답이 지워져요. 표시를 끌까요?'))
+      return true;
 
     const position = new Map(blocks.map((b, i) => [b.id, i]));
 
@@ -434,6 +436,8 @@
     } else if (caret || document.activeElement === document.body) {
       document.getElementById(`wrong-${current}`)?.focus();
     }
+
+    return result.ok;
   }
 
   /** 질문마다 저장을 차례로 보낸다. 멈췄을 때와 칸을 벗어날 때의 저장이 겹쳐도 나중 값이 남는다 */
@@ -486,8 +490,13 @@
   }
 
   async function finish() {
-    // 틀렸다 표시를 저장하는 중이면 끝난 뒤의 질문(새 id)으로 모두 저장한다
-    while (marked) await marked;
+    // 틀렸다 표시를 저장하는 중이면 끝난 뒤의 질문(새 id)으로 모두 저장한다. 표시를 못 바꿨으면 체크 아래의
+    // 이유를 보도록 끝내지 않는다
+    let markedAll = true;
+
+    while (marked) markedAll = (await marked) && markedAll;
+
+    if (!markedAll) return;
 
     for (const q of record?.questions ?? []) {
       if (!(await commit(q))) return;

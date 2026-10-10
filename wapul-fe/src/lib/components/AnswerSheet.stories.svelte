@@ -438,6 +438,34 @@
 />
 
 <Story
+  name="FinishStopsWhenMarkFails"
+  beforeEach={() => {
+    marks.length = 0;
+
+    return slowMark(markFails);
+  }}
+  play={async ({ canvas, userEvent, args }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
+
+    const input = within(canvas.getByRole('region', { name: '입력' }));
+
+    await userEvent.click(input.getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
+    await waitFor(() => expect(marks).toHaveLength(1));
+
+    // 표시를 저장하는 중에 다 썼다고 했는데 표시를 못 바꾸면, 체크 아래의 이유를 보도록 끝내지 않는다
+    await userEvent.click(canvas.getByRole('button', { name: '다 썼어요' }));
+    marks.shift()?.();
+    await expect(await input.findByText(/표시를 바꾸지 못했어요/)).toBeInTheDocument();
+    await new Promise((done) => setTimeout(done, 300));
+    await expect(args.onfinish).not.toHaveBeenCalled();
+
+    // 이유를 본 뒤 다시 누르면 끝낸다
+    await userEvent.click(canvas.getByRole('button', { name: '다 썼어요' }));
+    await waitFor(() => expect(args.onfinish).toHaveBeenCalledOnce());
+  }}
+/>
+
+<Story
   name="LeavesRemovedRevisionForCheckbox"
   beforeEach={() => {
     marks.length = 0;
