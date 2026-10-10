@@ -314,21 +314,21 @@
 
     const patches = () => writing.callsTo('PATCH', '/v1/records/record-1/answers');
 
-    // 틀렸다 표시를 저장하는 동안 답 칸으로 돌아가 더 친다
+    // 틀렸다 표시를 저장하는 동안 답 칸으로 돌아가 더 치고, 커서를 '이하' 앞으로 옮긴다
     await userEvent.type(field(), 'N은');
     await userEvent.click(input().getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
     await waitFor(() => expect(marks).toHaveLength(1));
 
     const sent = patches().length;
 
-    await userEvent.type(field(), ' 10만 이하');
+    await userEvent.type(field(), ' 10만 이하{ArrowLeft}{ArrowLeft}');
 
     // 표시를 저장하는 동안에는 치다 멈춰도 옛 id로 보내지 않는다
     await autosaved();
     await expect(patches()).toHaveLength(sent);
     marks.shift()?.();
 
-    // 칸을 새 id로 다시 그려도 더 친 글자와 커서는 그 칸에 남고, 더 친 답은 새 id로 저장한다
+    // 칸을 새 id로 다시 그려도 더 친 글자와 커서 자리는 그 칸에 남고, 더 친 답은 새 id로 저장한다
     await waitFor(() =>
       expect(
         input().getByRole('button', { name: /^처음 제출(에서|과).*, 선택$/ })
@@ -336,6 +336,7 @@
     );
     await expect(field()).toHaveValue('N은 10만 이하');
     await expect(field()).toHaveFocus();
+    await expect((field() as HTMLTextAreaElement).selectionStart).toBe('N은 10만 '.length);
     await waitFor(() => {
       const [last] = patches().slice(-1);
 
@@ -411,6 +412,42 @@
     marks.shift()?.();
     await waitFor(() => expect(args.onfinish).toHaveBeenCalledOnce());
     await expect(finishedWith).toBe('N은 10만 이하');
+  }}
+/>
+
+<Story
+  name="LeavesRemovedRevisionForCheckbox"
+  beforeEach={() => {
+    marks.length = 0;
+
+    return slowMark(writing);
+  }}
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
+
+    const input = () => within(canvas.getByRole('region', { name: '입력' }));
+
+    const mark = () => input().getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ });
+
+    // 표시를 켜서 달라진 점 질문을 붙이고 그 질문을 펼친다
+    await userEvent.click(mark());
+    await waitFor(() => expect(marks).toHaveLength(1));
+    marks.shift()?.();
+    await userEvent.click(
+      await input().findByRole('button', { name: /^처음 제출(에서|과).*, 선택$/ })
+    );
+
+    // 빈 달라진 점 칸을 펼친 채 표시를 끄고, 저장하는 동안 그 칸에 친다
+    await userEvent.click(mark());
+    await waitFor(() => expect(marks).toHaveLength(1));
+    await userEvent.type(input().getByRole('textbox', { name: /^처음 제출/ }), '정렬');
+    marks.shift()?.();
+
+    // 치던 질문이 빠졌으니 다른 답 칸이 아니라 체크로 커서를 돌려준다
+    await waitFor(() =>
+      expect(input().queryByRole('textbox', { name: /^처음 제출/ })).not.toBeInTheDocument()
+    );
+    await waitFor(() => expect(mark()).toHaveFocus());
   }}
 />
 

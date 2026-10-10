@@ -369,9 +369,16 @@
 
     marking = false;
 
-    // 저장하는 동안 체크가 disabled라 커서가 빠진다. 그사이 답 칸으로 옮겨 쳤는지는 칸이 새 id로 다시
-    // 그려지기 전에 잡아 둔다
-    const typing = document.activeElement?.id === currentThread?.questions[step]?.id;
+    // 저장하는 동안 체크가 disabled라 커서가 빠진다. 그사이 답 칸으로 옮겨 쳤으면 그 질문과 커서 자리를,
+    // 칸이 새 id로 다시 그려지기 전에 잡아 둔다
+    const active = currentThread?.questions[step];
+
+    const field = document.activeElement;
+
+    const caret =
+      field instanceof HTMLTextAreaElement && field.id === active?.id
+        ? [field.selectionStart, field.selectionEnd]
+        : null;
 
     if (result.ok) {
       markError = '';
@@ -406,12 +413,18 @@
       markError = `표시를 바꾸지 못했어요. ${result.message}`;
     }
 
-    // 답 칸에서 치고 있었으면 새로 그린 그 칸으로, 커서가 body로 빠졌으면 체크로 돌려준다
     await tick();
 
-    if (typing) focusActive(false);
-    else if (document.activeElement === document.body)
+    // 치던 질문이 남았으면 다시 그린 그 칸의 같은 자리로, 치던 질문이 빠졌거나(달라진 점) 커서가 body로
+    // 빠졌으면 체크로 커서를 돌려준다
+    if (caret && (!result.ok || next.some((n) => n.from === active))) {
+      focusActive(false);
+
+      if (document.activeElement instanceof HTMLTextAreaElement)
+        document.activeElement.setSelectionRange(caret[0], caret[1]);
+    } else if (caret || document.activeElement === document.body) {
       document.getElementById(`wrong-${current}`)?.focus();
+    }
   }
 
   /** 질문마다 저장을 차례로 보낸다. 멈췄을 때와 칸을 벗어날 때의 저장이 겹쳐도 나중 값이 남는다 */
