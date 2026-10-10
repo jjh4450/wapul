@@ -236,3 +236,18 @@
     await expect(list(canvasElement).queryByRole('listbox')).not.toBeInTheDocument();
   }}
 />
+
+<Story
+  name="CtrlEnterWithoutNext"
+  args={{ words }}
+  play={async ({ canvas, userEvent }) => {
+    const field = canvas.getByLabelText(question);
+
+    // 넘어갈 곳이 없는 마지막 질문에서는 Ctrl(⌘)+Enter가 아무것도 하지 않는다. 답에 줄도 넣지 않는다
+    await userEvent.type(field, '정렬');
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}');
+    await expect(field).toHaveValue('정렬');
+    await expect(field).toHaveFocus();
+  }}
+/>

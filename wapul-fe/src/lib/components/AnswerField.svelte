@@ -157,10 +157,14 @@
     // 한글을 조합하는 중의 키는 입력기 몫이다. Safari는 조합을 끝내는 키에서 isComposing이 거짓이라 Process도 본다
     if (event.isComposing || event.key === 'Process') return;
 
-    if (onnext && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+    // 넘어갈 곳이 없는 마지막 질문에서도 답에 줄을 넣지 않는다
+    if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
       event.preventDefault();
-      textarea?.blur();
-      onnext();
+
+      if (onnext) {
+        textarea?.blur();
+        onnext();
+      }
 
       return;
     }
