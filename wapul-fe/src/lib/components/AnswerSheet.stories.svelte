@@ -65,33 +65,51 @@
       expect(document.body).not.toHaveStyle({ pointerEvents: 'none' });
     });
 
-  /** 질문 묶음 바로 위에 있는 코드 줄의 번호 */
-  const lineAbove = (thread: HTMLElement) =>
-    thread.parentElement?.previousElementSibling?.getAttribute('data-line');
+  /** 질문 묶음 막대(펼치고 접는 단추). 이름이 '로직 1, 질문 2개 중 0개 답함…' 꼴이다 */
+  const rule = (root: HTMLElement, label: string) =>
+    within(root).getByRole('button', { name: new RegExp(`^${label}, 질문 \\d+개 중`) });
+
+  /** 막대 바로 위에 있는 코드 줄의 번호 */
+  const lineAbove = (bar: HTMLElement) =>
+    bar.closest('h2')?.previousElementSibling?.getAttribute('data-line');
+
+  /** 화면 안에 들어왔는지 */
+  const onScreen = (element: HTMLElement) =>
+    waitFor(() => {
+      const { top } = element.getBoundingClientRect();
+
+      expect(top).toBeGreaterThanOrEqual(0);
+      expect(top).toBeLessThan(window.innerHeight);
+    });
 </script>
 
 <Story
   name="ThreadsUnderBlocks"
   beforeEach={() => writing.install()}
   play={async ({ canvas, canvasElement }) => {
-    // 전체 코드가 보이고, 블럭 질문은 블럭이 끝나는 줄 바로 아래에 달린다
-    const logic = await canvas.findByRole('region', { name: '로직 1' });
+    // 전체 코드가 보이고, 블럭 질문 묶음은 블럭이 끝나는 줄 바로 아래의 막대로 접어 둔다
+    const logic = await canvas.findByRole('button', { name: /^로직 1, 질문/ });
 
     await expect(canvasElement.querySelector('[data-line="1"]')).toHaveTextContent(
       '#include <bits/stdc++.h>'
     );
     await expect(lineAbove(logic)).toBe('12');
-    await expect(lineAbove(canvas.getByRole('region', { name: '입력' }))).toBe('7');
-    await expect(lineAbove(canvas.getByRole('region', { name: '출력' }))).toBe('15');
+    await expect(lineAbove(rule(canvasElement, '입력'))).toBe('7');
+    await expect(lineAbove(rule(canvasElement, '출력'))).toBe('15');
+
+    // 막대는 진행도를 이름으로 읽힌다. 건너뛸 수 있는 질문은 따로 센다
+    await expect(logic).toHaveAccessibleName('로직 1, 질문 2개 중 0개 답함, 선택 질문 1개');
+    await expect(rule(canvasElement, '입력')).toHaveAccessibleName('입력, 질문 2개 중 1개 답함');
 
     // 처음에는 빈 칸이 있는 첫 묶음(문제)만 펼친다
+    await expect(rule(canvasElement, '문제')).toHaveAttribute('aria-expanded', 'true');
+    await expect(logic).toHaveAttribute('aria-expanded', 'false');
     await expect(canvas.getAllByRole('textbox')).toHaveLength(1);
-    await expect(within(logic).getByRole('button', { expanded: false })).toHaveTextContent(
-      '질문 3개 · 0개 답함'
-    );
 
     // 빈 칸에는 다른 문제에서 가져온 예제가 회색 안내문으로 뜬다
-    const placeholder = canvas.getByLabelText(problemQuestion).getAttribute('placeholder');
+    const placeholder = canvas
+      .getByRole('textbox', { name: problemQuestion })
+      .getAttribute('placeholder');
 
     await expect(EXAMPLES.problem.map((e) => truncate(e, 90))).toContain(placeholder);
   }}
@@ -101,95 +119,103 @@
   name="PickBlockInCode"
   beforeEach={() => writing.install()}
   play={async ({ canvas, canvasElement, userEvent }) => {
-    const expanded = (label: string) =>
-      within(canvas.getByRole('region', { name: label })).queryByRole('button', { expanded: true });
-
-    // 코드에서 블럭의 문장을 누르면 그 블럭의 질문 묶음을 열고 그리로 옮긴다. 앞 묶음은 접힌다
-    await canvas.findByRole('region', { name: '출력' });
+    // 코드에서 블럭의 문장을 누르면 그 블럭의 질문 묶음을 막대 아래에 열고 그리로 옮긴다. 앞 묶음은 접힌다
+    await canvas.findByRole('button', { name: /^출력, 질문/ });
     await userEvent.click(canvasElement.querySelector('[data-unit="14"]') ?? document.body);
-    await expect(expanded('출력')).toBeInTheDocument();
-    await expect(expanded('문제')).toBeNull();
 
-    const outputThread = canvas.getByRole('region', { name: '출력' });
+    const output = await canvas.findByRole('region', { name: '출력' });
 
-    await waitFor(() => {
-      const { top } = outputThread.getBoundingClientRect();
-
-      expect(top).toBeGreaterThanOrEqual(0);
-      expect(top).toBeLessThan(window.innerHeight);
-    });
+    await expect(output.previousElementSibling).toBe(rule(canvasElement, '출력').closest('h2'));
+    await expect(canvas.queryByRole('region', { name: '문제' })).toBeNull();
+    await onScreen(output);
 
     // 블럭 이름을 눌러도 같다
     await userEvent.click(canvasElement.querySelector('[data-block="1"]') ?? document.body);
-    await expect(expanded('로직 1')).toBeInTheDocument();
-    await expect(expanded('출력')).toBeNull();
+    await expect(await canvas.findByRole('region', { name: '로직 1' })).toBeInTheDocument();
+    await expect(canvas.queryByRole('region', { name: '출력' })).toBeNull();
   }}
 />
 
 <Story
   name="OneThreadAtATime"
   beforeEach={() => writing.install()}
-  play={async ({ canvas, userEvent }) => {
-    // 다음 질문은 코드에서 다음에 나오는 묶음(입력)을 연다. 앞 묶음은 접힌다
-    await userEvent.click(await canvas.findByRole('button', { name: '다음 질문' }));
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    // 넘기기 단추는 갈 곳을 말한다. 묶음의 마지막 질문에서는 빈 칸이 남은 다음 묶음(입력)으로 간다
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
 
     const inputThread = canvas.getByRole('region', { name: '입력' });
+
     const input = within(inputThread);
 
-    // 화면을 그 묶음으로 옮기고, 첫 빈 칸에 커서를 둔다
-    await waitFor(() => {
-      const { top } = inputThread.getBoundingClientRect();
+    // 화면을 그 묶음으로 옮기고, 첫 빈 질문의 답 칸에 커서를 둔다. 답한 질문은 한 줄로 답 앞부분을 보인다
+    await onScreen(inputThread);
+    await expect(input.getByRole('textbox', { name: /입력 조건/ })).toHaveFocus();
+    await expect(
+      input.getByRole('button', {
+        name: '입력을 담은 변수와 자료구조는 각각 무엇을 나타내나요?, 내 답: m은 (끝나는 시간, 시작 시간) 쌍의 목록이다.'
+      })
+    ).toBeInTheDocument();
+    await expect(rule(canvasElement, '입력')).toHaveAttribute('aria-expanded', 'true');
+    await expect(canvas.queryByRole('region', { name: '문제' })).toBeNull();
 
-      expect(top).toBeGreaterThanOrEqual(0);
-      expect(top).toBeLessThan(window.innerHeight);
-    });
-    await expect(input.getByLabelText(/입력 조건/)).toHaveFocus();
+    // 접힌 묶음은 막대를 눌러 바로 연다
+    await userEvent.click(rule(canvasElement, '로직 1'));
 
-    await expect(input.getByLabelText(/입력을 담은 변수/)).toHaveValue(
-      'm은 (끝나는 시간, 시작 시간) 쌍의 목록이다.'
-    );
-    await expect(input.getByRole('button', { expanded: true })).toHaveTextContent(
-      '질문 2개 · 1개 답함'
-    );
-    await expect(canvas.queryByLabelText(problemQuestion)).not.toBeInTheDocument();
-
-    // 접힌 묶음은 눌러서 바로 연다
     const logic = within(canvas.getByRole('region', { name: '로직 1' }));
 
-    await userEvent.click(logic.getByRole('button', { expanded: false }));
-    await expect(logic.getByLabelText('이 설명이 통하지 않는 입력은 뭘까요?')).toBeInTheDocument();
-    await expect(input.queryByRole('textbox')).not.toBeInTheDocument();
+    await expect(
+      logic.getByRole('button', { name: '이 설명이 통하지 않는 입력은 뭘까요?, 아직 답하지 않음' })
+    ).toBeInTheDocument();
+    await expect(canvas.queryByRole('region', { name: '입력' })).toBeNull();
 
     // 처음 제출에서 틀렸다고 표시한 블럭에는 건너뛸 수 있는 달라진 점 질문이 붙는다
     await expect(logic.getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ })).toBeChecked();
-    await expect(logic.getByText('건너뛸 수 있어요.')).toBeInTheDocument();
+    await expect(
+      logic.getByRole('button', { name: /^처음 제출에서 무엇이.*, 선택$/ })
+    ).toBeInTheDocument();
 
-    // 기록 단위의 나머지 질문은 코드 아래 마무리에 있다. 블럭이 아니라 틀렸다는 표시는 없다
+    // 기록 단위의 나머지 질문은 코드 아래 마무리에 있다. 틀렸다는 표시가 없고, 갈 곳이 없어 넘기기도 없다
+    await userEvent.click(rule(canvasElement, '마무리'));
+
     const closing = within(canvas.getByRole('region', { name: '마무리' }));
 
-    await userEvent.click(closing.getByRole('button', { expanded: false }));
-    await expect(closing.getByLabelText(/입력이 하나뿐이라면/)).toBeInTheDocument();
+    await expect(closing.getByRole('textbox', { name: /입력이 하나뿐이라면/ })).toBeInTheDocument();
     await expect(closing.queryByRole('checkbox')).not.toBeInTheDocument();
-    await expect(closing.queryByRole('button', { name: '다음 질문' })).not.toBeInTheDocument();
+    await expect(
+      closing.queryByRole('button', { name: /다음 질문|질문으로$/ })
+    ).not.toBeInTheDocument();
+    await expect(closing.getByText("다 쓰면 아래 '다 썼어요'를 눌러요.")).toBeInTheDocument();
   }}
 />
 
 <Story
   name="MarkWrongInThread"
   beforeEach={() => writing.install()}
-  play={async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole('button', { name: '다음 질문' }));
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
 
     const input = () => within(canvas.getByRole('region', { name: '입력' }));
 
-    await userEvent.type(input().getByLabelText(/입력 조건/), 'N은 10만 이하');
+    await userEvent.type(input().getByRole('textbox', { name: /입력 조건/ }), 'N은 10만 이하');
 
     // 답 쓰다가 틀렸던 블럭이라고 켜면 그 묶음 끝에 달라진 점 질문이 붙는다. 쓰던 답도 함께 저장된다
     await userEvent.click(input().getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
 
-    // 저장하면 블럭과 질문의 id가 바뀌어 묶음을 새로 그리므로 매번 다시 찾는다
-    await waitFor(() => expect(input().getByText('건너뛸 수 있어요.')).toBeInTheDocument());
-    await expect(input().getByLabelText(/입력 조건/)).toHaveValue('N은 10만 이하');
+    // 저장하면 블럭과 질문의 id가 바뀌어 묶음을 새로 그리므로 매번 다시 찾는다. 쓰던 질문은 그대로 펼쳐져 있다
+    await waitFor(() =>
+      expect(
+        input().getByRole('button', { name: /^처음 제출(에서|과).*, 선택$/ })
+      ).toBeInTheDocument()
+    );
+    await expect(input().getByRole('textbox', { name: /입력 조건/ })).toHaveValue('N은 10만 이하');
+    await expect(rule(canvasElement, '입력')).toHaveAccessibleName(
+      '입력, 질문 2개 중 2개 답함, 선택 질문 1개'
+    );
+
+    // 저장하는 동안 체크가 꺼져 커서가 빠졌다가 체크로 돌아온다
+    await waitFor(() =>
+      expect(input().getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ })).toHaveFocus()
+    );
 
     const [call] = writing.callsTo('PUT', '/v1/records/record-1/blocks');
 
@@ -207,71 +233,85 @@
   name="MarkWrongFails"
   beforeEach={() => markFails.install()}
   play={async ({ canvas, userEvent }) => {
-    await userEvent.click(await canvas.findByRole('button', { name: '다음 질문' }));
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
 
     const input = within(canvas.getByRole('region', { name: '입력' }));
+
     const mark = input.getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ });
 
     // 저장하지 못하면 체크가 켜진 채로 남지 않고, 이유가 체크 바로 아래에 뜬다
     await userEvent.click(mark);
     await expect(await input.findByText(/표시를 바꾸지 못했어요/)).toBeInTheDocument();
     await expect(mark).not.toBeChecked();
-    await expect(input.queryByText('건너뛸 수 있어요.')).not.toBeInTheDocument();
+    await expect(input.queryByRole('button', { name: /^처음 제출/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(mark).toHaveFocus());
   }}
 />
 
 <Story
   name="CloseTakesThreeTries"
   beforeEach={() => writing.install()}
-  play={async ({ canvas, userEvent }) => {
+  play={async ({ canvas, canvasElement, userEvent }) => {
     const body = within(document.body);
-    const problem = within(await canvas.findByRole('region', { name: '문제' }));
-    const close = problem.getByRole('button', { name: '닫기' });
 
-    // 빈 칸이 있으면 닫기는 막힌 것처럼 보인다. 묶음 머리를 눌러도 닫히지 않는다
-    await expect(close).toHaveAttribute('aria-disabled', 'true');
-    await userEvent.click(problem.getByRole('button', { expanded: true }));
-    await expect(problem.getByRole('button', { expanded: true })).toBeInTheDocument();
+    const problem = await canvas.findByRole('region', { name: '문제' });
 
+    const bar = rule(canvasElement, '문제');
+
+    const field = () => canvas.getByRole('textbox', { name: problemQuestion });
+
+    // 빈 칸이 있으면 막대를 눌러도 바로 접히지 않는다.
     // 1번: 묶음이 흔들리고 빈 칸이 필수 칸처럼 강조되며 모달이 뜬다
-    await userEvent.click(close);
+    await userEvent.click(bar);
 
     const dialog = await body.findByRole('alertdialog');
 
     await expect(dialog).toHaveTextContent(/넘어가실|한 줄만|할 말이/);
-    await expect(problem.getByLabelText(problemQuestion)).toHaveAttribute('aria-invalid', 'true');
+    await expect(field()).toHaveAttribute('aria-invalid', 'true');
     await userEvent.click(within(dialog).getByRole('button', { name: '답하러 가기' }));
     await modalClosed();
-    await expect(problem.getByLabelText(problemQuestion)).toHaveFocus();
+    await expect(field()).toHaveFocus();
+    await expect(bar).toHaveAttribute('aria-expanded', 'true');
 
-    // 2번: 흔들린 뒤에 닫기가 풀린다
-    await userEvent.click(close);
-    await waitFor(() => expect(close).toHaveAttribute('aria-disabled', 'false'));
+    // 2번: 흔들린 뒤에야 접기가 풀린다
+    await userEvent.click(bar);
     await expect(body.queryByRole('alertdialog')).not.toBeInTheDocument();
+    await expect(bar).toHaveAttribute('aria-expanded', 'true');
+    await waitFor(() => expect(problem.querySelector('.animate-shake')).toBeNull());
 
-    // 3번: 닫힌다
-    await userEvent.click(close);
-    await expect(problem.getByRole('button', { expanded: false })).toBeInTheDocument();
+    // 3번: 접히고, 커서는 막대로 돌아온다
+    await userEvent.click(bar);
+    await expect(bar).toHaveAttribute('aria-expanded', 'false');
     await expect(canvas.queryByRole('textbox')).not.toBeInTheDocument();
+    await expect(bar).toHaveFocus();
   }}
 />
 
 <Story
   name="CloseRightAwayWhenAnswered"
   beforeEach={() => writing.install()}
-  play={async ({ canvas, userEvent }) => {
-    const logic = within(await canvas.findByRole('region', { name: '로직 1' }));
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: /^로직 1, 질문/ }));
 
-    await userEvent.click(logic.getByRole('button', { expanded: false }));
-    await userEvent.type(logic.getByLabelText(/무엇이 보장되고/), '끝나는 시간 순서로 놓인다');
-    await userEvent.type(logic.getByLabelText(/통하지 않는 입력/), '끝나는 시간이 같을 때');
+    const logic = within(canvas.getByRole('region', { name: '로직 1' }));
 
-    // 건너뛸 수 있는 달라진 점 질문은 비어 있어도 바로 닫힌다
-    const close = logic.getByRole('button', { name: '닫기' });
+    await userEvent.type(
+      logic.getByRole('textbox', { name: /무엇이 보장되고/ }),
+      '끝나는 시간 순서로 놓인다'
+    );
+    await userEvent.click(logic.getByRole('button', { name: '다음 질문' }));
+    await userEvent.type(
+      logic.getByRole('textbox', { name: /통하지 않는 입력/ }),
+      '끝나는 시간이 같을 때'
+    );
 
-    await expect(close).toHaveAttribute('aria-disabled', 'false');
-    await userEvent.click(close);
-    await expect(logic.getByRole('button', { expanded: false })).toBeInTheDocument();
+    // 건너뛸 수 있는 달라진 점 질문은 비어 있어도 바로 접힌다
+    const bar = rule(canvasElement, '로직 1');
+
+    await userEvent.click(bar);
+    await expect(canvas.queryByRole('region', { name: '로직 1' })).toBeNull();
+    await expect(bar).toHaveAttribute('aria-expanded', 'false');
+    await expect(bar).toHaveFocus();
     await expect(within(document.body).queryByRole('alertdialog')).not.toBeInTheDocument();
   }}
 />
@@ -279,12 +319,17 @@
 <Story
   name="ResumesAtFirstGap"
   beforeEach={() => resumed.install()}
-  play={async ({ canvas }) => {
-    // 문제 질문에 답했으면 빈 칸이 남은 입력 묶음부터 연다
+  play={async ({ canvas, canvasElement }) => {
+    // 문제 질문에 답했으면 빈 칸이 남은 입력 묶음의 빈 질문부터 연다
     const input = within(await canvas.findByRole('region', { name: '입력' }));
 
-    await expect(input.getByRole('button', { expanded: true })).toBeInTheDocument();
-    await expect(canvas.queryByLabelText(problemQuestion)).not.toBeInTheDocument();
+    await expect(rule(canvasElement, '입력')).toHaveAttribute('aria-expanded', 'true');
+    await expect(input.getAllByRole('textbox')).toHaveLength(1);
+    await expect(input.getByRole('textbox', { name: /입력 조건/ }).closest('li')).toHaveAttribute(
+      'aria-current',
+      'step'
+    );
+    await expect(canvas.queryByRole('textbox', { name: problemQuestion })).not.toBeInTheDocument();
   }}
 />
 
@@ -399,5 +444,125 @@
     await waitFor(() => expect(patches()).toHaveLength(2));
     await expect(JSON.parse(patches()[1].body).answers[0].answer).toBe('정렬했기 때문이다');
     replies.shift()?.();
+  }}
+/>
+
+<Story
+  name="ProgressPerBlock"
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    const field = await canvas.findByRole('textbox', { name: problemQuestion });
+
+    // 치는 대로 막대의 진행도가 바뀐다. 묶음을 다 답했다는 알림은 저장한 뒤에 한 번만 나온다
+    await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 0개 답함');
+    await userEvent.type(field, '성');
+    await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 1개 답함');
+    await expect(canvas.getByRole('status')).toHaveTextContent('');
+    await userEvent.tab();
+    await waitFor(() =>
+      expect(canvas.getByRole('status')).toHaveTextContent('문제 질문 1개에 모두 답했어요.')
+    );
+  }}
+/>
+
+<Story
+  name="OneQuestionAtATime"
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: /^로직 1, 질문/ }));
+
+    const logic = within(canvas.getByRole('region', { name: '로직 1' }));
+
+    const guarantee = () => logic.getByRole('textbox', { name: /무엇이 보장되고/ });
+
+    // 질문 셋 중 답하는 하나만 답 칸을 펼친 카드다
+    await expect(logic.getAllByRole('listitem')).toHaveLength(3);
+    await expect(logic.getAllByRole('textbox')).toHaveLength(1);
+    await expect(guarantee().closest('li')).toHaveAttribute('aria-current', 'step');
+    await expect(guarantee()).toHaveFocus();
+
+    // Enter는 줄바꿈이고, Ctrl+Enter는 저장하고 다음 질문으로 넘긴다
+    await userEvent.type(guarantee(), '정렬이 끝나면{Enter}끝나는 시간 순서로 놓인다');
+    await expect(guarantee()).toHaveValue('정렬이 끝나면\n끝나는 시간 순서로 놓인다');
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    await expect(logic.getByRole('textbox', { name: /통하지 않는 입력/ })).toHaveFocus();
+
+    const answered = logic.getByRole('button', {
+      name: /무엇이 보장되고.*, 내 답: 정렬이 끝나면 끝나는 시간 순서로 놓인다$/
+    });
+
+    await expect(answered).toBeInTheDocument();
+    await waitFor(() =>
+      expect(writing.callsTo('PATCH', '/v1/records/record-1/answers')).toHaveLength(1)
+    );
+    await expect(rule(canvasElement, '로직 1')).toHaveAccessibleName(
+      '로직 1, 질문 2개 중 1개 답함, 선택 질문 1개'
+    );
+
+    // 한 줄로 접힌 질문을 누르면 쓴 답 그대로 다시 카드가 된다
+    await userEvent.click(answered);
+    await expect(guarantee()).toHaveValue('정렬이 끝나면\n끝나는 시간 순서로 놓인다');
+    await expect(guarantee()).toHaveFocus();
+
+    // 묶음의 마지막 질문에서는 넘기기 단추가 다음 묶음을 부른다
+    await userEvent.click(logic.getByRole('button', { name: /^처음 제출에서 무엇이.*, 선택$/ }));
+    await expect(logic.getByRole('button', { name: '출력 질문으로' })).toBeInTheDocument();
+  }}
+/>
+
+<Story
+  name="NextThreadByName"
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    // 문제 칸에서 Ctrl+Enter를 누르면 저장하고 빈 칸이 남은 입력 묶음의 빈 질문으로 간다
+    await userEvent.type(
+      await canvas.findByRole('textbox', { name: problemQuestion }),
+      '끝나는 시간이 빠를수록 남는 시간이 넓다'
+    );
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+
+    const input = within(await canvas.findByRole('region', { name: '입력' }));
+
+    await expect(canvas.queryByRole('region', { name: '문제' })).toBeNull();
+    await expect(input.getByRole('textbox', { name: /입력 조건/ })).toHaveFocus();
+    await expect(rule(canvasElement, '문제')).toHaveAttribute('aria-expanded', 'false');
+    await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 1개 답함');
+    await waitFor(() =>
+      expect(writing.callsTo('PATCH', '/v1/records/record-1/answers')).toHaveLength(1)
+    );
+    await waitFor(() =>
+      expect(canvas.getByRole('status')).toHaveTextContent('문제 질문 1개에 모두 답했어요.')
+    );
+
+    // 넘기기 단추는 다음 묶음의 이름을 부르고, 단축키를 알린다
+    await expect(input.getByRole('button', { name: '로직 1 질문으로' })).toHaveAttribute(
+      'aria-keyshortcuts',
+      'Control+Enter Meta+Enter'
+    );
+  }}
+/>
+
+<Story
+  name="PleaLeadsToBlank"
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
+
+    const input = within(canvas.getByRole('region', { name: '입력' }));
+
+    // 답한 질문을 펼쳐 둔 채로 접으려 하면, 모달을 닫은 뒤 빈 질문으로 데려간다
+    await userEvent.click(input.getByRole('button', { name: /^입력을 담은 변수.*, 내 답:/ }));
+    await userEvent.click(rule(canvasElement, '입력'));
+
+    const dialog = await within(document.body).findByRole('alertdialog');
+
+    await userEvent.click(within(dialog).getByRole('button', { name: '답하러 가기' }));
+    await modalClosed();
+
+    const blank = input.getByRole('textbox', { name: /입력 조건/ });
+
+    await expect(blank.closest('li')).toHaveAttribute('aria-current', 'step');
+    await expect(blank).toHaveFocus();
+    await expect(blank).toHaveAttribute('aria-invalid', 'true');
   }}
 />
