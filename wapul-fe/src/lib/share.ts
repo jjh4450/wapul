@@ -1,13 +1,15 @@
 /**
- * 기록을 링크 하나에 담는다. 백엔드가 없을 때는 링크가 곧 저장소다.
+ * 기록의 내용을 본문 한 줄로 담는다. 백엔드가 없을 때 탭 밖에 남는 기록은 모두 이 꼴이다:
+ * 저장 링크(/share#<본문>)와 이 브라우저에 담아 둔 기록(drafts.ts).
  *
- * 링크는 /share#v1.<본문>. 본문은 기록(RecordCreate)의 JSON을 deflate(LZ77 계열)로 줄인 base64url이다.
- * #뒤는 서버로 가지 않는다. v1은 나중에 형식이 바뀌어도 예전 링크를 알아보려고 붙인다: 계약이 바뀌어
- * 이미 건넨 링크가 열리지 않게 되면(share.spec.ts의 저장해 둔 링크 테스트가 깨진다) v1의 꼴을 고정해
- * 두고 지금 꼴로 옮기는 코드를 더한다. 백엔드가 없을 때는 그 링크가 기록의 유일한 사본이다.
+ * 본문은 v1.<기록(RecordCreate)의 JSON을 deflate(LZ77 계열)로 줄인 base64url>이다. 링크의 #뒤는 서버로 가지
+ * 않는다. v1은 나중에 형식이 바뀌어도 예전 본문을 알아보려고 붙인다: 계약이 바뀌어 이미 건넨 링크가 열리지
+ * 않게 되면(share.spec.ts의 저장해 둔 링크 테스트가 깨진다) v1의 꼴을 고정해 두고 지금 꼴로 옮기는 코드를
+ * 더한다. 백엔드가 없을 때는 링크와 이 브라우저의 본문이 기록의 유일한 사본이다.
  *
- * 링크는 누구나 만들 수 있어서, 앱에서 런타임에 값을 검사하는 곳은 여기뿐이다. 크기를 제한하며 풀고,
- * 백엔드가 받는 값만 받는다: API 계약(openapi.json의 RecordCreate)과 문장·블럭 규칙(app/api/v1/records.py).
+ * 링크는 누구나 만들 수 있고 브라우저에 담아 둔 본문은 예전 버전의 앱이 담았을 수 있어서, 앱에서 런타임에
+ * 값을 검사하는 곳은 여기뿐이다. 크기를 제한하며 풀고, 백엔드가 받는 값만 받는다: API 계약(openapi.json의
+ * RecordCreate)과 문장·블럭 규칙(app/api/v1/records.py).
  */
 import { Validator } from '@cfworker/json-schema';
 import type {
@@ -143,8 +145,8 @@ function capped(max: number): TransformStream<Uint8Array, Uint8Array> {
   });
 }
 
-/** 링크의 본문을 기록으로 푼다. 깨졌거나, 너무 크거나, 백엔드가 받지 않을 값이면 던진다 */
-export async function decodeShare(payload: string): Promise<RecordCreate> {
+/** 본문을 기록의 내용으로 푼다. 깨졌거나, 너무 크거나, 백엔드가 받지 않을 값이면 던진다 */
+export async function unpackRecord(payload: string): Promise<RecordCreate> {
   if (!payload.startsWith(PREFIX) || payload.length > MAX_PAYLOAD)
     throw new Error('Not a share link');
 
@@ -170,18 +172,28 @@ export async function decodeShare(payload: string): Promise<RecordCreate> {
   return record;
 }
 
-/** 링크의 #뒤에 넣을 본문 */
-export async function encodeShare(record: RecordOut): Promise<Result<string>> {
+/** 기록이 본문에 담긴 내용과 같은지. 같은 링크를 다시 열 때 이미 있는 기록을 쓰려고 본다 */
+export function holds(record: RecordOut, content: RecordCreate): boolean {
+  return JSON.stringify(toCreate(record)) === JSON.stringify(content);
+}
+
+/** 기록의 내용을 본문으로 담는다 */
+export async function packRecord(record: RecordOut): Promise<string> {
   const json = new TextEncoder().encode(JSON.stringify(toCreate(record)));
 
   const packed = new Blob([json]).stream().pipeThrough(new CompressionStream('deflate-raw'));
 
-  const payload = PREFIX + toBase64Url(new Uint8Array(await new Response(packed).arrayBuffer()));
+  return PREFIX + toBase64Url(new Uint8Array(await new Response(packed).arrayBuffer()));
+}
+
+/** 링크의 #뒤에 넣을 본문 */
+export async function encodeShare(record: RecordOut): Promise<Result<string>> {
+  const payload = await packRecord(record);
 
   // 여는 쪽과 같은 검사로 한 번 열어 본다. 브라우저 안의 백엔드는 길이를 검사하지 않아서
   // 계약보다 긴 답이 들어 있을 수 있고, 그런 링크는 열리지 않으니 건네지 않는다
   try {
-    await decodeShare(payload);
+    await unpackRecord(payload);
   } catch {
     return {
       ok: false,

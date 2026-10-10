@@ -5,7 +5,7 @@
   import { groups, record, sharedRecord } from '#lib/api/fixtures.js';
   import { localApi } from '#lib/api/local.js';
   import { buildLayouts } from '#lib/layouts.js';
-  import { decodeShare } from '#lib/share.js';
+  import { unpackRecord } from '#lib/share.js';
   import RecordResult from './RecordResult.svelte';
 
   const { Story } = defineMeta({
@@ -204,7 +204,7 @@
 
     await expect(address).toBe(new URL('/share', location.origin).href);
 
-    const opened = await decodeShare(payload);
+    const opened = await unpackRecord(payload);
 
     await expect(opened.problem).toBe(record.problem);
     await expect(opened.questions.map((q) => q.answer)).toEqual(

@@ -3,13 +3,22 @@
   import { expect, fn, waitFor, within } from 'storybook/test';
   import { reply } from '#lib/api/fake.js';
   import { localApi } from '#lib/api/local.js';
+  import { browserStorage, clearForm, loadForm, saveForm } from '#lib/drafts.js';
   import NewRecordForm from './NewRecordForm.svelte';
 
   const { Story } = defineMeta({
     title: 'Components/NewRecordForm',
     component: NewRecordForm,
-    args: { oncreated: fn(), onsaved: fn() }
+    args: { oncreated: fn(), onsaved: fn() },
+    // 폼은 쓰는 대로 이 브라우저에 초안을 담는다. story마다 빈 폼에서 시작한다
+    beforeEach: () => {
+      clearForm(browserStorage());
+
+      return () => clearForm(browserStorage());
+    }
   });
+
+  const DAY = 24 * 60 * 60 * 1000;
 
   // 새 기록은 브라우저 안의 백엔드가 새 id로 만든다
   const created = localApi();
@@ -64,6 +73,8 @@
         timeout: 15000
       }
     );
+    // 기록을 만들었으니 담아 둔 초안은 지운다
+    await expect(loadForm(browserStorage())).toBeNull();
 
     const [call] = created.callsTo('POST', '/v1/records');
 
@@ -181,5 +192,45 @@
       await canvas.findByText('입력한 내용을 다시 확인해 주세요.', {}, { timeout: 15000 })
     ).toBeInTheDocument();
     await expect(args.oncreated).not.toHaveBeenCalled();
+  }}
+/>
+
+<Story
+  name="ResumesDraft"
+  beforeEach={() => {
+    // 엿새 전에 쓰던 초안
+    saveForm(
+      browserStorage(),
+      {
+        problem: 'BOJ 1931 회의실 배정',
+        keyIdea: '끝나는 시간이 빠른 회의부터',
+        code: 'print(1)',
+        language: 'python'
+      },
+      Date.now() - 6 * DAY
+    );
+
+    return created.install();
+  }}
+  play={async ({ canvas, userEvent }) => {
+    const problem = canvas.getByLabelText(/어떤 문제인가요/);
+
+    // 새로고침하거나 다시 열어도 쓰던 칸이 그대로 있다
+    await expect(problem).toHaveValue('BOJ 1931 회의실 배정');
+    await expect(canvas.getByLabelText(/맞은 풀이 코드/)).toHaveValue('print(1)');
+    await expect(canvas.getByLabelText('언어')).toHaveValue('python');
+    await expect(canvas.getByText(/쓰던 내용을 불러왔어요/)).toBeInTheDocument();
+    // 열기만 해서는 7일 시계가 다시 시작되지 않는다: 이틀 뒤에는 만료된다
+    await expect(loadForm(browserStorage(), Date.now() + 2 * DAY)).toBeNull();
+
+    // 고치는 대로 다시 담는다
+    await userEvent.type(problem, '!');
+    await expect(loadForm(browserStorage())?.problem).toBe('BOJ 1931 회의실 배정!');
+
+    // 새로 쓰기는 칸과 담아 둔 초안을 비운다
+    await userEvent.click(canvas.getByRole('button', { name: '새로 쓰기' }));
+    await expect(problem).toHaveValue('');
+    await expect(canvas.queryByText(/쓰던 내용을 불러왔어요/)).not.toBeInTheDocument();
+    await expect(loadForm(browserStorage())).toBeNull();
   }}
 />

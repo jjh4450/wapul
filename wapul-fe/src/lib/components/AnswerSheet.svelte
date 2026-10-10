@@ -19,6 +19,7 @@
   import { Label } from '#lib/components/ui/label/index.js';
   import type { Name } from '#lib/completions.js';
   import { pickExample, revisionQuestion } from '#lib/questions.js';
+  import { DRAFT_DAYS, browserStorage } from '#lib/drafts.js';
   import { codeNames } from '#lib/segment.js';
   import { blockColors, blockLabels, lastLine, unitLines } from '#lib/study.js';
   import { cn } from '#lib/utils.js';
@@ -38,20 +39,29 @@
   let {
     id,
     backend = BACKEND,
+    persistent = browserStorage() !== null,
     onfinish,
     onnotowner
   }: {
     id: string;
-    /** 백엔드를 쓰는지. 없으면 답은 이 탭에만 있다가 새로고침하면 사라진다 */
+    /** 백엔드를 쓰는지. 없으면 답은 이 브라우저(drafts.ts)에 담긴다 */
     backend?: boolean;
+    /** 백엔드가 없을 때 이 브라우저에 담을 수 있는지. 저장소를 못 쓰면 답은 이 탭에만 있다가 새로고침하면 사라진다 */
+    persistent?: boolean;
     /** 모든 답을 저장한 뒤 */
     onfinish: () => void;
     /** 작성자가 아닌 사람이 열었을 때 (답은 작성자만 쓴다) */
     onnotowner: () => void;
   } = $props();
 
-  /** 답을 보낸 뒤 알림. 백엔드가 없으면 저장된 것이 아니므로 저장했다고 하지 않는다 */
-  const kept = $derived(backend ? '저장했어요.' : '이 탭에만 담아 뒀어요. 새로고침하면 사라져요.');
+  /** 답을 보낸 뒤 알림. 백엔드가 없으면 서버에 저장한 것이 아니므로 어디에 담았는지 말한다 */
+  const kept = $derived(
+    backend
+      ? '저장했어요.'
+      : persistent
+        ? `이 브라우저에 담아 뒀어요. ${DRAFT_DAYS}일 동안 고치지 않으면 지워져요.`
+        : '이 탭에만 담아 뒀어요. 새로고침하면 사라져요.'
+  );
 
   let record = $state<RecordOut | null>(null);
 

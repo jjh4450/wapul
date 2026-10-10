@@ -7,6 +7,7 @@
   import { Label } from '#lib/components/ui/label/index.js';
   import * as NativeSelect from '#lib/components/ui/native-select/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
+  import { DRAFT_DAYS, browserStorage, clearForm, loadForm, saveForm } from '#lib/drafts.js';
   import { blockFacts, buildQuestions } from '#lib/questions.js';
   import { segmentCode } from '#lib/segment.js';
   import { LANGUAGE_LABEL } from '#lib/study.js';
@@ -21,13 +22,41 @@
     onsaved: (id: string) => void;
   } = $props();
 
-  let problem = $state('');
+  const storage = browserStorage();
 
-  let keyIdea = $state('');
+  /** 이 브라우저에 담아 둔, 쓰던 칸 */
+  const resumed = loadForm(storage);
 
-  let code = $state('');
+  let problem = $state(resumed?.problem ?? '');
 
-  let language = $state<Language>('cpp');
+  let keyIdea = $state(resumed?.keyIdea ?? '');
+
+  let code = $state(resumed?.code ?? '');
+
+  let language = $state<Language>(resumed?.language ?? 'cpp');
+
+  /** 쓰던 칸을 불러왔다는 안내. 새로 쓰면 닫는다 */
+  let restored = $state(resumed !== null);
+
+  // 쓰는 대로 이 브라우저에 담는다. 기록을 만들면 지운다. 처음 한 번은 불러온 그대로라 담지 않는다:
+  // 열기만 해서는 DRAFT_DAYS가 다시 시작되지 않게
+  let opened = false;
+
+  $effect(() => {
+    const draft = { problem, keyIdea, code, language };
+
+    if (opened) saveForm(storage, draft);
+
+    opened = true;
+  });
+
+  function startOver() {
+    problem = '';
+    keyIdea = '';
+    code = '';
+    language = 'cpp';
+    restored = false;
+  }
 
   let error = $state('');
 
@@ -100,8 +129,14 @@
 
     submitting = false;
 
-    if (result.ok) oncreated(result.data.id);
-    else error = result.message;
+    if (!result.ok) {
+      error = result.message;
+
+      return;
+    }
+
+    clearForm(storage);
+    oncreated(result.data.id);
   }
 </script>
 
@@ -131,9 +166,22 @@
 </AlertDialog.Root>
 
 {#if draft}
-  <BlockEditor {draft} {onsaved} />
+  <BlockEditor
+    {draft}
+    onsaved={(id) => {
+      clearForm(storage);
+      onsaved(id);
+    }}
+  />
 {:else}
   <h1 class="mb-6 text-2xl font-semibold">새 기록</h1>
+
+  {#if restored}
+    <p class="-mt-3 mb-6 flex flex-wrap items-center gap-x-2 text-sm text-muted-foreground">
+      쓰던 내용을 불러왔어요. 마지막으로 고친 뒤 {DRAFT_DAYS}일 동안 이 브라우저에 남아요.
+      <Button variant="link" size="sm" class="h-auto p-0" onclick={startOver}>새로 쓰기</Button>
+    </p>
+  {/if}
 
   <form class="grid max-w-3xl gap-6" onsubmit={submit}>
     <div class="grid gap-2">

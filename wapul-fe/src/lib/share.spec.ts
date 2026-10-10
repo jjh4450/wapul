@@ -2,7 +2,7 @@ import { deflateRawSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
 import type { RecordCreate } from '#lib/api/client.js';
 import { record } from '#lib/api/fixtures.js';
-import { decodeShare, encodeShare } from '#lib/share.js';
+import { encodeShare, holds, unpackRecord } from '#lib/share.js';
 
 /** 링크 본문을 node의 deflate로 따로 만든다. 앱이 표준 형식을 읽는지도 함께 본다 */
 const pack = (text: string) => `v1.${deflateRawSync(Buffer.from(text)).toString('base64url')}`;
@@ -32,10 +32,27 @@ const SAVED_V1 =
 
 describe('share link', () => {
   it('still opens a link handed out before', async () => {
-    const opened = await decodeShare(SAVED_V1);
+    const opened = await unpackRecord(SAVED_V1);
 
     expect(opened.problem).toBe('BOJ 1000 A+B');
     expect(opened.questions.map((q) => q.answer)).toEqual(['덧셈은 순서와 상관없다', '']);
+  });
+
+  it('tells whether a kept record still holds what a link carries', async () => {
+    const link = await encodeShare(record);
+
+    if (!link.ok) throw new Error(link.message);
+
+    const content = await unpackRecord(link.data);
+
+    expect(holds(record, content)).toBe(true);
+    // 링크를 연 뒤 답을 고친 기록은 다른 기록이다
+    expect(
+      holds(
+        { ...record, questions: record.questions.map((q) => ({ ...q, answer: `${q.answer}!` })) },
+        content
+      )
+    ).toBe(false);
   });
 
   it('round-trips a record', async () => {
@@ -44,21 +61,21 @@ describe('share link', () => {
     if (!link.ok) throw new Error(link.message);
 
     expect(link.data).toMatch(/^v1\.[\w-]+$/);
-    expect(await decodeShare(link.data)).toEqual(created);
+    expect(await unpackRecord(link.data)).toEqual(created);
   });
 
   it('reads a link made by any standard deflate', async () => {
-    expect(await decodeShare(pack(JSON.stringify(created)))).toEqual(created);
+    expect(await unpackRecord(pack(JSON.stringify(created)))).toEqual(created);
   });
 
   it('rejects text that is not one of our links', async () => {
     const plain = pack(JSON.stringify(created));
 
-    await expect(decodeShare(plain.slice(3))).rejects.toThrow();
-    await expect(decodeShare(`v2.${plain.slice(3)}`)).rejects.toThrow();
-    await expect(decodeShare('v1.not base64!')).rejects.toThrow();
-    await expect(decodeShare('v1.AAAA')).rejects.toThrow();
-    await expect(decodeShare(`v1.${'A'.repeat(400_000)}`)).rejects.toThrow();
+    await expect(unpackRecord(plain.slice(3))).rejects.toThrow();
+    await expect(unpackRecord(`v2.${plain.slice(3)}`)).rejects.toThrow();
+    await expect(unpackRecord('v1.not base64!')).rejects.toThrow();
+    await expect(unpackRecord('v1.AAAA')).rejects.toThrow();
+    await expect(unpackRecord(`v1.${'A'.repeat(400_000)}`)).rejects.toThrow();
   });
 
   it('rejects content outside the API contract', async () => {
@@ -72,7 +89,7 @@ describe('share link', () => {
       JSON.stringify({ ...created, units: undefined })
     ];
 
-    for (const json of bad) await expect(decodeShare(pack(json))).rejects.toThrow();
+    for (const json of bad) await expect(unpackRecord(pack(json))).rejects.toThrow();
   });
 
   it('rejects sentences and blocks the backend would not take', async () => {
@@ -98,7 +115,8 @@ describe('share link', () => {
       { ...created, questions: ask(created.blocks.length) }
     ];
 
-    for (const json of bad) await expect(decodeShare(pack(JSON.stringify(json)))).rejects.toThrow();
+    for (const json of bad)
+      await expect(unpackRecord(pack(JSON.stringify(json)))).rejects.toThrow();
   });
 
   it('counts columns in characters (code points) like the backend', async () => {
@@ -111,8 +129,8 @@ describe('share link', () => {
       questions: [{ kind: 'logic', text: '왜?', block: 0, answer: '' }]
     });
 
-    await expect(decodeShare(pack(JSON.stringify(line(7))))).resolves.toEqual(line(7));
-    await expect(decodeShare(pack(JSON.stringify(line(8))))).rejects.toThrow();
+    await expect(unpackRecord(pack(JSON.stringify(line(7))))).resolves.toEqual(line(7));
+    await expect(unpackRecord(pack(JSON.stringify(line(8))))).rejects.toThrow();
   });
 
   it('rejects a link whose layouts would repeat one long line per block', async () => {
@@ -140,8 +158,8 @@ describe('share link', () => {
     // 같은 문장을 블럭 하나에 담으면 그 줄은 한 번만 실려서 열린다
     const single = { ...line, blocks: [{ kind: 'logic', units: line.units.map((_, i) => i) }] };
 
-    await expect(decodeShare(pack(JSON.stringify(flood)))).rejects.toThrow();
-    await expect(decodeShare(pack(JSON.stringify(single)))).resolves.toEqual(single);
+    await expect(unpackRecord(pack(JSON.stringify(flood)))).rejects.toThrow();
+    await expect(unpackRecord(pack(JSON.stringify(single)))).resolves.toEqual(single);
   });
 
   it('stops inflating at the size limit', async () => {
@@ -149,7 +167,7 @@ describe('share link', () => {
     const bomb = pack(JSON.stringify('a'.repeat(5_000_000)));
 
     expect(bomb.length).toBeLessThan(10_000);
-    await expect(decodeShare(bomb)).rejects.toThrow('too large');
+    await expect(unpackRecord(bomb)).rejects.toThrow('too large');
   });
 
   it('refuses to make a link it could not open again', async () => {

@@ -2,15 +2,34 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
-  import { BACKEND, api } from '#lib/api/client.js';
-  import { decodeShare } from '#lib/share.js';
+  import { BACKEND, api, type RecordCreate } from '#lib/api/client.js';
+  import { holds, unpackRecord } from '#lib/share.js';
 
   let error = $state('');
 
-  /** 링크에 담긴 기록을 새 기록으로 만든다. 못 열면 null */
+  /** 링크와 내용이 같은, 이 브라우저에 담아 둔 기록. 같은 링크를 다시 열 때 사본이 쌓이지 않게 쓴다 */
+  async function kept(content: RecordCreate): Promise<string | null> {
+    const listed = await api.listRecords();
+
+    for (const { id } of listed.ok ? listed.data : []) {
+      const record = await api.getRecord(id);
+
+      if (record.ok && holds(record.data, content)) return id;
+    }
+
+    return null;
+  }
+
+  /** 링크에 담긴 기록을 연다. 같은 기록이 없으면 새로 만든다. 못 열면 null */
   async function open(payload: string): Promise<string | null> {
     try {
-      const result = await api.createRecord(await decodeShare(payload));
+      const content = await unpackRecord(payload);
+
+      const same = await kept(content);
+
+      if (same !== null) return same;
+
+      const result = await api.createRecord(content);
 
       return result.ok ? result.data.id : null;
     } catch {
@@ -26,9 +45,13 @@
 
     const id = await open(location.hash.slice(1));
 
-    if (id === null)
+    if (id === null) {
       error = '링크가 깨졌어요. 저장할 때 받은 링크를 끝까지 복사했는지 확인해 주세요.';
-    else await goto(resolve(`/records/view?id=${id}`), { replaceState: true });
+
+      return;
+    }
+
+    await goto(resolve(`/records/view?id=${id}`), { replaceState: true });
   }
 
   onMount(load);

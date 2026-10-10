@@ -4,7 +4,8 @@
  * 백엔드를 끈 배포(hooks.client.ts)와 story·테스트가 같이 쓰므로, story가 보는 동작이 배포되는 동작이다.
  * 요청은 같은 계약 타입으로 묶인 API 클라이언트에서만 와서 런타임에 다시 검사하지 않는다. 대신 route마다
  * 본문과 답을 openapi에서 생성한 타입(schema.ts)에 묶어, 계약이 바뀌면 타입 검사(pnpm check)에서 걸린다.
- * 누구나 만들 수 있는 링크는 여는 쪽(share.ts)이 검사한다. 기록은 새로고침하면 사라지고, 그룹은 없다.
+ * 누구나 만들 수 있는 링크는 여는 쪽(share.ts)이 검사한다. 그룹은 없다.
+ * 기록은 story·테스트에서는 메모리에 두고, 백엔드를 끈 배포에서는 이 브라우저(drafts.ts)에 담아 둔다.
  */
 import { buildLayouts } from '#lib/layouts.js';
 import type { BlockIn, QuestionIn, RecordCreate, RecordOut, RecordSummary } from './client.js';
@@ -24,6 +25,14 @@ type Responses<O> = O extends { responses: infer R } ? R : never;
 
 /** 응답 본문. 본문이 없는 응답(204)은 null */
 type ResponseBody<R> = R extends { content: { 'application/json': infer B } } ? B : null;
+
+/** 브라우저 안의 백엔드가 기록을 두는 곳. Map이면 메모리에, drafts.ts의 BrowserRecords면 이 브라우저에 둔다 */
+export interface RecordStore {
+  get(id: string): RecordOut | undefined;
+  set(id: string, record: RecordOut): void;
+  delete(id: string): void;
+  values(): Iterable<RecordOut>;
+}
 
 /** 계약에는 적히지 않았지만 백엔드가 내는 실패: 없는 기록(404), 작성자가 아님(403) */
 class Failure {
@@ -91,7 +100,8 @@ function withBlocks(record: RecordOut, blocks: BlockIn[], questions: QuestionIn[
   };
 }
 
-function create(body: RecordCreate): RecordOut {
+/** 새 기록. 담아 둔 기록을 되살릴 때(drafts.ts)도 이것으로 만들고 id와 시각만 담을 때 것으로 바꾼다 */
+export function create(body: RecordCreate): RecordOut {
   const now = new Date().toISOString();
 
   const record: RecordOut = {
@@ -127,7 +137,7 @@ function summary(record: RecordOut): RecordSummary {
   return { id, problem, key_idea, language, owner_name, created_at, updated_at };
 }
 
-function recordRoutes(records: Map<string, RecordOut>): [string, FakeHandler][] {
+function recordRoutes(records: RecordStore): [string, FakeHandler][] {
   /** 경로의 기록을 넘긴다. 고치는 요청은 작성자만 (백엔드의 _get_own) */
   const withRecord = <T>(id: string, own: boolean, use: (record: RecordOut) => T) => {
     const record = records.get(id);
@@ -186,12 +196,16 @@ function recordRoutes(records: Map<string, RecordOut>): [string, FakeHandler][] 
 }
 
 /**
- * 브라우저 안의 백엔드를 끼운 가짜 API. records로 시작하고, install할 때마다 그 상태로 돌아간다.
+ * 브라우저 안의 백엔드를 끼운 가짜 API. 기록 목록을 주면 메모리에서 그 기록들로 시작하고, install할 때마다
+ * 그 상태로 돌아간다. 기록을 두는 곳(RecordStore)을 주면 그곳을 그대로 쓴다.
  * overrides는 먼저 맞춰 보는 route다. story가 불러오는 중·오류나 그룹 응답을 정할 때 쓴다
  */
 export function localApi(
-  records: RecordOut[] = [],
+  records: RecordOut[] | RecordStore = [],
   overrides: [string, FakeHandler][] = []
 ): FakeApi {
-  return new FakeApi(() => [...overrides, ...recordRoutes(new Map(records.map((r) => [r.id, r])))]);
+  return new FakeApi(() => [
+    ...overrides,
+    ...recordRoutes(Array.isArray(records) ? new Map(records.map((r) => [r.id, r])) : records)
+  ]);
 }

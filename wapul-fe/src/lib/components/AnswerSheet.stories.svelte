@@ -302,8 +302,8 @@
 />
 
 <Story
-  name="NoBackendKeepsInTab"
-  args={{ backend: false }}
+  name="NoBackendKeepsInBrowser"
+  args={{ backend: false, persistent: true }}
   beforeEach={() => writing.install()}
   play={async ({ canvas, userEvent }) => {
     await userEvent.type(
@@ -312,7 +312,26 @@
     );
     await userEvent.tab();
 
-    // 백엔드가 없으면 답은 이 탭에만 있으니 저장했다고 하지 않는다
+    // 백엔드가 없으면 답은 이 브라우저에 담기고, 언제 지워지는지 알려 준다
+    await expect(
+      await canvas.findByText('이 브라우저에 담아 뒀어요. 7일 동안 고치지 않으면 지워져요.')
+    ).toBeInTheDocument();
+    await expect(canvas.queryByText('저장했어요.')).not.toBeInTheDocument();
+  }}
+/>
+
+<Story
+  name="NoBackendKeepsInTab"
+  args={{ backend: false, persistent: false }}
+  beforeEach={() => writing.install()}
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.type(
+      await canvas.findByLabelText(problemQuestion),
+      '끝나는 시간이 빠를수록 남는 시간이 넓다'
+    );
+    await userEvent.tab();
+
+    // 저장소를 못 쓰는 브라우저에서는 답이 이 탭에만 있으니 저장했다고 하지 않는다
     await expect(
       await canvas.findByText('이 탭에만 담아 뒀어요. 새로고침하면 사라져요.')
     ).toBeInTheDocument();
