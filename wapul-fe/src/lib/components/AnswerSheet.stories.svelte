@@ -7,6 +7,7 @@
   import { localApi } from '#lib/api/local.js';
   import { EXAMPLES } from '#lib/questions.js';
   import { truncate } from '#lib/study.js';
+  import { PAUSE_MS } from './AnswerField.svelte';
   import AnswerSheet from './AnswerSheet.svelte';
 
   const { Story } = defineMeta({
@@ -58,7 +59,10 @@
     ]
   );
 
-  /** 블럭 저장(틀렸다 표시)이 늦게 돌아오는 백엔드. 언제 돌려보낼지는 story가 정한다 */
+  /**
+   * 블럭 저장(틀렸다 표시)의 답이 늦게 돌아오는 백엔드. 백엔드처럼 바로 바꾸고 답만 붙잡아서, 그동안 옛 id로
+   * 보낸 저장은 찾지 못한다. 언제 돌려보낼지는 story가 정한다
+   */
   const marks: (() => void)[] = [];
 
   function slowMark(api: FakeApi) {
@@ -69,13 +73,21 @@
     globalThis.fetch = async (input, init) => {
       const method = input instanceof Request ? input.method : (init?.method ?? 'GET');
 
+      const response = await local(input, init);
+
       if (method === 'PUT') await new Promise<void>((done) => marks.push(done));
 
-      return local(input, init);
+      return response;
     };
 
     return restore;
   }
+
+  /** 치다 멈춘 자동 저장이 돌 만큼 기다린다 */
+  const autosaved = () => new Promise((done) => setTimeout(done, PAUSE_MS + 100));
+
+  /** '다 썼어요'가 끝났을 때 마지막으로 저장된 답 */
+  let finishedWith = '';
 
   /** 모달이 닫히고 페이지가 다시 눌릴 때까지. bits-ui는 모달이 닫히고도 잠깐 body의 클릭을 막는다 */
   const modalClosed = () =>
@@ -300,14 +312,23 @@
 
     const field = () => input().getByRole('textbox', { name: /입력 조건/ });
 
+    const patches = () => writing.callsTo('PATCH', '/v1/records/record-1/answers');
+
     // 틀렸다 표시를 저장하는 동안 답 칸으로 돌아가 더 친다
     await userEvent.type(field(), 'N은');
     await userEvent.click(input().getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
     await waitFor(() => expect(marks).toHaveLength(1));
+
+    const sent = patches().length;
+
     await userEvent.type(field(), ' 10만 이하');
+
+    // 표시를 저장하는 동안에는 치다 멈춰도 옛 id로 보내지 않는다
+    await autosaved();
+    await expect(patches()).toHaveLength(sent);
     marks.shift()?.();
 
-    // 칸을 새 id로 다시 그려도 더 친 글자와 커서는 그 칸에 남고, 더 친 답도 저장한다
+    // 칸을 새 id로 다시 그려도 더 친 글자와 커서는 그 칸에 남고, 더 친 답은 새 id로 저장한다
     await waitFor(() =>
       expect(
         input().getByRole('button', { name: /^처음 제출(에서|과).*, 선택$/ })
@@ -316,7 +337,7 @@
     await expect(field()).toHaveValue('N은 10만 이하');
     await expect(field()).toHaveFocus();
     await waitFor(() => {
-      const [last] = writing.callsTo('PATCH', '/v1/records/record-1/answers').slice(-1);
+      const [last] = patches().slice(-1);
 
       expect(JSON.parse(last.body).answers[0].answer).toBe('N은 10만 이하');
     });
@@ -342,11 +363,11 @@
     await userEvent.click(input.getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
     await waitFor(() => expect(marks).toHaveLength(1));
     await userEvent.type(field, ' 10만 이하');
-    // 치다 멈춘 자동 저장(0.5초)이 표시를 저장하는 동안 돌게 기다린다. 그때는 보내지 않고 미룬다
-    await new Promise((done) => setTimeout(done, 600));
+    // 표시를 저장하는 동안 치다 멈춘 자동 저장은 표시가 끝날 때까지 미룬다
+    await autosaved();
     marks.shift()?.();
 
-    // 표시를 못 바꿔도 저장하는 동안 미룬 답은 원래 질문으로 보낸다
+    // 표시를 못 바꾸면 질문은 그대로라, 미룬 답을 원래 질문으로 보낸다
     await expect(await input.findByText(/표시를 바꾸지 못했어요/)).toBeInTheDocument();
     await expect(field).toHaveFocus();
     await waitFor(() => {
@@ -357,6 +378,39 @@
         answer: 'N은 10만 이하'
       });
     });
+  }}
+/>
+
+<Story
+  name="FinishWaitsForMark"
+  args={{
+    onfinish: fn(() => {
+      const [last] = writing.callsTo('PATCH', '/v1/records/record-1/answers').slice(-1);
+
+      finishedWith = last === undefined ? '' : JSON.parse(last.body).answers[0].answer;
+    })
+  }}
+  beforeEach={() => {
+    marks.length = 0;
+    finishedWith = '';
+
+    return slowMark(writing);
+  }}
+  play={async ({ canvas, userEvent, args }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
+
+    const input = within(canvas.getByRole('region', { name: '입력' }));
+
+    await userEvent.click(input.getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
+    await waitFor(() => expect(marks).toHaveLength(1));
+    await userEvent.type(input.getByRole('textbox', { name: /입력 조건/ }), 'N은 10만 이하');
+
+    // 표시를 저장하는 중에 다 썼다고 하면, 표시가 끝나고 그사이 친 답까지 저장한 뒤에 끝낸다
+    await userEvent.click(canvas.getByRole('button', { name: '다 썼어요' }));
+    await expect(args.onfinish).not.toHaveBeenCalled();
+    marks.shift()?.();
+    await waitFor(() => expect(args.onfinish).toHaveBeenCalledOnce());
+    await expect(finishedWith).toBe('N은 10만 이하');
   }}
 />
 

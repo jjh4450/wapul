@@ -293,6 +293,22 @@
   /** 처음 제출에서 틀렸다는 표시를 바꾸는 중. 그동안 다시 누르지 못한다 */
   let marking = $state(false);
 
+  /**
+   * 저장 중인 틀렸다 표시. 끝나면 질문 id가 모두 바뀌어 있을 수 있어서, 답 저장과 '다 썼어요'는 이것이
+   * 끝난 뒤에 한다
+   */
+  let marked: Promise<void> | null = null;
+
+  /** 체크를 바꿨다. 표시를 저장하는 동안 marked에 둔다 */
+  function setWrong(block: number, wrong: boolean) {
+    const run = markWrong(block, wrong);
+
+    marked = run;
+    void run.finally(() => {
+      if (marked === run) marked = null;
+    });
+  }
+
   /** 표시를 바꾸지 못한 이유. 펼친 묶음의 체크 바로 아래에 보인다 */
   let markError = $state('');
 
@@ -388,9 +404,6 @@
       status = kept;
     } else {
       markError = `표시를 바꾸지 못했어요. ${result.message}`;
-
-      // 질문은 그대로라, 저장하는 동안 미룬 답을 보낸다
-      for (const q of questions) void commit(q);
     }
 
     // 답 칸에서 치고 있었으면 새로 그린 그 칸으로, 커서가 body로 빠졌으면 체크로 돌려준다
@@ -417,9 +430,12 @@
     hasBlank(t.questions.map((q) => ({ kind: q.kind, answer: saved.get(q.id) ?? '' })));
 
   async function send(question: QuestionOut): Promise<boolean> {
-    // 틀렸다 표시를 저장하면 질문 id가 모두 바뀌어, 그동안과 그 뒤에 옛 id로 보내면 백엔드가 찾지 못한다
-    // (칸이 사라지며 blur로도 온다). 그사이 친 답은 markWrong이 새 질문으로 옮겨 보낸다
-    if (marking || !record?.questions.some((q) => q.id === question.id)) return true;
+    // 틀렸다 표시를 저장하는 중이면 끝난 뒤에 보낸다. 표시를 바꾸면 질문 id가 모두 바뀌어 옛 id로 보내면
+    // 백엔드가 찾지 못하므로 보내지 않는다(칸이 사라지며 blur로도 온다). 그사이 친 답은 markWrong이 새
+    // 질문으로 옮겨 보낸다
+    while (marked) await marked;
+
+    if (!record?.questions.some((q) => q.id === question.id)) return true;
 
     // 보낸 값만 저장한 것으로 친다. 보내는 동안 더 친 글자는 다음 저장이 보낸다
     const answer = question.answer;
@@ -448,6 +464,9 @@
   }
 
   async function finish() {
+    // 틀렸다 표시를 저장하는 중이면 끝난 뒤의 질문(새 id)으로 모두 저장한다
+    while (marked) await marked;
+
     for (const q of record?.questions ?? []) {
       if (!(await commit(q))) return;
     }
@@ -590,7 +609,7 @@
             <Checkbox
               id="wrong-{t.key}"
               bind:checked={
-                () => t.questions.some((q) => q.kind === 'revision'), (on) => markWrong(block, on)
+                () => t.questions.some((q) => q.kind === 'revision'), (on) => setWrong(block, on)
               }
               disabled={marking}
             />

@@ -1,3 +1,8 @@
+<script lang="ts" module>
+  /** 치다가 이만큼 멈추면 저장한다. 칸을 벗어나지 않고 새로고침해도 쓰던 답이 남게 */
+  export const PAUSE_MS = 500;
+</script>
+
 <script lang="ts">
   import { autoUpdate, computePosition, flip, hide, offset, shift, size } from '@floating-ui/dom';
   import { onDestroy } from 'svelte';
@@ -179,9 +184,6 @@
 
     event.preventDefault();
   }
-
-  /** 치다가 이만큼 멈추면 저장한다. 칸을 벗어나지 않고 새로고침해도 쓰던 답이 남게 */
-  const PAUSE_MS = 500;
 
   let pause: ReturnType<typeof setTimeout> | undefined;
 
