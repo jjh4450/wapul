@@ -570,6 +570,46 @@
 />
 
 <Story
+  name="NoRefusalAfterClosing"
+  beforeEach={() => {
+    const restore = writing.install();
+
+    const original = window.matchMedia;
+
+    // 동작 줄이기: 흔들지 않아서, 두 번째로 막힌 바로 다음 누름에 접힌다
+    window.matchMedia = (query) =>
+      query.includes('prefers-reduced-motion')
+        ? Object.create(original.call(window, query), { matches: { value: true } })
+        : original.call(window, query);
+
+    return () => {
+      window.matchMedia = original;
+      restore();
+    };
+  }}
+  play={async ({ canvas, canvasElement, userEvent }) => {
+    await canvas.findByRole('region', { name: '문제' });
+
+    const bar = rule(canvasElement, '문제');
+
+    await userEvent.click(bar);
+    await userEvent.click(
+      within(await within(document.body).findByRole('alertdialog')).getByRole('button', {
+        name: '답하러 가기'
+      })
+    );
+    await modalClosed();
+
+    // 막힌 누름과 접는 누름을 잇달아 하면, 접힌 뒤에 '한 번 더 누르면 접혀요'를 읽지 않는다
+    await userEvent.click(bar);
+    await userEvent.click(bar);
+    await expect(bar).toHaveAttribute('aria-expanded', 'false');
+    await new Promise((done) => setTimeout(done, 300));
+    await expect(canvas.getByRole('status').textContent).toBe('');
+  }}
+/>
+
+<Story
   name="CloseRightAwayWhenAnswered"
   beforeEach={() => writing.install()}
   play={async ({ canvas, canvasElement, userEvent }) => {

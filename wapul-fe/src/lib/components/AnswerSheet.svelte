@@ -275,12 +275,14 @@
   /**
    * 화면 읽기에 알린다. 같은 말이 다시 와도 읽히게 비운 뒤 잠깐 있다가 넣는다. 한 번에 비우고 넣으면
    * 접근성 트리는 바뀐 줄 모르고, Chrome에서 NVDA나 JAWS는 비운 뒤 틈을 두어야 같은 말을 다시 읽는다
-   * (Angular CDK의 LiveAnnouncer처럼 100ms)
+   * (Angular CDK의 LiveAnnouncer처럼 100ms). still은 넣을 때도 아직 맞는 말인지 본다
    */
-  function announce(message: string) {
+  function announce(message: string, still = () => true) {
     clearTimeout(announcing);
     announcement = '';
-    announcing = setTimeout(() => (announcement = message), 100);
+    announcing = setTimeout(() => {
+      if (still()) announcement = message;
+    }, 100);
   }
 
   onDestroy(() => clearTimeout(announcing));
@@ -288,8 +290,13 @@
   /** 펼친 묶음을 접는다. 빈 칸이 있으면 바로 접히지 않아서, 생각 없이 열고 닫는 대신 답하게 한다 */
   async function close(t: Thread) {
     if (!guard.close(hasBlank(t.questions))) {
-      // 처음에는 모달이 뜨지만 두 번째부터는 흔들기만 한다. 흔들림을 못 보는 사람에게는 말로 알린다
-      if (guard.tries >= 2) announce('빈 칸이 남았어요. 한 번 더 누르면 접혀요.');
+      // 처음에는 모달이 뜨지만 두 번째부터는 흔들기만 한다. 흔들림을 못 보는 사람에게는 말로 알린다.
+      // 알리기 전에 접혔거나 다른 묶음을 펼쳤으면 알리지 않는다
+      if (guard.tries >= 2)
+        announce(
+          '빈 칸이 남았어요. 한 번 더 누르면 접혀요.',
+          () => current === t.key && guard.tries >= 2
+        );
 
       return;
     }
