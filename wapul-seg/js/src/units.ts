@@ -164,8 +164,9 @@ export function units(tree: Tree, code: string): Unit[] {
       }
     }
 
-    // Columns count code points, as Python's str does; indices are UTF-16 units
-    return [lo, code.slice(lineStarts[lo - 1], index).length];
+    // Columns count code points, as Python's str does; indices are UTF-16 units, so a character
+    // outside the BMP (an emoji) is two of them
+    return [lo, Array.from(code.slice(lineStarts[lo - 1], index)).length];
   };
 
   const out: Unit[] = [];
