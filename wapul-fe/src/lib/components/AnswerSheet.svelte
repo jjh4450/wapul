@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
   import { IconArrowsVertical } from '@tabler/icons-svelte';
   import { resolve } from '$app/paths';
@@ -269,18 +269,27 @@
     if (found) open(found.key, true);
   }
 
-  /** 화면 읽기에 알린다. 같은 말이 다시 와도 읽히게 한 번 비운 뒤 넣는다 */
-  async function announce(message: string) {
+  /** 알림을 넣기를 기다리는 타이머 */
+  let announcing: ReturnType<typeof setTimeout> | undefined;
+
+  /**
+   * 화면 읽기에 알린다. 같은 말이 다시 와도 읽히게 비운 뒤 잠깐 있다가 넣는다. 한 번에 비우고 넣으면
+   * 접근성 트리는 바뀐 줄 모르고, Chrome에서 NVDA나 JAWS는 비운 뒤 틈을 두어야 같은 말을 다시 읽는다
+   * (Angular CDK의 LiveAnnouncer처럼 100ms)
+   */
+  function announce(message: string) {
+    clearTimeout(announcing);
     announcement = '';
-    await tick();
-    announcement = message;
+    announcing = setTimeout(() => (announcement = message), 100);
   }
+
+  onDestroy(() => clearTimeout(announcing));
 
   /** 펼친 묶음을 접는다. 빈 칸이 있으면 바로 접히지 않아서, 생각 없이 열고 닫는 대신 답하게 한다 */
   async function close(t: Thread) {
     if (!guard.close(hasBlank(t.questions))) {
       // 처음에는 모달이 뜨지만 두 번째부터는 흔들기만 한다. 흔들림을 못 보는 사람에게는 말로 알린다
-      if (guard.tries >= 2) void announce('빈 칸이 남았어요. 한 번 더 누르면 접혀요.');
+      if (guard.tries >= 2) announce('빈 칸이 남았어요. 한 번 더 누르면 접혀요.');
 
       return;
     }
@@ -471,7 +480,7 @@
     status = kept;
 
     if (t !== undefined && before && !savedBlank(t))
-      void announce(`${t.label} 질문 ${progress(t.questions).total}개에 모두 답했어요.`);
+      announce(`${t.label} 질문 ${progress(t.questions).total}개에 모두 답했어요.`);
 
     return true;
   }

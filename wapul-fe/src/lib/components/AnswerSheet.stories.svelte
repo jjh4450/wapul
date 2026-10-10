@@ -665,28 +665,40 @@
 
     const done = '문제 질문 1개에 모두 답했어요.';
 
-    // 알림 칸의 글자가 바뀔 때마다 남긴다. 같은 글자를 다시 넣으면 바뀌지 않아 읽히지 않는다
-    const said: string[] = [];
+    // 알림 칸의 글자를 그려지는 프레임마다 남긴다. 같은 말을 다시 알리려면 비운 칸이 한 프레임은 그려져야
+    // 화면 읽기가 바뀐 줄 안다
+    const frames: string[] = [];
 
-    const observer = new MutationObserver(() => said.push(status.textContent ?? ''));
+    let sampling = true;
 
-    observer.observe(status, { childList: true, characterData: true, subtree: true });
+    const sample = () => {
+      frames.push(status.textContent ?? '');
 
-    // 치는 대로 막대의 진행도가 바뀐다. 묶음을 다 답했다는 알림은 저장한 뒤에 한 번만 나온다
-    await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 0개 답함');
-    await userEvent.type(field, '성');
-    await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 1개 답함');
-    await expect(status).toHaveTextContent('');
-    await userEvent.tab();
-    await waitFor(() => expect(status).toHaveTextContent(done));
+      if (sampling) requestAnimationFrame(sample);
+    };
 
-    // 비웠다가 다시 다 답하면 같은 말이라도 다시 알린다
-    await userEvent.clear(field);
-    await userEvent.tab();
-    await userEvent.type(field, '성');
-    await userEvent.tab();
-    await waitFor(() => expect(said.filter((text) => text === done)).toHaveLength(2));
-    observer.disconnect();
+    requestAnimationFrame(sample);
+
+    try {
+      // 치는 대로 막대의 진행도가 바뀐다. 묶음을 다 답했다는 알림은 저장한 뒤에 한 번만 나온다
+      await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 0개 답함');
+      await userEvent.type(field, '성');
+      await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 1개 답함');
+      await expect(status).toHaveTextContent('');
+      await userEvent.tab();
+      await waitFor(() => expect(status).toHaveTextContent(done));
+
+      // 비웠다가 다시 다 답하면 같은 말이라도 비운 칸을 거쳐 다시 알린다
+      await userEvent.clear(field);
+      await userEvent.tab();
+      await userEvent.type(field, '성');
+      await userEvent.tab();
+      await waitFor(() =>
+        expect(frames.filter((text, i) => text !== frames[i - 1])).toEqual(['', done, '', done])
+      );
+    } finally {
+      sampling = false;
+    }
   }}
 />
 
