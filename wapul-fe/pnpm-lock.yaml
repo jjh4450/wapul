@@ -171,8 +171,8 @@ importers:
         specifier: ^3.1.0
         version: 3.1.0(svelte@5.57.1(@typescript-eslint/types@8.71.0))(vitest@4.1.11)
       wapul-seg:
-        specifier: 1.2.5
-        version: 1.2.5
+        specifier: 1.2.6
+        version: 1.2.6
 
 packages:
 
@@ -3267,8 +3267,8 @@ packages:
       jsdom:
         optional: true
 
-  wapul-seg@1.2.5:
-    resolution: {integrity: sha512-5kL9gIXtGZLYPBza7uB2bs7lAXEN/Qq+FfAaThXF2b6nI5rZPcSAFT9UYyz4EGMigCJiZc4XAh8gt/ysZvQEBQ==}
+  wapul-seg@1.2.6:
+    resolution: {integrity: sha512-KnMu1IhW9xlksGwx5IzQs0sXn4aje6RwoTPjcZhSjNfmY/qyY1+KL5YveAHrBhc+1hZney6D8DoCeriq06S5Hw==}
 
   web-tree-sitter@0.27.0:
     resolution: {integrity: sha512-XK08gj6RwTMQatAG7uVRP8MunqotL/XC19vHgkSPKmELgbGPBj4ECvB8haHOUnyj6ls2B8t42UTro14zxGgAHg==}
@@ -6264,7 +6264,7 @@ snapshots:
     transitivePeerDependencies:
       - msw
 
-  wapul-seg@1.2.5:
+  wapul-seg@1.2.6:
     dependencies:
       web-tree-sitter: 0.27.0
 
