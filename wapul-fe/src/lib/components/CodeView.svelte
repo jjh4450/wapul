@@ -6,6 +6,7 @@
   import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
   import { highlight, type Tint } from '#lib/highlight.js';
   import { BLOCK_KIND_LABEL, blockColors, blockLabels } from '#lib/study.js';
+  import { lensVariants } from '#lib/components/lens/index.js';
   import { cn } from '#lib/utils.js';
 
   /** 줄을 문장 경계로 자른 조각. from, to는 칸 */
@@ -693,12 +694,12 @@
   {@const pulled = give(stretch[side])}
   {@const count = pane.to - pane.from + 1}
   {@const track = tracks[side]}
-  <!-- 물방울 같은 유리 (layout.css의 glass) -->
+  <!-- 물방울 같은 유리(Lens). 붙어 다니도록 relative 대신 sticky다 -->
   <div
     class={cn(
-      'sticky',
-      side === 'top' ? 'top-4' : 'bottom-4 mt-auto',
-      'glass overflow-hidden rounded-2xl bg-white/30 text-xs shadow-[0_12px_32px_-12px_rgb(0_0_0/0.35),0_1px_2px_rgb(0_0_0/0.08)] dark:bg-white/5'
+      lensVariants({ size: 'pane' }),
+      'sticky text-xs',
+      side === 'top' ? 'top-4' : 'bottom-4 mt-auto'
     )}
     style={colors[block].style}
     role="group"
