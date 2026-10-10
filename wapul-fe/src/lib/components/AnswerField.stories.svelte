@@ -227,5 +227,18 @@
     await userEvent.keyboard('{Meta>}{Enter}{/Meta}');
     await expect(field).toHaveValue('정렬');
     await expect(field).toHaveFocus();
+
+    // user-event는 Ctrl을 누른 채로는 줄을 넣지 않아서, 키 자체를 막았는지 본다
+    for (const modifier of [{ ctrlKey: true }, { metaKey: true }]) {
+      const press = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        bubbles: true,
+        cancelable: true,
+        ...modifier
+      });
+
+      field.dispatchEvent(press);
+      await expect(press.defaultPrevented).toBe(true);
+    }
   }}
 />
