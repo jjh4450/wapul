@@ -87,7 +87,7 @@
   /** 펼친 묶음에서 답 칸을 펼친 질문의 번호. 나머지 질문은 한 줄로 접는다 */
   let step = $state(0);
 
-  /** 화면 읽기에 알릴 말: 묶음의 질문에 모두 답했을 때 (커서 밖의 변화라 따로 알린다) */
+  /** 화면 읽기에 따로 알릴 말: 묶음의 질문에 모두 답했을 때(커서 밖의 변화), 두 번째로 접기를 막았을 때 */
   let announcement = $state('');
 
   // 마지막으로 저장된 답. 바뀐 칸만 저장한다
@@ -269,9 +269,21 @@
     if (found) open(found.key, true);
   }
 
+  /** 화면 읽기에 알린다. 같은 말이 다시 와도 읽히게 한 번 비운 뒤 넣는다 */
+  async function announce(message: string) {
+    announcement = '';
+    await tick();
+    announcement = message;
+  }
+
   /** 펼친 묶음을 접는다. 빈 칸이 있으면 바로 접히지 않아서, 생각 없이 열고 닫는 대신 답하게 한다 */
   async function close(t: Thread) {
-    if (!guard.close(hasBlank(t.questions))) return;
+    if (!guard.close(hasBlank(t.questions))) {
+      // 처음에는 모달이 뜨지만 두 번째부터는 흔들기만 한다. 흔들림을 못 보는 사람에게는 말로 알린다
+      if (guard.tries >= 2) void announce('빈 칸이 남았어요. 한 번 더 누르면 접혀요.');
+
+      return;
+    }
 
     current = '';
     await tick();
@@ -405,7 +417,7 @@
     status = kept;
 
     if (t !== undefined && before && !savedBlank(t))
-      announcement = `${t.label} 질문 ${progress(t.questions).total}개에 모두 답했어요.`;
+      void announce(`${t.label} 질문 ${progress(t.questions).total}개에 모두 답했어요.`);
 
     return true;
   }

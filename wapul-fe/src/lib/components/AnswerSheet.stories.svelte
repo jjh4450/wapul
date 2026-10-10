@@ -273,10 +273,15 @@
     await expect(field()).toHaveFocus();
     await expect(bar).toHaveAttribute('aria-expanded', 'true');
 
-    // 2번: 흔들린 뒤에야 접기가 풀린다
+    // 2번: 흔들린 뒤에야 접기가 풀린다. 흔들림을 못 보는 사람에게는 말로 알린다
     await userEvent.click(bar);
     await expect(body.queryByRole('alertdialog')).not.toBeInTheDocument();
     await expect(bar).toHaveAttribute('aria-expanded', 'true');
+    await waitFor(() =>
+      expect(canvas.getByRole('status')).toHaveTextContent(
+        '빈 칸이 남았어요. 한 번 더 누르면 접혀요.'
+      )
+    );
     await waitFor(() => expect(problem.querySelector('.animate-shake')).toBeNull());
 
     // 3번: 접히고, 커서는 막대로 돌아온다
@@ -453,15 +458,32 @@
   play={async ({ canvas, canvasElement, userEvent }) => {
     const field = await canvas.findByRole('textbox', { name: problemQuestion });
 
+    const status = canvas.getByRole('status');
+
+    const done = '문제 질문 1개에 모두 답했어요.';
+
+    // 알림 칸의 글자가 바뀔 때마다 남긴다. 같은 글자를 다시 넣으면 바뀌지 않아 읽히지 않는다
+    const said: string[] = [];
+
+    const observer = new MutationObserver(() => said.push(status.textContent ?? ''));
+
+    observer.observe(status, { childList: true, characterData: true, subtree: true });
+
     // 치는 대로 막대의 진행도가 바뀐다. 묶음을 다 답했다는 알림은 저장한 뒤에 한 번만 나온다
     await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 0개 답함');
     await userEvent.type(field, '성');
     await expect(rule(canvasElement, '문제')).toHaveAccessibleName('문제, 질문 1개 중 1개 답함');
-    await expect(canvas.getByRole('status')).toHaveTextContent('');
+    await expect(status).toHaveTextContent('');
     await userEvent.tab();
-    await waitFor(() =>
-      expect(canvas.getByRole('status')).toHaveTextContent('문제 질문 1개에 모두 답했어요.')
-    );
+    await waitFor(() => expect(status).toHaveTextContent(done));
+
+    // 비웠다가 다시 다 답하면 같은 말이라도 다시 알린다
+    await userEvent.clear(field);
+    await userEvent.tab();
+    await userEvent.type(field, '성');
+    await userEvent.tab();
+    await waitFor(() => expect(said.filter((text) => text === done)).toHaveLength(2));
+    observer.disconnect();
   }}
 />
 
