@@ -17,9 +17,19 @@ export function skippable(q: { kind: QuestionKind }): boolean {
   return q.kind === 'revision';
 }
 
-/** 답하지 않은 칸이 있는지. 건너뛸 수 있는 질문은 세지 않는다 */
+/** 답을 썼는지. 공백만 쓴 칸은 빈 칸이다 */
+export function filled(q: { answer: string }): boolean {
+  return q.answer.trim() !== '';
+}
+
+/** 답해야 하는데 비어 있는 질문인지. 건너뛸 수 있는 질문은 비어도 된다 */
+export function unanswered(q: { kind: QuestionKind; answer: string }): boolean {
+  return !skippable(q) && !filled(q);
+}
+
+/** 답하지 않은 칸이 있는지 */
 export function hasBlank(questions: { kind: QuestionKind; answer: string }[]): boolean {
-  return questions.some((q) => !skippable(q) && q.answer.trim() === '');
+  return questions.some(unanswered);
 }
 
 /**

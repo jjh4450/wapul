@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { filled } from '#lib/closeGuard.svelte.js';
 import {
-  filled,
   firstGap,
+  firstOpen,
   nextThread,
   progress,
   progressName,
@@ -72,6 +73,11 @@ describe('nextThread', () => {
   it('goes forward to the first group with a blank required question', () => {
     // 다 답한 입력과, 달라진 점 질문만 빈 로직은 건너뛴다
     expect(nextThread(threads, 'problem')?.key).toBe('output');
+  });
+
+  it('opens the first group with a blank required question, else the first', () => {
+    expect(firstOpen(threads)?.key).toBe('problem');
+    expect(firstOpen(threads.slice(1, 3))?.key).toBe('input');
   });
 
   it('goes to the very next group when nothing later is blank, and never back', () => {

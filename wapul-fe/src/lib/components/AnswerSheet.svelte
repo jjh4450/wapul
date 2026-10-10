@@ -10,7 +10,7 @@
     type QuestionOut,
     type RecordOut
   } from '#lib/api/client.js';
-  import { CloseGuard, hasBlank, skippable } from '#lib/closeGuard.svelte.js';
+  import { CloseGuard, filled, hasBlank, skippable, unanswered } from '#lib/closeGuard.svelte.js';
   import AnswerField from '#lib/components/AnswerField.svelte';
   import CodeView from '#lib/components/CodeView.svelte';
   import { lensVariants } from '#lib/components/lens/index.js';
@@ -24,8 +24,8 @@
   import { codeNames } from '#lib/segment.js';
   import { blockColors, blockLabels, lastLine, unitLines } from '#lib/study.js';
   import {
-    filled,
     firstGap,
+    firstOpen,
     nextThread,
     progress,
     progressName,
@@ -142,18 +142,27 @@
   /** 펼친 묶음이 블럭 질문이면 그 블럭만 칠한다 */
   const focus = $derived(currentThread?.block ?? null);
 
-  /** 넘기기 단추의 이름(갈 곳). 묶음 안의 다음 질문, 묶음 끝이면 넘어갈 묶음. 갈 곳이 없으면 null */
-  const target = $derived.by(() => {
+  /** 넘기기로 갈 곳: 묶음 안의 다음 질문, 묶음 끝이면 넘어갈 묶음. 갈 곳이 없으면 null */
+  const destination = $derived.by((): { step: number } | { thread: Thread } | null => {
     const t = currentThread;
 
     if (t === undefined) return null;
 
-    if (step < t.questions.length - 1) return '다음 질문';
+    if (step < t.questions.length - 1) return { step: step + 1 };
 
     const next = nextThread(threads, t.key);
 
-    return next === undefined ? null : `${next.label} 질문으로`;
+    return next === undefined ? null : { thread: next };
   });
+
+  /** 넘기기 단추의 이름: 갈 곳을 부른다 */
+  const target = $derived(
+    destination === null
+      ? null
+      : 'step' in destination
+        ? '다음 질문'
+        : `${destination.thread.label} 질문으로`
+  );
 
   /** 넘기기 단축키 안내에 쓰는 조합 키 */
   const MOD = /Mac|iPhone|iPad/.test(navigator.userAgent) ? '⌘' : 'Ctrl';
@@ -194,7 +203,7 @@
     for (const q of result.data.questions) saved.set(q.id, q.answer);
 
     // 이어서 쓸 때는 아직 빈 칸이 있는 첫 묶음의 첫 빈 질문부터 연다
-    const first = threads.find((t) => hasBlank(t.questions)) ?? threads[0];
+    const first = firstOpen(threads);
 
     current = first?.key ?? '';
     step = firstGap(first?.questions ?? []);
@@ -244,21 +253,13 @@
     focusActive(false);
   }
 
-  /** 넘기기: 묶음 안의 다음 질문, 묶음 끝이면 빈 칸이 남은 다음 묶음 */
   function advance() {
-    const t = currentThread;
+    const to = destination;
 
-    if (t === undefined) return;
+    if (to === null) return;
 
-    if (step < t.questions.length - 1) {
-      void goTo(step + 1);
-
-      return;
-    }
-
-    const next = nextThread(threads, t.key);
-
-    if (next) void open(next.key, true);
+    if ('step' in to) void goTo(to.step);
+    else void open(to.thread.key, true);
   }
 
   /** 코드에서 누른 블럭의 질문 묶음을 펼치고 그리로 옮긴다 */
@@ -424,7 +425,7 @@
     question={question.text}
     example={examples[question.id] ?? ''}
     note={skippable(question) ? '건너뛸 수 있어요.' : undefined}
-    invalid={guard.tries > 0 && !skippable(question) && !filled(question)}
+    invalid={guard.tries > 0 && unanswered(question)}
     bind:value={question.answer}
     {words}
     near={question.block_id === null ? undefined : blockLines.get(question.block_id)}
@@ -520,7 +521,7 @@
                     'mt-1.5 size-2 shrink-0 rounded-full border',
                     filled(question)
                       ? 'border-transparent bg-foreground/70'
-                      : guard.tries > 0 && !skippable(question)
+                      : guard.tries > 0 && unanswered(question)
                         ? 'border-destructive'
                         : 'border-foreground/60',
                     skippable(question) && !filled(question) && 'border-dashed'

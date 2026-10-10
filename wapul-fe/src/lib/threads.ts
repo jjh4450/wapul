@@ -3,7 +3,7 @@
  * 화면(AnswerSheet)과 떨어진 순수 함수라 CI(server 프로젝트)에서 돈다.
  */
 import type { QuestionKind } from '#lib/api/client.js';
-import { hasBlank, skippable } from '#lib/closeGuard.svelte.js';
+import { filled, hasBlank, skippable, unanswered } from '#lib/closeGuard.svelte.js';
 import { truncate } from '#lib/study.js';
 
 /** 진행도를 세는 데 쓰는 질문의 종류와 답 */
@@ -11,11 +11,6 @@ type Asked = { kind: QuestionKind; answer: string };
 
 /** answered: 답한 필수 질문 수, total: 필수 질문 수, optional: 건너뛸 수 있는 질문 수 */
 export type Progress = { answered: number; total: number; optional: number };
-
-/** 답을 썼는지. 공백만 쓴 칸은 빈 칸이다 (hasBlank와 같은 기준) */
-export function filled(q: Asked): boolean {
-  return q.answer.trim() !== '';
-}
 
 export function progress(questions: Asked[]): Progress {
   const required = questions.filter((q) => !skippable(q));
@@ -45,7 +40,7 @@ export function questionName(q: Asked & { text: string }): string {
 
 /** 묶음을 열 때 펼칠 질문: 첫 빈 필수 질문, 없으면 첫 빈 질문, 다 답했으면 첫 질문 */
 export function firstGap(questions: Asked[]): number {
-  const required = questions.findIndex((q) => !skippable(q) && !filled(q));
+  const required = questions.findIndex(unanswered);
 
   if (required !== -1) return required;
 
@@ -55,12 +50,15 @@ export function firstGap(questions: Asked[]): number {
   );
 }
 
-/** 묶음 끝에서 넘어갈 묶음: 뒤에서 빈 필수 질문이 남은 첫 묶음, 없으면 바로 다음 묶음. 앞으로는 돌아가지 않는다 */
+/** 펼칠 묶음: 빈 필수 질문이 남은 첫 묶음, 없으면 첫 묶음 */
+export function firstOpen<T extends { questions: Asked[] }>(threads: T[]): T | undefined {
+  return threads.find((t) => hasBlank(t.questions)) ?? threads[0];
+}
+
+/** 묶음 끝에서 넘어갈 묶음: 뒤의 묶음 가운데 펼칠 묶음. 앞으로는 돌아가지 않는다 */
 export function nextThread<T extends { key: string; questions: Asked[] }>(
   threads: T[],
   key: string
 ): T | undefined {
-  const later = threads.slice(threads.findIndex((t) => t.key === key) + 1);
-
-  return later.find((t) => hasBlank(t.questions)) ?? later[0];
+  return firstOpen(threads.slice(threads.findIndex((t) => t.key === key) + 1));
 }
