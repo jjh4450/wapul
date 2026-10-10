@@ -120,9 +120,28 @@
     await expect(logic).toHaveAccessibleName('로직 1, 질문 2개 중 0개 답함, 선택 질문 1개');
     await expect(rule(canvasElement, '입력')).toHaveAccessibleName('입력, 질문 2개 중 1개 답함');
 
-    // 처음에는 빈 칸이 있는 첫 묶음(문제)만 펼친다
+    // 막대의 유리에는 필수 질문마다 한 마디가 있고, 답한 마디를 블럭 색으로 칠한다
+    const glass = (bar: HTMLElement) => bar.querySelector('span[aria-hidden]');
+
+    const [answered, blank] = glass(rule(canvasElement, '입력'))?.children ?? [];
+
+    await expect(glass(logic)?.children).toHaveLength(2);
+    await expect(answered).toHaveClass('bg-(--block)');
+    await expect(blank).toHaveClass('bg-(--block)/15');
+
+    // 막대는 얇아도 위아래로 조금 더 눌린다
+    logic.scrollIntoView({ block: 'center' });
+
+    const box = logic.getBoundingClientRect();
+
+    await expect(document.elementFromPoint(box.left + box.width / 2, box.top - 1)).toBe(logic);
+    await expect(document.elementFromPoint(box.left + box.width / 2, box.bottom)).toBe(logic);
+
+    // 처음에는 빈 칸이 있는 첫 묶음(문제)만 펼치고, 펼친 막대는 블럭 색으로 물든다
     await expect(rule(canvasElement, '문제')).toHaveAttribute('aria-expanded', 'true');
     await expect(logic).toHaveAttribute('aria-expanded', 'false');
+    await expect(glass(rule(canvasElement, '문제'))).toHaveClass('bg-(--block)/15');
+    await expect(glass(logic)).toHaveClass('bg-white/30');
     await expect(canvas.getAllByRole('textbox')).toHaveLength(1);
 
     // 빈 칸에는 다른 문제에서 가져온 예제가 회색 안내문으로 뜬다

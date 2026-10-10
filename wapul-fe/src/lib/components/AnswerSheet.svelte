@@ -471,8 +471,9 @@
   />
 {/snippet}
 
-<!-- 묶음 막대: 돋보기 창과 같은 유리에 필수 질문마다 한 마디를 두고, 답한 마디를 블럭 색으로 비춘다.
-     누르면 펼치고, 펼친 막대를 누르면 접는다(빈 칸이 있으면 바로 접히지 않는다) -->
+<!-- 묶음 막대: 돋보기 창과 같은 유리에 필수 질문마다 한 마디를 두고, 답한 마디를 블럭 색으로 칠한다.
+     누르면 펼치고, 펼친 막대를 누르면 접는다(빈 칸이 있으면 바로 접히지 않는다). 막대는 얇아서 누르는 곳을
+     위아래로 넓힌다(after): 24px, 터치는 32px. 터치에서 더 넓히면 코드 글자와 붙은 막대를 덮는다 -->
 {#snippet rule(t: Thread)}
   {@const expanded = t.key === current}
   {@const name = progressName(t.label, progress(t.questions))}
@@ -484,7 +485,7 @@
       aria-controls={expanded ? `thread-${t.key}` : undefined}
       aria-label={name}
       title={name}
-      class="flex h-5 w-full cursor-pointer items-center gap-2 rounded-full font-sans text-foreground/55 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/50"
+      class="relative flex h-5 w-full cursor-pointer items-center gap-2 rounded-full font-sans text-foreground/55 outline-none after:absolute after:inset-x-0 after:-inset-y-0.5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-foreground/50 pointer-coarse:after:-inset-y-1.5"
       style={t.block === null ? '--block: var(--foreground)' : colors[t.block].style}
       onclick={() => (expanded ? close(t) : open(t.key, false))}
     >
@@ -499,7 +500,7 @@
         )}
       >
         {#each t.questions.filter((q) => !skippable(q)) as q (q.id)}
-          <span class={cn('flex-1', filled(q) ? 'bg-(--block)/65' : 'bg-(--block)/15')}></span>
+          <span class={cn('flex-1', filled(q) ? 'bg-(--block)' : 'bg-(--block)/15')}></span>
         {/each}
       </span>
       <IconArrowsVertical class="size-3.5 shrink-0" aria-hidden="true" />
