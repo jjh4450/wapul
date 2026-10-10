@@ -46,6 +46,22 @@
 />
 
 <Story
+  name="QuestionShines"
+  play={async ({ canvas }) => {
+    const style = getComputedStyle(canvas.getByText(question));
+
+    // 질문 글자는 글자색을 비우고 배경을 글자 모양으로 칠해 그린다. 배경이 빠지면 글자가 사라진다
+    await expect(style.color).toBe('rgba(0, 0, 0, 0)');
+    await expect(style.backgroundClip).toBe('text');
+    await expect(style.backgroundImage).toMatch(/^linear-gradient/);
+
+    // 펼칠 때 빛이 두 번 지나가고 멈춘다
+    await expect(style.animationName).toBe('shine');
+    await expect(style.animationIterationCount).toBe('2');
+  }}
+/>
+
+<Story
   name="LongExample"
   args={{ example: '가'.repeat(120) }}
   play={async ({ canvas }) => {

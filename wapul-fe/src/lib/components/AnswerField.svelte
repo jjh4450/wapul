@@ -200,7 +200,13 @@
 </script>
 
 <div class="grid gap-2">
-  <Label for={id} class="leading-snug">{question}</Label>
+  <!-- 질문 글자는 배경을 글자 모양으로 칠해 그리고, 그 위로 블럭 색을 띤 빛이 지나간다(layout.css의 shine).
+       멈춰 있을 때는 빛이 글자 밖에 있어 보통 글자와 같다 -->
+  <Label
+    for={id}
+    class="w-fit bg-[linear-gradient(110deg,var(--foreground)_40%,var(--shine)_50%,var(--foreground)_60%)] bg-size-[250%_100%] bg-clip-text leading-snug text-transparent [--shine:color-mix(in_oklab,var(--block,var(--foreground))_40%,white)] motion-safe:animate-shine dark:[--shine:var(--block,var(--muted-foreground))]"
+    >{question}</Label
+  >
   {#if note}
     <p class="text-xs text-muted-foreground">{note}</p>
   {/if}
