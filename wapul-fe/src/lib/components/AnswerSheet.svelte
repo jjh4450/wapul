@@ -313,21 +313,24 @@
 
     const position = new Map(blocks.map((b, i) => [b.id, i]));
 
-    // 질문과 그 질문의 예제 답을 같이 들고 가서, 새 id에 예제를 그대로 옮긴다
-    const next = questions.flatMap((q): { question: QuestionIn; example: string }[] =>
-      q === revision
-        ? []
-        : [
-            {
-              question: {
-                kind: q.kind,
-                text: q.text,
-                answer: q.answer,
-                block: q.block_id === null ? null : (position.get(q.block_id) ?? null)
-              },
-              example: examples[q.id] ?? ''
-            }
-          ]
+    // 질문과 그 질문의 예제 답, 옛 질문(from)을 같이 들고 가서, 새 id에 예제와 저장하는 동안 더 친 답을
+    // 옮긴다
+    const next = questions.flatMap(
+      (q): { question: QuestionIn; example: string; from?: QuestionOut }[] =>
+        q === revision
+          ? []
+          : [
+              {
+                question: {
+                  kind: q.kind,
+                  text: q.text,
+                  answer: q.answer,
+                  block: q.block_id === null ? null : (position.get(q.block_id) ?? null)
+                },
+                example: examples[q.id] ?? '',
+                from: q
+              }
+            ]
     );
 
     // 달라진 점 질문은 그 블럭 질문의 맨 뒤에 붙는다
@@ -350,6 +353,10 @@
 
     marking = false;
 
+    // 저장하는 동안 체크가 disabled라 커서가 빠진다. 그사이 답 칸으로 옮겨 쳤는지는 칸이 새 id로 다시
+    // 그려지기 전에 잡아 둔다
+    const typing = document.activeElement?.id === currentThread?.questions[step]?.id;
+
     if (result.ok) {
       markError = '';
 
@@ -365,18 +372,32 @@
 
       for (const q of result.data.questions) saved.set(q.id, q.answer);
 
+      // 저장하는 동안 더 친 답은 새 질문으로 옮겨 다시 저장한다
+      record.questions.forEach((q, i) => {
+        const typed = next[i]?.from?.answer;
+
+        if (typed !== undefined && typed !== q.answer) {
+          q.answer = typed;
+          void commit(q);
+        }
+      });
+
       if (opened !== -1) current = result.data.blocks[opened].id;
 
       step = Math.min(step, (currentThread?.questions.length ?? 1) - 1);
       status = kept;
     } else {
       markError = `표시를 바꾸지 못했어요. ${result.message}`;
+
+      // 질문은 그대로라, 저장하는 동안 미룬 답을 보낸다
+      for (const q of questions) void commit(q);
     }
 
-    // 저장하는 동안 체크가 disabled라 커서가 body로 빠진다. 다른 곳으로 옮기지 않았으면 체크로 돌려준다
+    // 답 칸에서 치고 있었으면 새로 그린 그 칸으로, 커서가 body로 빠졌으면 체크로 돌려준다
     await tick();
 
-    if (document.activeElement === document.body)
+    if (typing) focusActive(false);
+    else if (document.activeElement === document.body)
       document.getElementById(`wrong-${current}`)?.focus();
   }
 
@@ -396,6 +417,10 @@
     hasBlank(t.questions.map((q) => ({ kind: q.kind, answer: saved.get(q.id) ?? '' })));
 
   async function send(question: QuestionOut): Promise<boolean> {
+    // 틀렸다 표시를 저장하면 질문 id가 모두 바뀌어, 그동안과 그 뒤에 옛 id로 보내면 백엔드가 찾지 못한다
+    // (칸이 사라지며 blur로도 온다). 그사이 친 답은 markWrong이 새 질문으로 옮겨 보낸다
+    if (marking || !record?.questions.some((q) => q.id === question.id)) return true;
+
     // 보낸 값만 저장한 것으로 친다. 보내는 동안 더 친 글자는 다음 저장이 보낸다
     const answer = question.answer;
 

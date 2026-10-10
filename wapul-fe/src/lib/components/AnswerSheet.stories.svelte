@@ -2,7 +2,7 @@
   import { defineMeta } from '@storybook/addon-svelte-csf';
   import { expect, fn, waitFor, within } from 'storybook/test';
   import type { QuestionIn } from '#lib/api/client.js';
-  import { reply } from '#lib/api/fake.js';
+  import { type FakeApi, reply } from '#lib/api/fake.js';
   import { record, sharedRecord } from '#lib/api/fixtures.js';
   import { localApi } from '#lib/api/local.js';
   import { EXAMPLES } from '#lib/questions.js';
@@ -57,6 +57,25 @@
       ]
     ]
   );
+
+  /** 블럭 저장(틀렸다 표시)이 늦게 돌아오는 백엔드. 언제 돌려보낼지는 story가 정한다 */
+  const marks: (() => void)[] = [];
+
+  function slowMark(api: FakeApi) {
+    const restore = api.install();
+
+    const local = globalThis.fetch;
+
+    globalThis.fetch = async (input, init) => {
+      const method = input instanceof Request ? input.method : (init?.method ?? 'GET');
+
+      if (method === 'PUT') await new Promise<void>((done) => marks.push(done));
+
+      return local(input, init);
+    };
+
+    return restore;
+  }
 
   /** 모달이 닫히고 페이지가 다시 눌릴 때까지. bits-ui는 모달이 닫히고도 잠깐 body의 클릭을 막는다 */
   const modalClosed = () =>
@@ -245,6 +264,80 @@
     await expect(mark).not.toBeChecked();
     await expect(input.queryByRole('button', { name: /^처음 제출/ })).not.toBeInTheDocument();
     await waitFor(() => expect(mark).toHaveFocus());
+  }}
+/>
+
+<Story
+  name="KeepsTypingWhileMarking"
+  beforeEach={() => {
+    marks.length = 0;
+
+    return slowMark(writing);
+  }}
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
+
+    const input = () => within(canvas.getByRole('region', { name: '입력' }));
+
+    const field = () => input().getByRole('textbox', { name: /입력 조건/ });
+
+    // 틀렸다 표시를 저장하는 동안 답 칸으로 돌아가 더 친다
+    await userEvent.type(field(), 'N은');
+    await userEvent.click(input().getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
+    await waitFor(() => expect(marks).toHaveLength(1));
+    await userEvent.type(field(), ' 10만 이하');
+    marks.shift()?.();
+
+    // 칸을 새 id로 다시 그려도 더 친 글자와 커서는 그 칸에 남고, 더 친 답도 저장한다
+    await waitFor(() =>
+      expect(
+        input().getByRole('button', { name: /^처음 제출(에서|과).*, 선택$/ })
+      ).toBeInTheDocument()
+    );
+    await expect(field()).toHaveValue('N은 10만 이하');
+    await expect(field()).toHaveFocus();
+    await waitFor(() => {
+      const [last] = writing.callsTo('PATCH', '/v1/records/record-1/answers').slice(-1);
+
+      expect(JSON.parse(last.body).answers[0].answer).toBe('N은 10만 이하');
+    });
+    await expect(canvas.getByText('저장했어요.')).toBeInTheDocument();
+  }}
+/>
+
+<Story
+  name="KeepsTypingWhenMarkFails"
+  beforeEach={() => {
+    marks.length = 0;
+
+    return slowMark(markFails);
+  }}
+  play={async ({ canvas, userEvent }) => {
+    await userEvent.click(await canvas.findByRole('button', { name: '입력 질문으로' }));
+
+    const input = within(canvas.getByRole('region', { name: '입력' }));
+
+    const field = input.getByRole('textbox', { name: /입력 조건/ });
+
+    await userEvent.type(field, 'N은');
+    await userEvent.click(input.getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
+    await waitFor(() => expect(marks).toHaveLength(1));
+    await userEvent.type(field, ' 10만 이하');
+    // 치다 멈춘 자동 저장(0.5초)이 표시를 저장하는 동안 돌게 기다린다. 그때는 보내지 않고 미룬다
+    await new Promise((done) => setTimeout(done, 600));
+    marks.shift()?.();
+
+    // 표시를 못 바꿔도 저장하는 동안 미룬 답은 원래 질문으로 보낸다
+    await expect(await input.findByText(/표시를 바꾸지 못했어요/)).toBeInTheDocument();
+    await expect(field).toHaveFocus();
+    await waitFor(() => {
+      const [last] = markFails.callsTo('PATCH', '/v1/records/record-1/answers').slice(-1);
+
+      expect(JSON.parse(last.body).answers[0]).toEqual({
+        question_id: 'q-input-condition',
+        answer: 'N은 10만 이하'
+      });
+    });
   }}
 />
 
