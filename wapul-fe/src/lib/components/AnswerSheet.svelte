@@ -450,8 +450,10 @@
 
 {#if record}
   <div class="mb-6 grid gap-1">
-    <h1 class="text-2xl font-semibold">{record.problem}</h1>
-    <p class="text-muted-foreground">핵심 아이디어: {record.key_idea}</p>
+    <h1 class="text-2xl font-semibold" data-clarity-mask="true">{record.problem}</h1>
+    <p class="text-muted-foreground">
+      핵심 아이디어: <span data-clarity-mask="true">{record.key_idea}</span>
+    </p>
     <a
       href={resolve(`/records/blocks?id=${id}`)}
       class="text-sm text-muted-foreground underline underline-offset-4">블럭 다시 나누기</a

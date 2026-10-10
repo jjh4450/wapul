@@ -221,6 +221,7 @@
     <div
       bind:this={popup}
       {@attach place}
+      data-clarity-mask="true"
       class="fixed top-0 left-0 z-50 flex w-72 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border bg-popover text-sm text-popover-foreground shadow-md"
     >
       <ul

@@ -142,7 +142,7 @@
 {/snippet}
 
 {#if record}
-  <h1 class="text-2xl font-semibold">{record.problem}</h1>
+  <h1 class="text-2xl font-semibold" data-clarity-mask="true">{record.problem}</h1>
   <p class="mt-1 mb-6 text-sm text-muted-foreground">
     코드를 끌어서 문장을 고른 뒤 넣을 블럭을 고르세요. 어디서 끌든 끈 범위에 온전히 든 문장만
     골라요. 줄 번호를 끌면 그 줄의 문장을 모두 골라요. 한 블럭의 문장이 떨어져 있어도 괜찮아요.

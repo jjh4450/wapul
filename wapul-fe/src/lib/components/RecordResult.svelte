@@ -146,7 +146,7 @@
 
   <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
     <div>
-      <h1 class="text-2xl font-semibold">{record.problem}</h1>
+      <h1 class="text-2xl font-semibold" data-clarity-mask="true">{record.problem}</h1>
       <p class="text-sm text-muted-foreground">{record.owner_name}</p>
     </div>
     {#if record.is_owner}
@@ -175,6 +175,7 @@
       <Tabs.Content value={layout.id}>
         {#if raw}
           <pre
+            data-clarity-mask="true"
             class="overflow-x-auto rounded-2xl bg-muted p-4 text-sm leading-6 whitespace-pre-wrap">{layout.markdown}</pre>
         {:else}
           <div class="rounded-2xl border p-6">

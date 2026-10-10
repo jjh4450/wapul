@@ -2,6 +2,7 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { resolve } from '$app/paths';
+  import { startAnalytics } from '#lib/analytics.js';
   import { BACKEND, api, type RecordCreate } from '#lib/api/client.js';
   import { holds, unpackRecord } from '#lib/share.js';
 
@@ -52,6 +53,8 @@
     }
 
     await goto(resolve(`/records/view?id=${id}`), { replaceState: true });
+    // 주소에서 링크 본문이 빠졌으니 방문 분석을 켠다 (hooks.client.ts)
+    startAnalytics();
   }
 
   onMount(load);

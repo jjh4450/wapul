@@ -35,8 +35,8 @@
     {#each records as record (record.id)}
       <Card.Root>
         <Card.Header>
-          <Card.Title>{record.problem}</Card.Title>
-          <Card.Description>{record.key_idea}</Card.Description>
+          <Card.Title data-clarity-mask="true">{record.problem}</Card.Title>
+          <Card.Description data-clarity-mask="true">{record.key_idea}</Card.Description>
         </Card.Header>
         <Card.Content class="flex items-center gap-2 text-sm text-muted-foreground">
           <Badge variant="outline">{LANGUAGE_LABEL[record.language]}</Badge>

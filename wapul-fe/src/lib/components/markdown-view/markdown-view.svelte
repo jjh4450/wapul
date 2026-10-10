@@ -17,6 +17,7 @@
 </script>
 
 <div
+  data-clarity-mask="true"
   class="prose max-w-none dark:prose-invert prose-code:rounded prose-code:bg-muted prose-code:px-1 prose-code:py-0.5 prose-code:font-normal prose-code:before:content-none prose-code:after:content-none"
 >
   <Markdown md={source} {plugins} />

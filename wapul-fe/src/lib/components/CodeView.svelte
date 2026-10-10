@@ -733,7 +733,9 @@
               <span class="w-9 shrink-0 pr-2 text-right text-muted-foreground select-none"
                 >{number}</span
               >
-              <span class="min-w-0 flex-1 pr-6 wrap-anywhere whitespace-pre-wrap"
+              <span
+                class="min-w-0 flex-1 pr-6 wrap-anywhere whitespace-pre-wrap"
+                data-clarity-mask="true"
                 >{#each pieces(number) as piece, i (i)}<span
                     class={cn('rounded-sm', fill(piece.unit))}
                     style={tint(piece.unit)}>{@render colored(number, piece)}</span
@@ -878,7 +880,9 @@
               >{number}</span
             >
           {/if}
-          <span class="min-w-0 flex-1 pr-3 wrap-anywhere whitespace-pre-wrap"
+          <span
+            class="min-w-0 flex-1 pr-3 wrap-anywhere whitespace-pre-wrap"
+            data-clarity-mask="true"
             >{#each pieces(number) as piece, i (i)}{@const unit =
                 piece.unit}{#if onselect && unit !== null}<button
                   type="button"
