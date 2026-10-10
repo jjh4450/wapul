@@ -212,3 +212,27 @@
     next.remove();
   }}
 />
+
+<Story
+  name="CtrlEnterGoesNext"
+  args={{ words, onnext: fn() }}
+  play={async ({ canvas, canvasElement, userEvent, args }) => {
+    const field = canvas.getByLabelText(question);
+
+    // Ctrl+Enter는 칸을 벗어나 저장한 뒤 넘긴다. 줄은 바뀌지 않는다
+    await userEvent.type(field, '정렬');
+    await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    await expect(args.onnext).toHaveBeenCalledOnce();
+    await expect(args.oncommit).toHaveBeenCalledOnce();
+    await expect(field).toHaveValue('정렬');
+    await expect(field).not.toHaveFocus();
+
+    // Mac의 ⌘+Enter도 같고, 열린 자동완성 목록은 닫힌다
+    await userEvent.click(field);
+    await userEvent.type(field, ' ma');
+    await expect(list(canvasElement).getByRole('listbox')).toBeInTheDocument();
+    await userEvent.keyboard('{Meta>}{Enter}{/Meta}');
+    await expect(args.onnext).toHaveBeenCalledTimes(2);
+    await expect(list(canvasElement).queryByRole('listbox')).not.toBeInTheDocument();
+  }}
+/>

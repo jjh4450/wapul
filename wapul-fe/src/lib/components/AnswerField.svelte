@@ -20,7 +20,8 @@
     invalid = false,
     words = [],
     near,
-    oncommit
+    oncommit,
+    onnext
   }: {
     id: string;
     question: string;
@@ -37,6 +38,8 @@
     near?: ReadonlySet<number>;
     /** 치다가 멈추거나 칸을 벗어날 때 저장한다 */
     oncommit?: () => void;
+    /** Ctrl(Mac은 ⌘)+Enter로 넘긴다. 칸을 벗어나 저장한(onblur) 뒤 부른다. Enter만 누르면 줄바꿈이다 */
+    onnext?: () => void;
   } = $props();
 
   const placeholder = $derived(truncate(example, 90));
@@ -152,7 +155,17 @@
 
   function keydown(event: KeyboardEvent) {
     // 한글을 조합하는 중의 키는 입력기 몫이다. Safari는 조합을 끝내는 키에서 isComposing이 거짓이라 Process도 본다
-    if (!menu || event.isComposing || event.key === 'Process') return;
+    if (event.isComposing || event.key === 'Process') return;
+
+    if (onnext && event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      event.preventDefault();
+      textarea?.blur();
+      onnext();
+
+      return;
+    }
+
+    if (!menu) return;
 
     const { items, active } = menu;
 
