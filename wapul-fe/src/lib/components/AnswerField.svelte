@@ -8,6 +8,7 @@
   import type { NameKind } from 'wapul-seg';
   import { suggest, type Name } from '#lib/completions.js';
   import { truncate } from '#lib/study.js';
+  import { settleComposition } from '#lib/composition.js';
   import { cn } from '#lib/utils.js';
 
   let {
@@ -48,6 +49,9 @@
   } satisfies Record<NameKind, string>;
 
   let textarea = $state<HTMLTextAreaElement | null>(null);
+
+  /** 열린 후보 목록. 그 안을 눌러도 칸에서 커서를 빼지 않는다 */
+  let popup = $state<HTMLDivElement | null>(null);
 
   /** 열린 후보 목록. start는 치고 있는 낱말이 시작하는 곳 */
   let menu = $state<{ items: Name[]; active: number; start: number } | null>(null);
@@ -187,6 +191,7 @@
   {/if}
   <Textarea
     bind:ref={textarea}
+    {@attach settleComposition(() => popup)}
     {id}
     bind:value
     {placeholder}
@@ -214,6 +219,7 @@
 {#if menu}
   <Portal>
     <div
+      bind:this={popup}
       {@attach place}
       class="fixed top-0 left-0 z-50 flex w-72 max-w-[calc(100vw-1rem)] flex-col overflow-hidden rounded-xl border bg-popover text-sm text-popover-foreground shadow-md"
     >
