@@ -42,6 +42,22 @@
 
   const problemQuestion = record.questions[0].text;
 
+  /** 답 저장이 늦게 돌아오는 백엔드. 언제 돌려보낼지는 story가 정한다 */
+  const replies: (() => void)[] = [];
+
+  const slowSave = localApi(
+    [record],
+    [
+      [
+        'PATCH /v1/records/:id/answers',
+        () =>
+          new Promise<Response>((done) =>
+            replies.push(() => done(new Response(null, { status: 204 })))
+          )
+      ]
+    ]
+  );
+
   /** 모달이 닫히고 페이지가 다시 눌릴 때까지. bits-ui는 모달이 닫히고도 잠깐 body의 클릭을 막는다 */
   const modalClosed = () =>
     waitFor(() => {
@@ -357,5 +373,31 @@
   play={async ({ canvas, args }) => {
     await waitFor(() => expect(args.onnotowner).toHaveBeenCalledOnce());
     await expect(canvas.queryByRole('textbox')).not.toBeInTheDocument();
+  }}
+/>
+
+<Story
+  name="SendsWhatWasTypedWhileSaving"
+  beforeEach={() => {
+    replies.length = 0;
+
+    return slowSave.install();
+  }}
+  play={async ({ canvas, userEvent }) => {
+    const field = await canvas.findByLabelText(problemQuestion);
+
+    const patches = () => slowSave.callsTo('PATCH', '/v1/records/record-1/answers');
+
+    // 치다가 멈추면 저장을 보낸다. 답이 오기 전에 더 친다
+    await userEvent.type(field, '정렬했기');
+    await waitFor(() => expect(patches()).toHaveLength(1));
+    await userEvent.type(field, ' 때문이다');
+    replies.shift()?.();
+
+    // 보내는 동안 친 글자는 저장된 것으로 치지 않아서, 칸을 벗어날 때 다시 보낸다
+    await userEvent.tab();
+    await waitFor(() => expect(patches()).toHaveLength(2));
+    await expect(JSON.parse(patches()[1].body).answers[0].answer).toBe('정렬했기 때문이다');
+    replies.shift()?.();
   }}
 />

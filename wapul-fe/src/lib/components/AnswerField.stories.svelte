@@ -1,6 +1,6 @@
 <script module lang="ts">
   import { defineMeta } from '@storybook/addon-svelte-csf';
-  import { expect, fn, within } from 'storybook/test';
+  import { expect, fn, waitFor, within } from 'storybook/test';
   import type { Name } from '#lib/completions.js';
   import AnswerField from './AnswerField.svelte';
 
@@ -77,6 +77,18 @@
     await expect(args.oncommit).not.toHaveBeenCalled();
     await userEvent.tab();
     await expect(args.oncommit).toHaveBeenCalledOnce();
+  }}
+/>
+
+<Story
+  name="SavesWhenTypingStops"
+  play={async ({ canvas, userEvent, args }) => {
+    const field = canvas.getByLabelText(question);
+
+    // 칸을 벗어나지 않아도 치다가 멈추면 저장한다. 새로고침해도 쓰던 답이 남는다
+    await userEvent.type(field, '정렬 순서가 보장된다');
+    await waitFor(() => expect(args.oncommit).toHaveBeenCalledOnce());
+    await expect(field).toHaveFocus();
   }}
 />
 

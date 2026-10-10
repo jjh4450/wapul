@@ -291,9 +291,23 @@
     status = kept;
   }
 
-  async function commit(question: QuestionOut): Promise<boolean> {
-    if (saved.get(question.id) === question.answer) return true;
-    const result = await api.saveAnswer(id, question.id, question.answer);
+  /** 질문마다 저장을 차례로 보낸다. 멈췄을 때와 칸을 벗어날 때의 저장이 겹쳐도 나중 값이 남는다 */
+  const sending = new SvelteMap<string, Promise<boolean>>();
+
+  function commit(question: QuestionOut): Promise<boolean> {
+    const next = (sending.get(question.id) ?? Promise.resolve(true)).then(() => send(question));
+
+    sending.set(question.id, next);
+
+    return next;
+  }
+
+  async function send(question: QuestionOut): Promise<boolean> {
+    // 보낸 값만 저장한 것으로 친다. 보내는 동안 더 친 글자는 다음 저장이 보낸다
+    const answer = question.answer;
+
+    if (saved.get(question.id) === answer) return true;
+    const result = await api.saveAnswer(id, question.id, answer);
 
     if (!result.ok) {
       status = result.message;
@@ -301,7 +315,7 @@
       return false;
     }
 
-    saved.set(question.id, question.answer);
+    saved.set(question.id, answer);
     status = kept;
 
     return true;

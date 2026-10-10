@@ -1,5 +1,6 @@
 <script lang="ts">
   import { autoUpdate, computePosition, flip, hide, offset, shift, size } from '@floating-ui/dom';
+  import { onDestroy } from 'svelte';
   import { Portal } from 'bits-ui';
   import { InputRange } from 'dom-input-range';
   import { Label } from '#lib/components/ui/label/index.js';
@@ -33,7 +34,7 @@
     words?: readonly Name[];
     /** 이 질문이 묻는 블럭의 줄. 그 줄에 나온 이름을 먼저 보여준다 */
     near?: ReadonlySet<number>;
-    /** 칸을 벗어날 때 저장한다 */
+    /** 치다가 멈추거나 칸을 벗어날 때 저장한다 */
     oncommit?: () => void;
   } = $props();
 
@@ -162,6 +163,19 @@
     event.preventDefault();
   }
 
+  /** 치다가 이만큼 멈추면 저장한다. 칸을 벗어나지 않고 새로고침해도 쓰던 답이 남게 */
+  const PAUSE_MS = 500;
+
+  let pause: ReturnType<typeof setTimeout> | undefined;
+
+  function typed() {
+    update();
+    clearTimeout(pause);
+    pause = setTimeout(() => oncommit?.(), PAUSE_MS);
+  }
+
+  onDestroy(() => clearTimeout(pause));
+
   // 캐럿만 옮기는 키. 친 낱말을 벗어나므로 목록을 닫는다
   const MOVES = new Set(['ArrowLeft', 'ArrowRight', 'Home', 'End']);
 </script>
@@ -182,12 +196,13 @@
     aria-autocomplete={words.length > 0 ? 'list' : undefined}
     aria-controls={menu ? listId : undefined}
     aria-activedescendant={menu ? `${listId}-${menu.active}` : undefined}
-    oninput={update}
+    oninput={typed}
     onkeydown={keydown}
     onkeyup={(event) => MOVES.has(event.key) && (menu = null)}
     onclick={() => (menu = null)}
     onblur={() => {
       menu = null;
+      clearTimeout(pause);
       oncommit?.();
     }}
   />
