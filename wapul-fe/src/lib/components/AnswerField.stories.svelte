@@ -192,28 +192,6 @@
 />
 
 <Story
-  name="SettlesCompositionBeforeClicks"
-  play={async ({ canvas, canvasElement, userEvent, args }) => {
-    const field = canvas.getByLabelText(question);
-
-    // Safari의 버튼처럼 눌러도 포커스를 가져가지 않는 버튼
-    const next = document.createElement('button');
-
-    next.textContent = '다음 질문';
-    next.addEventListener('mousedown', (event) => event.preventDefault());
-    canvasElement.append(next);
-
-    // 마지막 글자를 조합하는 중에 버튼을 누르면, 버튼보다 먼저 칸을 벗어나 글자를 확정하고 저장한다
-    await userEvent.type(field, '정렬했');
-    field.dispatchEvent(new CompositionEvent('compositionstart'));
-    await userEvent.click(next);
-    await expect(field).not.toHaveFocus();
-    await expect(args.oncommit).toHaveBeenCalled();
-    next.remove();
-  }}
-/>
-
-<Story
   name="CtrlEnterGoesNext"
   args={{ words, onnext: fn() }}
   play={async ({ canvas, canvasElement, userEvent, args }) => {

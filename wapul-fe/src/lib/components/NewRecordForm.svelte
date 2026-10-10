@@ -7,7 +7,6 @@
   import { Label } from '#lib/components/ui/label/index.js';
   import * as NativeSelect from '#lib/components/ui/native-select/index.js';
   import { Textarea } from '#lib/components/ui/textarea/index.js';
-  import { settleComposition } from '#lib/composition.js';
   import { DRAFT_DAYS, browserStorage, clearForm, loadForm, saveForm } from '#lib/drafts.js';
   import { blockFacts, buildQuestions } from '#lib/questions.js';
   import { segmentCode } from '#lib/segment.js';
@@ -189,7 +188,6 @@
       <Label for="problem">1. 어떤 문제인가요?</Label>
       <Input
         id="problem"
-        {@attach settleComposition()}
         bind:value={problem}
         maxlength={__LIMITS__.problem}
         placeholder="문제 제목이나 링크"
@@ -200,12 +198,7 @@
       <Label for="key-idea"
         >2. 코드를 붙여넣기 전에, 풀이의 핵심 아이디어를 한 줄로 적어 주세요</Label
       >
-      <Input
-        id="key-idea"
-        bind:value={keyIdea}
-        maxlength={__LIMITS__.keyIdea}
-        {@attach settleComposition()}
-      />
+      <Input id="key-idea" bind:value={keyIdea} maxlength={__LIMITS__.keyIdea} />
     </div>
 
     {#if ideaWritten}
@@ -220,7 +213,6 @@
         </div>
         <Textarea
           id="code"
-          {@attach settleComposition()}
           bind:value={code}
           maxlength={__LIMITS__.code}
           rows={16}
