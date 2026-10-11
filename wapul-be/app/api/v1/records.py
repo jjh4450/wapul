@@ -14,7 +14,7 @@ from sqlmodel import Session, col, delete, select
 from app.core.auth import CurrentUser, get_current_user
 from app.db.session import get_db, get_db_transactional
 from app.models.base import utc_now_naive
-from app.models.study import Block, GroupMember, GroupRecord, Question, Record
+from app.models.study import Block, BlockKind, GroupMember, GroupRecord, Question, Record
 from app.schemas.study import (
     AnswersUpdate,
     BlockIn,
@@ -96,7 +96,9 @@ def _validate_blocks(unit_count: int, blocks: list[BlockIn]) -> list[BlockIn]:
             if unit in seen:
                 raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"Unit {unit} is in more than one block")
             seen.add(unit)
-    return [BlockIn(kind=b.kind, units=sorted(b.units)) for b in blocks]
+        if block.title is not None and block.kind != BlockKind.LOGIC:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Only logic blocks have a title")
+    return [b.model_copy(update={"units": sorted(b.units)}) for b in blocks]
 
 
 def _validate_questions(block_count: int, questions: list[QuestionIn]) -> None:
@@ -107,24 +109,54 @@ def _validate_questions(block_count: int, questions: list[QuestionIn]) -> None:
             )
 
 
-def _replace_blocks(db: Session, record: Record, blocks: list[BlockIn], questions: list[QuestionIn]) -> None:
-    """블럭과 질문을 통째로 바꾼다. 질문과 남길 답은 브라우저가 정해 보낸다."""
-    db.exec(delete(Question).where(col(Question.record_id) == record.id))
-    db.exec(delete(Block).where(col(Block.record_id) == record.id))
+def _known(kind: str, ids: list[uuid.UUID | None], existing: set[uuid.UUID]) -> None:
+    """보낸 id는 이 기록의 것이고 한 번씩만 온다"""
+    sent = [i for i in ids if i is not None]
+    if len(sent) != len(set(sent)):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"{kind} id sent more than once")
+    for i in sent:
+        if i not in existing:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, f"{kind} {i} is not in this record")
 
-    new_blocks = [Block(record_id=record.id, position=i, kind=b.kind, units=b.units) for i, b in enumerate(blocks)]
-    db.add_all(new_blocks)
-    db.add_all(
-        Question(
-            record_id=record.id,
-            block_id=None if q.block is None else new_blocks[q.block].id,
-            position=i,
-            kind=q.kind,
-            text=q.text,
-            answer=q.answer,
+
+def _save_blocks(db: Session, record: Record, blocks: list[BlockIn], questions: list[QuestionIn]) -> None:
+    """블럭과 질문을 보낸 대로 맞춘다. id가 있는 것은 그 행을 고쳐 id가 그대로 남고, 없는 것은 새로 만들고,
+    보내지 않은 것은 지운다. 질문과 남길 답은 브라우저가 정해 보낸다."""
+    old_blocks = {b.id: b for b in _blocks(db, record.id)}
+    old_questions = {q.id: q for q in _questions(db, record.id)}
+    _known("Block", [b.id for b in blocks], set(old_blocks))
+    _known("Question", [q.id for q in questions], set(old_questions))
+
+    # 질문이 블럭을 가리키므로, 빠진 질문을 먼저 지우고 빠진 블럭은 남은 질문을 옮긴 뒤 지운다
+    kept_questions = {q.id for q in questions}
+    for q in old_questions.values():
+        if q.id not in kept_questions:
+            db.delete(q)
+    db.flush()
+
+    saved: list[Block] = []
+    for i, b in enumerate(blocks):
+        block = old_blocks[b.id] if b.id is not None else Block(record_id=record.id, position=i, kind=b.kind, units=[])
+        block.position, block.kind, block.units, block.title = i, b.kind, b.units, b.title
+        db.add(block)
+        saved.append(block)
+    db.flush()
+
+    for i, q in enumerate(questions):
+        question = (
+            old_questions[q.id]
+            if q.id is not None
+            else Question(record_id=record.id, position=i, kind=q.kind, text=q.text)
         )
-        for i, q in enumerate(questions)
-    )
+        question.block_id = None if q.block is None else saved[q.block].id
+        question.position, question.kind, question.text, question.answer = i, q.kind, q.text, q.answer
+        db.add(question)
+    db.flush()
+
+    kept_blocks = {b.id for b in blocks}
+    for b in old_blocks.values():
+        if b.id not in kept_blocks:
+            db.delete(b)
     db.flush()
 
 
@@ -172,7 +204,7 @@ def create_record(
     )
     db.add(record)
     db.flush()
-    _replace_blocks(db, record, blocks, body.questions)
+    _save_blocks(db, record, blocks, body.questions)
     return _to_out(db, record, user)
 
 
@@ -204,7 +236,7 @@ def update_blocks(
     record = _get_own(db, record_id, user)
     blocks = _validate_blocks(len(record.units), body.blocks)
     _validate_questions(len(blocks), body.questions)
-    _replace_blocks(db, record, blocks, body.questions)
+    _save_blocks(db, record, blocks, body.questions)
     record.updated_at = utc_now_naive()
     db.add(record)
     return _to_out(db, record, user)

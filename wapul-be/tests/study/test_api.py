@@ -67,6 +67,75 @@ class TestRecords:
         assert [(q["kind"], q["answer"]) for q in updated["questions"]] == [("problem", "성질"), ("logic", "")]
         assert updated["questions"][1]["block_id"] == updated["blocks"][0]["id"]
 
+    def test_update_keeps_ids_of_blocks_and_questions_sent_with_id(self, multi_user_e2e):
+        client = multi_user_e2e.as_user("a")
+        rec = _create(client)
+        blocks = [{"id": b["id"], "kind": b["kind"], "units": b["units"]} for b in rec["blocks"]]
+        # 로직 블럭에 제목을 붙이고, 질문 하나를 더한다. 나머지는 그대로 보낸다
+        blocks[1]["title"] = "두 배로 만들기"
+        questions = [
+            {"id": q["id"], "kind": q["kind"], "text": q["text"], "answer": q["answer"]}
+            | ({} if q["block_id"] is None else {"block": [b["id"] for b in rec["blocks"]].index(q["block_id"])})
+            for q in rec["questions"]
+        ] + [{"kind": "revision", "text": "달라진 점은?", "block": 1, "answer": ""}]
+        res = client.put(f"/v1/records/{rec['id']}/blocks", json={"blocks": blocks, "questions": questions})
+        assert res.status_code == 200, res.text
+        updated = res.json()
+        assert [b["id"] for b in updated["blocks"]] == [b["id"] for b in rec["blocks"]]
+        assert [b["title"] for b in updated["blocks"]] == [None, "두 배로 만들기", None]
+        assert [q["id"] for q in updated["questions"]][:-1] == [q["id"] for q in rec["questions"]]
+        assert updated["questions"][-1]["block_id"] == rec["blocks"][1]["id"]
+
+        # 질문과 블럭을 빼면 그 행만 지운다
+        res = client.put(
+            f"/v1/records/{rec['id']}/blocks",
+            json={"blocks": blocks[:2], "questions": questions[:3]},
+        )
+        assert res.status_code == 200, res.text
+        assert [b["id"] for b in res.json()["blocks"]] == [b["id"] for b in rec["blocks"][:2]]
+        assert [q["id"] for q in res.json()["questions"]] == [q["id"] for q in rec["questions"][:3]]
+
+    def test_ids_from_another_record_rejected(self, multi_user_e2e):
+        client = multi_user_e2e.as_user("a")
+        mine, other = _create(client), _create(client)
+        body = {"blocks": [{"id": other["blocks"][0]["id"], "kind": "logic", "units": [0]}], "questions": QUESTIONS[:1]}
+        assert client.put(f"/v1/records/{mine['id']}/blocks", json=body).status_code == 422
+        body = {"blocks": BLOCKS, "questions": [{**QUESTIONS[0], "id": other["questions"][0]["id"]}]}
+        assert client.put(f"/v1/records/{mine['id']}/blocks", json=body).status_code == 422
+        # 새 기록에는 아직 고칠 블럭이 없다
+        assert (
+            client.post(
+                "/v1/records",
+                json={
+                    "problem": "p",
+                    "key_idea": "k",
+                    "code": CODE,
+                    "language": "python",
+                    "units": UNITS,
+                    "blocks": [{**BLOCKS[0], "id": mine["blocks"][0]["id"]}, *BLOCKS[1:]],
+                    "questions": QUESTIONS,
+                },
+            ).status_code
+            == 422
+        )
+
+    @pytest.mark.parametrize(
+        "title",
+        ["", " 앞 공백", "줄\n바꿈", "가" * 31],
+    )
+    def test_invalid_titles_rejected(self, multi_user_e2e, title):
+        client = multi_user_e2e.as_user("a")
+        rec = _create(client)
+        blocks = [BLOCKS[0], {**BLOCKS[1], "title": title}, BLOCKS[2]]
+        body = {"blocks": blocks, "questions": QUESTIONS[:1]}
+        assert client.put(f"/v1/records/{rec['id']}/blocks", json=body).status_code == 422
+
+    def test_title_only_on_logic_blocks(self, multi_user_e2e):
+        client = multi_user_e2e.as_user("a")
+        rec = _create(client)
+        body = {"blocks": [{**BLOCKS[0], "title": "입력 읽기"}, *BLOCKS[1:]], "questions": QUESTIONS[:1]}
+        assert client.put(f"/v1/records/{rec['id']}/blocks", json=body).status_code == 422
+
     @pytest.mark.parametrize(
         "blocks",
         [

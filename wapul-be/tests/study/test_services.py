@@ -101,3 +101,28 @@ class TestLayouts:
         )
         for lay in build_layouts(record, blocks, [revision]):
             assert "### 처음 제출과의 차이\n\n#### 로직 1\n\n**R?**\n\n고쳤다" in lay.markdown
+
+    def test_titled_logic_block_is_called_by_its_title(self):
+        record = Record(
+            owner_id="u",
+            owner_name="u",
+            problem="p",
+            key_idea="k",
+            code="a = 1\nb = 2\n",
+            language=Language.PYTHON,
+            units=[_unit(1, 0, 5), _unit(2, 0, 5)],
+        )
+        blocks = [
+            Block(record_id=record.id, position=0, kind=BlockKind.LOGIC, units=[0], title="초기화"),
+            Block(record_id=record.id, position=1, kind=BlockKind.LOGIC, units=[1]),
+        ]
+        revisions = [
+            Question(
+                record_id=record.id, block_id=b.id, position=i, kind=QuestionKind.REVISION, text="R?", answer="고쳤다"
+            )
+            for i, b in enumerate(blocks)
+        ]
+        # 제목이 없는 블럭은 제목 있는 블럭도 센 순번으로 부른다
+        for lay in build_layouts(record, blocks, revisions):
+            assert "#### 초기화\n\n**R?**" in lay.markdown
+            assert "#### 로직 2\n\n**R?**" in lay.markdown

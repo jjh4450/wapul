@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "wapul-be",
-    "version": "69b2d193a160"
+    "version": "7aaa73e6abcb"
   },
   "paths": {
     "/v1/records": {
@@ -621,6 +621,18 @@
       },
       "BlockIn": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "kind": {
             "$ref": "#/components/schemas/BlockKind"
           },
@@ -631,6 +643,19 @@
             "type": "array",
             "minItems": 1,
             "title": "Units"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 30,
+                "pattern": "^\\S(?:[^\\r\\n]*\\S)?$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           }
         },
         "type": "object",
@@ -638,7 +663,8 @@
           "kind",
           "units"
         ],
-        "title": "BlockIn"
+        "title": "BlockIn",
+        "description": "블럭 하나. id가 있으면 이 기록에 이미 있는 블럭을 고치고, 없으면 새로 만든다"
       },
       "BlockKind": {
         "type": "string",
@@ -665,13 +691,25 @@
             },
             "type": "array",
             "title": "Units"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
           }
         },
         "type": "object",
         "required": [
           "id",
           "kind",
-          "units"
+          "units",
+          "title"
         ],
         "title": "BlockOut"
       },
@@ -891,6 +929,18 @@
       },
       "QuestionIn": {
         "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "uuid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
           "kind": {
             "$ref": "#/components/schemas/QuestionKind"
           },

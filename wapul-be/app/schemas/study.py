@@ -28,13 +28,19 @@ class Unit(CustomModel):
 
 
 class BlockIn(CustomModel):
+    """블럭 하나. id가 있으면 이 기록에 이미 있는 블럭을 고치고, 없으면 새로 만든다"""
+
+    id: uuid.UUID | None = None
     kind: BlockKind
     units: list[int] = Field(min_length=1)  # 기록의 units 번호
+    # 로직 블럭에만 붙이는 한 줄 제목. 결과물의 소제목에 그대로 들어가서 앞뒤 공백과 줄바꿈을 받지 않는다
+    title: str | None = Field(default=None, max_length=30, pattern=r"^\S(?:[^\r\n]*\S)?$")
 
 
 class QuestionIn(CustomModel):
     """질문은 브라우저가 블럭을 보고 만든다. 블럭을 고칠 때는 그대로 남은 질문의 답을 실어 보낸다."""
 
+    id: uuid.UUID | None = None  # 있으면 이 기록에 이미 있는 질문을 고치고, 없으면 새로 만든다
     kind: QuestionKind
     text: str = Field(min_length=1, max_length=500)
     block: int | None = None  # 함께 보낸 blocks의 번호, 기록 단위 질문이면 없음
@@ -75,6 +81,7 @@ class BlockOut(CustomModel):
     id: uuid.UUID
     kind: BlockKind
     units: list[int]
+    title: str | None
 
 
 class QuestionOut(CustomModel):

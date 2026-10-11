@@ -51,13 +51,14 @@ class _Parts:
         self.record = record
         self.blocks = blocks
         self.lines = record.code.splitlines()
-        # 블럭에 이름이 없어 종류와 로직 순번으로 부른다
+        # 제목을 붙인 로직 블럭은 제목으로, 나머지는 종류와 로직 순번으로 부른다. 순번은 제목이 있는
+        # 블럭도 세어서, 제목을 붙여도 다른 블럭의 번호가 밀리지 않는다
         self.labels: dict[uuid.UUID, str] = {}
         logic = 0
         for block in blocks:
             if block.kind == BlockKind.LOGIC:
                 logic += 1
-                self.labels[block.id] = f"로직 {logic}"
+                self.labels[block.id] = block.title or f"로직 {logic}"
             else:
                 self.labels[block.id] = "입력" if block.kind == BlockKind.INPUT else "출력"
         answered = [q for q in questions if q.answer.strip()]

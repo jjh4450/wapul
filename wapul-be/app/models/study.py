@@ -73,6 +73,8 @@ class Block(UUIDBase, table=True):
     kind: BlockKind
     # 이 블럭에 든 문장의 Record.units 번호. 떨어져 있을 수 있다
     units: list[int] = Field(sa_column=Column(JSON, nullable=False))
+    # 사용자가 붙인 로직 블럭의 제목. 없으면 종류와 로직 순번(로직 1)으로 부른다
+    title: str | None = None
 
 
 class Question(UUIDBase, table=True):
