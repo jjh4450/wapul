@@ -267,13 +267,23 @@ export function keepQuestions(
   const newIndex = new Map(blocks.map((b, i) => [blockKey(b), i]));
   const at = (block: string | null) => (block === null ? '' : (oldKeys.get(block) ?? '?'));
 
+  // 이어 쓰는 질문은 이전 질문의 id를 실어 그 질문을 고친다(백엔드가 id를 그대로 둔다). 한 질문은 한 번만 잇는다
+  const used = new Set<string>();
+
   const kept = questions.map((q) => {
     if (q.kind === 'varying') return q;
 
     const key = q.block === undefined || q.block === null ? '' : blockKey(blocks[q.block]);
-    const same = old.questions.find((o) => o.kind === q.kind && at(o.block_id) === key);
 
-    return same ? { ...q, text: same.text, answer: same.answer } : q;
+    const same = old.questions.find(
+      (o) => !used.has(o.id) && o.kind === q.kind && at(o.block_id) === key
+    );
+
+    if (same === undefined) return q;
+
+    used.add(same.id);
+
+    return { ...q, id: same.id, text: same.text, answer: same.answer };
   });
 
   const oldVarying = old.questions.find((q) => q.kind === 'varying');
@@ -294,6 +304,7 @@ export function keepQuestions(
 
   rest.splice(after + 1, 0, {
     ...ask('varying', oldVarying.text, block ?? undefined),
+    id: oldVarying.id,
     answer: oldVarying.answer
   });
 

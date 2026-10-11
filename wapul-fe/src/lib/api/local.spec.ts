@@ -108,6 +108,67 @@ describe('local backend', () => {
     ).toEqual({ ok: false, message: '요청을 처리하지 못했어요. (500)' });
   });
 
+  it('keeps the ids of blocks and questions sent with id, like the backend', async () => {
+    const created = await api.createRecord(create);
+
+    if (!created.ok) throw new Error(created.message);
+
+    const { id, blocks, questions } = created.data;
+
+    const updated = await api.updateBlocks(
+      id,
+      blocks
+        .map((b) => ({ id: b.id, kind: b.kind, units: b.units, title: b.title }))
+        .with(1, {
+          id: blocks[1].id,
+          kind: 'logic',
+          units: blocks[1].units,
+          title: '정렬'
+        }),
+      [
+        { id: questions[0].id, kind: 'logic', text: '왜 그런가요?', block: 1, answer: '' },
+        { kind: 'revision', text: '달라진 점은?', block: 1, answer: '' }
+      ]
+    );
+
+    if (!updated.ok) throw new Error(updated.message);
+
+    expect(updated.data.blocks.map((b) => [b.id, b.title])).toEqual(
+      blocks.map((b, i) => [b.id, i === 1 ? '정렬' : null])
+    );
+    expect(updated.data.questions[0].id).toBe(questions[0].id);
+    expect(updated.data.questions[1].id).not.toBe(questions[0].id);
+  });
+
+  it('refuses ids the record does not have, repeated ids and titles off logic blocks', async () => {
+    const rejected = { ok: false, message: expect.any(String) };
+
+    const ask = [{ kind: 'logic' as const, text: '왜?', block: 0, answer: '' }];
+
+    expect(
+      await api.updateBlocks('record-1', [{ id: 'shared-block', kind: 'logic', units: [0] }], ask)
+    ).toEqual(rejected);
+    expect(
+      await api.updateBlocks(
+        'record-1',
+        [
+          { id: 'block-input', kind: 'input', units: [0] },
+          { id: 'block-input', kind: 'logic', units: [1] }
+        ],
+        ask
+      )
+    ).toEqual(rejected);
+    expect(
+      await api.updateBlocks('record-1', [{ kind: 'input', units: [0], title: '읽기' }], ask)
+    ).toEqual(rejected);
+    expect(
+      await api.createRecord({
+        ...create,
+        blocks: [{ ...create.blocks[0], id: 'block-input' }, ...create.blocks.slice(1)]
+      })
+    ).toEqual(rejected);
+  });
+
   it('answers 404 for a record or question it does not have', async () => {
     const missing = { ok: false, message: '찾을 수 없어요.' };
 

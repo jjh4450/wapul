@@ -66,9 +66,9 @@ export const record: RecordOut = {
   is_owner: true,
   group_ids: [],
   blocks: [
-    { id: 'block-input', kind: 'input', units: [3, 4, 5, 6, 7] },
-    { id: 'block-logic', kind: 'logic', units: [8, 9, 10, 11, 12, 13] },
-    { id: 'block-output', kind: 'output', units: [14] }
+    { id: 'block-input', kind: 'input', units: [3, 4, 5, 6, 7], title: null },
+    { id: 'block-logic', kind: 'logic', units: [8, 9, 10, 11, 12, 13], title: null },
+    { id: 'block-output', kind: 'output', units: [14], title: null }
   ],
   questions: [
     {

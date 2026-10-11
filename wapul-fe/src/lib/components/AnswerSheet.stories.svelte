@@ -16,7 +16,7 @@
     args: { id: 'record-1', backend: true, onfinish: fn(), onnotowner: fn() }
   });
 
-  // 기록은 브라우저 안의 백엔드가 답한다. 블럭을 고치면 백엔드처럼 블럭과 질문에 새 id가 붙는다
+  // 기록은 브라우저 안의 백엔드가 답한다. 블럭을 고치면 백엔드처럼 id를 실어 보낸 블럭과 질문은 id가 그대로다
   const writing = localApi([record]);
 
   // 문제 질문에 이미 답한 기록
@@ -60,8 +60,8 @@
   );
 
   /**
-   * 블럭 저장(틀렸다 표시)의 답이 늦게 돌아오는 백엔드. 백엔드처럼 바로 바꾸고 답만 붙잡아서, 그동안 옛 id로
-   * 보낸 저장은 찾지 못한다. 언제 돌려보낼지는 story가 정한다
+   * 블럭 저장(틀렸다 표시)의 답이 늦게 돌아오는 백엔드. 백엔드처럼 바로 바꾸고 답만 붙잡아서, 그동안 보낸
+   * 답 저장은 그 요청보다 먼저 저장된다. 언제 돌려보낼지는 story가 정한다
    */
   const marks: (() => void)[] = [];
 
@@ -94,8 +94,8 @@
     {
       ...record,
       blocks: [
-        { id: 'block-input', kind: 'input', units: [3, 4, 5, 6] },
-        { id: 'block-read', kind: 'logic', units: [7] },
+        { id: 'block-input', kind: 'input', units: [3, 4, 5, 6], title: null },
+        { id: 'block-read', kind: 'logic', units: [7], title: null },
         ...record.blocks.slice(1)
       ],
       questions: [
@@ -268,18 +268,21 @@
 
     const input = () => within(canvas.getByRole('region', { name: '입력' }));
 
-    await userEvent.type(input().getByRole('textbox', { name: /입력 조건/ }), 'N은 10만 이하');
+    const field = input().getByRole('textbox', { name: /입력 조건/ });
+
+    await userEvent.type(field, 'N은 10만 이하');
 
     // 답 쓰다가 틀렸던 블럭이라고 켜면 그 묶음 끝에 달라진 점 질문이 붙는다. 쓰던 답도 함께 저장된다
     await userEvent.click(input().getByRole('checkbox', { name: /처음 제출에서 틀렸어요/ }));
 
-    // 저장하면 블럭과 질문의 id가 바뀌어 묶음을 새로 그리므로 매번 다시 찾는다. 쓰던 질문은 그대로 펼쳐져 있다
+    // 블럭과 질문은 id가 그대로라 답 칸을 다시 그리지 않는다. 쓰던 질문은 그대로 펼쳐져 있다
     await waitFor(() =>
       expect(
         input().getByRole('button', { name: /^처음 제출(에서|과).*, 선택$/ })
       ).toBeInTheDocument()
     );
-    await expect(input().getByRole('textbox', { name: /입력 조건/ })).toHaveValue('N은 10만 이하');
+    await expect(input().getByRole('textbox', { name: /입력 조건/ })).toBe(field);
+    await expect(field).toHaveValue('N은 10만 이하');
     await expect(rule(canvasElement, '입력')).toHaveAccessibleName(
       '입력, 질문 2개 중 2개 답함, 선택 질문 1개'
     );
@@ -291,12 +294,13 @@
 
     const [call] = writing.callsTo('PUT', '/v1/records/record-1/blocks');
 
-    const sent = JSON.parse(call.body).questions.map((q: QuestionIn) => [q.kind, q.block]);
+    const sent = JSON.parse(call.body).questions.map((q: QuestionIn) => [q.kind, q.block, q.id]);
 
+    // 있던 질문은 id를 실어 고치고, 새 달라진 점 질문만 id 없이 보낸다
     await expect(sent.slice(1, 4)).toEqual([
-      ['input_meaning', 0],
-      ['input_condition', 0],
-      ['revision', 0]
+      ['input_meaning', 0, 'q-input-meaning'],
+      ['input_condition', 0, 'q-input-condition'],
+      ['revision', 0, undefined]
     ]);
   }}
 />
@@ -345,12 +349,12 @@
 
     await userEvent.type(field(), ' 10만 이하{ArrowLeft}{ArrowLeft}');
 
-    // 표시를 저장하는 동안에는 치다 멈춰도 옛 id로 보내지 않는다
+    // 표시를 저장하는 동안에는 치다 멈춰도 보내지 않는다. 그 요청에 실린 답이 이 답을 덮지 않게 뒤에 보낸다
     await autosaved();
     await expect(patches()).toHaveLength(sent);
     marks.shift()?.();
 
-    // 칸을 새 id로 다시 그려도 더 친 글자와 커서 자리는 그 칸에 남고, 더 친 답은 새 id로 저장한다
+    // 표시를 저장해도 더 친 글자와 커서 자리는 그 칸에 남고, 더 친 답은 그 뒤에 저장한다
     await waitFor(() =>
       expect(
         input().getByRole('button', { name: /^처음 제출(에서|과).*, 선택$/ })

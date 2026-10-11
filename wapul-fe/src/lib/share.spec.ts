@@ -55,6 +55,24 @@ describe('share link', () => {
     ).toBe(false);
   });
 
+  it('carries block titles, and an untitled record still matches an old link', async () => {
+    const titled = {
+      ...record,
+      blocks: record.blocks.map((b) => (b.kind === 'logic' ? { ...b, title: '정렬' } : b))
+    };
+
+    const link = await encodeShare(titled);
+
+    if (!link.ok) throw new Error(link.message);
+
+    const content = await unpackRecord(link.data);
+
+    expect(content.blocks.map((b) => b.title)).toEqual([undefined, '정렬', undefined]);
+    expect(holds(titled, content)).toBe(true);
+    // 제목 없는 기록은 제목 칸 없이 담겨, 예전 링크와 같은 내용으로 보인다
+    expect(holds(record, created)).toBe(true);
+  });
+
   it('round-trips a record', async () => {
     const link = await encodeShare(record);
 

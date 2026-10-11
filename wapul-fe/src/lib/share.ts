@@ -41,7 +41,10 @@ function toCreate(record: RecordOut): RecordCreate {
     language: record.language,
     code: record.code,
     units: record.units,
-    blocks: record.blocks.map(({ kind, units }) => ({ kind, units })),
+    // 제목은 있을 때만 싣는다. 제목 없는 예전 링크와 담긴 기록이 다시 열 때도 같은 내용으로 보인다(holds)
+    blocks: record.blocks.map(({ kind, units, title }) =>
+      title === null ? { kind, units } : { kind, units, title }
+    ),
     questions: record.questions.map(({ kind, text, answer, block_id }) => ({
       kind,
       text,

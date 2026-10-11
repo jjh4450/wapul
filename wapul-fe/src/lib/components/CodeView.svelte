@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack, type Snippet } from 'svelte';
   import { SvelteMap } from 'svelte/reactivity';
-  import { IconChevronDown, IconX } from '@tabler/icons-svelte';
+  import { IconChevronDown, IconPencil, IconX } from '@tabler/icons-svelte';
   import type { BlockKind, Language, Span } from '#lib/api/client.js';
   import * as DropdownMenu from '#lib/components/ui/dropdown-menu/index.js';
   import { highlight, type Tint } from '#lib/highlight.js';
@@ -21,7 +21,7 @@
    */
   type Drag = { by: 'unit' | 'line'; from: number; to: number };
 
-  type Block = { kind: BlockKind; units: number[]; wrong?: boolean };
+  type Block = { kind: BlockKind; units: number[]; title?: string | null; wrong?: boolean };
 
   /**
    * 화면 위나 아래의 돋보기 창. 줄 from~to를 모두 담고, target은 창이 뜰 때 가운데에 둘 줄, marks는
@@ -107,6 +107,7 @@
     onkind,
     onwrong,
     onremove,
+    onrename,
     onpick,
     after,
     class: className
@@ -131,6 +132,8 @@
     onwrong?: (block: number, wrong: boolean) => void;
     /** 주면 범례에서 블럭을 뺄 수 있다 */
     onremove?: (block: number) => void;
+    /** 주면 범례에서 로직 블럭에 제목을 붙일 수 있다. 빈 제목은 지운다 */
+    onrename?: (block: number, title: string) => void;
     /** 주면 문장이나 블럭 이름을 눌러 그 블럭을 고를 수 있다 (답 쓰기에서 그 블럭의 질문 묶음을 연다) */
     onpick?: (block: number) => void;
     /** 줄 아래에 끼울 내용 (질문 스레드, 블럭 고르는 창). 줄 번호를 받는다 */
@@ -142,6 +145,23 @@
 
   /** 마우스를 올린 문장이나 블럭 이름의 블럭. 그 블럭의 문장을 모두 진하게 칠한다 */
   let hovered = $state<number | null>(null);
+
+  /** 범례에서 제목을 고치는 블럭 */
+  let renaming = $state<number | null>(null);
+
+  /** 제목 칸을 열면 커서를 두고 글자를 고른다 */
+  const editTitle = (input: HTMLInputElement) => {
+    input.focus();
+    input.select();
+  };
+
+  /** 고친 제목을 넘기고 칸을 닫는다. Esc로 닫으면(취소) 넘기지 않는다 */
+  function rename(block: number, input: HTMLInputElement) {
+    if (renaming !== block) return;
+
+    renaming = null;
+    onrename?.(block, input.value);
+  }
 
   let root = $state<HTMLDivElement>();
 
@@ -720,7 +740,9 @@
         style="transform: translateY({side === 'top' ? -pulled : pulled}px)"
       >
         <p class="flex items-center gap-1.5 px-4 pt-2 pb-1">
-          <span class={cn('size-2 rounded-full', colors[block].bar)}></span>{labels[block]}
+          <span class={cn('size-2 rounded-full', colors[block].bar)}></span><span
+            data-clarity-mask="true">{labels[block]}</span
+          >
         </p>
         <!-- 본문과 똑같이 칠하고, 화면과 겹친 줄은 흐리게 둔다 -->
         <div class="font-mono leading-5">
@@ -806,12 +828,29 @@
             data-block={i}
           >
             <span class={cn('size-2 rounded-full', colors[i].bar)}></span>
-            {#if onkind}
+            {#if renaming === i}
+              <input
+                {@attach editTitle}
+                class="w-36 rounded-sm bg-background px-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                value={blocks[i].title ?? ''}
+                maxlength={__LIMITS__.blockTitle}
+                placeholder={label}
+                aria-label="{label} 제목"
+                data-clarity-mask="true"
+                onkeydown={(event) => {
+                  if (event.key === 'Enter') rename(i, event.currentTarget);
+                  else if (event.key === 'Escape') renaming = null;
+                }}
+                onblur={(event) => rename(i, event.currentTarget)}
+              />
+            {:else if onkind}
               <DropdownMenu.Root>
                 <DropdownMenu.Trigger
                   class="-mx-1 inline-flex cursor-pointer items-center gap-0.5 rounded-sm px-1 hover:bg-foreground/10"
                   aria-label="{label} 종류 바꾸기"
-                  >{label}<IconChevronDown class="size-3" /></DropdownMenu.Trigger
+                  ><span data-clarity-mask="true">{label}</span><IconChevronDown
+                    class="size-3"
+                  /></DropdownMenu.Trigger
                 >
                 <DropdownMenu.Content class="w-32" align="start">
                   <DropdownMenu.Group>
@@ -838,7 +877,15 @@
                 </DropdownMenu.Content>
               </DropdownMenu.Root>
             {:else}
-              {label}
+              <span data-clarity-mask="true">{label}</span>
+            {/if}
+            {#if onrename && blocks[i].kind === 'logic' && renaming !== i}
+              <button
+                type="button"
+                class="-mx-0.5 cursor-pointer rounded-sm p-0.5 hover:bg-foreground/10"
+                aria-label="{label} 제목 바꾸기"
+                onclick={() => (renaming = i)}><IconPencil class="size-3" /></button
+              >
             {/if}
             {#if blocks[i].units.length === 0}
               <span class="text-muted-foreground">· 비어 있음</span>
@@ -914,7 +961,8 @@
                 onpick && 'cursor-pointer'
               )}
               style={colors[block].style}
-              data-block={block}>{labels[block]}</span
+              data-block={block}
+              data-clarity-mask="true">{labels[block]}</span
             >
           {/each}
         </div>

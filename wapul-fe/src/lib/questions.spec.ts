@@ -103,8 +103,8 @@ describe('keepQuestions', () => {
   const old: RecordOut = {
     ...record,
     blocks: [
-      { id: 'b-in', kind: 'input', units: [0] },
-      { id: 'b-logic', kind: 'logic', units: [1, 2] }
+      { id: 'b-in', kind: 'input', units: [0], title: null },
+      { id: 'b-logic', kind: 'logic', units: [1, 2], title: null }
     ],
     questions: [
       { id: 'q1', block_id: null, kind: 'problem', text: '옛 문제 질문', answer: '성질' },
@@ -136,7 +136,33 @@ describe('keepQuestions', () => {
     expect(kept.find((q) => q.kind === 'logic')).toMatchObject({ answer: '', block: 1 });
     // 바뀌는 질문이 붙었던 입력 블럭이 남아 있어서 이전 질문을 그대로 쓴다
     expect(kept.filter((q) => q.kind === 'varying')).toEqual([
-      { kind: 'varying', text: '옛 바뀌는 질문', answer: '관점', block: 0 }
+      { id: 'q4', kind: 'varying', text: '옛 바뀌는 질문', answer: '관점', block: 0 }
+    ]);
+
+    // 이어 쓰는 질문은 이전 질문의 id를 실어 그 질문을 고치고, 새 질문에는 id가 없다
+    const carried = new Map([
+      ['problem', 'q1'],
+      ['input_meaning', 'q2'],
+      ['varying', 'q4']
+    ]);
+
+    for (const q of kept) expect(q.id).toBe(carried.get(q.kind));
+  });
+
+  it('carries one old question into one new question only', () => {
+    // 같은 블럭에 같은 종류 질문이 둘이면 이전 질문 하나를 둘 다 고치지 않는다(백엔드가 겹친 id를 거절한다)
+    const kept = keepQuestions(
+      [
+        { kind: 'input_meaning', text: 'A', block: 0, answer: '' },
+        { kind: 'input_meaning', text: 'B', block: 0, answer: '' }
+      ],
+      [{ kind: 'input', units: [0] }],
+      old
+    );
+
+    expect(kept.filter((q) => q.kind === 'input_meaning').map((q) => q.id)).toEqual([
+      'q2',
+      undefined
     ]);
   });
 

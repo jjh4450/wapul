@@ -61,8 +61,10 @@
     // 처음 제출에서 틀렸다는 표시는 그 블럭에 붙은 달라진 점 질문으로 남아 있다
     editing = new BlockDraft(
       result.data.blocks.map((b) => ({
+        id: b.id,
         kind: b.kind,
         units: [...b.units],
+        title: b.title,
         wrong: result.data.questions.some((q) => q.kind === 'revision' && q.block_id === b.id)
       }))
     );
@@ -96,7 +98,8 @@
     }
 
     const questions = buildQuestions(blockFacts(record.units, kept));
-    const sent = kept.map(({ kind, units }) => ({ kind, units }));
+    // 있던 블럭은 id를 실어 그 블럭을 고친다. 새 블럭은 id 없이 보낸다
+    const sent = kept.map(({ id, kind, units, title }) => ({ id, kind, units, title }));
 
     saving = true;
 
@@ -124,7 +127,8 @@
       aria-label="고른 문장을 넣을 블럭"
     >
       <span class="px-1 text-muted-foreground">문장 {editing.selected.length}개를</span>
-      {#each editing.choices as choice (choice.label)}
+      <!-- 제목은 사용자가 정해서 겹칠 수 있다. 라벨이 아니라 순서로 구분한다 -->
+      {#each editing.choices as choice, i (i)}
         <Button variant="outline" size="sm" onclick={() => editing.place(choice.into)}>
           {#if choice.color}<span
               class={cn('size-2 rounded-full', choice.color.bar)}
@@ -146,7 +150,8 @@
   <p class="mt-1 mb-6 text-sm text-muted-foreground">
     코드를 끌어서 문장을 고른 뒤 넣을 블럭을 고르세요. 어디서 끌든 끈 범위에 온전히 든 문장만
     골라요. 줄 번호를 끌면 그 줄의 문장을 모두 골라요. 한 블럭의 문장이 떨어져 있어도 괜찮아요.
-    블럭의 종류와 처음 제출에서 틀렸는지는 위의 블럭 이름을 눌러 바꿔요.
+    블럭의 종류와 처음 제출에서 틀렸는지는 위의 블럭 이름을 눌러 바꾸고, 로직 블럭의 제목은 연필을
+    눌러 붙여요.
   </p>
 
   <div class="grid max-w-4xl gap-3">
@@ -176,6 +181,7 @@
       onselect={(picked) => (editing.selected = picked)}
       onkind={(i, kind) => editing.setKind(i, kind)}
       onwrong={(i, wrong) => editing.setWrong(i, wrong)}
+      onrename={(i, title) => editing.setTitle(i, title)}
       onremove={(i) => editing.remove(i)}
       after={picker}
     />

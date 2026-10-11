@@ -83,9 +83,10 @@
 
     const { blocks, questions } = JSON.parse(call.body);
 
+    // 있던 블럭은 id를 실어 그 블럭을 고치고, 새로 만든 블럭은 id 없이 보낸다
     await expect(blocks).toEqual([
-      { kind: 'input', units: [3, 4, 5, 6, 7] },
-      { kind: 'logic', units: [9, 10, 11, 12, 13] },
+      { id: 'block-input', kind: 'input', units: [3, 4, 5, 6, 7], title: null },
+      { id: 'block-logic', kind: 'logic', units: [9, 10, 11, 12, 13], title: null },
       { kind: 'logic', units: [8] }
     ]);
 
@@ -105,6 +106,7 @@
       ]
     );
     await expect(questions[1]).toEqual({
+      id: record.questions[1].id,
       kind: 'input_meaning',
       text: record.questions[1].text,
       answer: record.questions[1].answer,
@@ -225,9 +227,53 @@
     const [call] = editing.callsTo('PUT', '/v1/records/record-1/blocks');
 
     await expect(JSON.parse(call.body).blocks).toEqual([
-      { kind: 'input', units: [3, 4, 5, 6, 7] },
-      { kind: 'output', units: [8, 9, 10, 11, 12, 13, 14] }
+      { id: 'block-input', kind: 'input', units: [3, 4, 5, 6, 7], title: null },
+      { id: 'block-output', kind: 'output', units: [8, 9, 10, 11, 12, 13, 14], title: null }
     ]);
+  }}
+/>
+
+<Story
+  name="TitleLogicBlock"
+  beforeEach={() => editing.install()}
+  play={async ({ canvas, userEvent, args }) => {
+    const blockNames = () =>
+      canvas
+        .getAllByRole('button', { name: /블럭 빼기$/ })
+        .map((b) => b.getAttribute('aria-label'));
+
+    // 로직 블럭만 연필로 제목을 붙인다. Enter로 정하고 Esc로 그만둔다
+    await userEvent.click(await canvas.findByRole('button', { name: '로직 1 제목 바꾸기' }));
+    await expect(canvas.queryByRole('button', { name: '입력 제목 바꾸기' })).toBeNull();
+    await userEvent.keyboard('정렬{Enter}');
+    await expect(blockNames()).toEqual(['입력 블럭 빼기', '정렬 블럭 빼기', '출력 블럭 빼기']);
+
+    await userEvent.click(canvas.getByRole('button', { name: '정렬 제목 바꾸기' }));
+    await userEvent.keyboard('{Control>}a{/Control}끝{Escape}');
+    await expect(blockNames()).toEqual(['입력 블럭 빼기', '정렬 블럭 빼기', '출력 블럭 빼기']);
+
+    // 되돌리고 다시 할 수 있다
+    await userEvent.click(canvas.getByRole('button', { name: '되돌리기' }));
+    await expect(blockNames()).toContain('로직 1 블럭 빼기');
+    await userEvent.click(canvas.getByRole('button', { name: '다시 하기' }));
+    await expect(blockNames()).toContain('정렬 블럭 빼기');
+
+    // 저장하면 블럭과 질문의 id가 그대로이고 제목만 바뀐다
+    await userEvent.click(canvas.getByRole('button', { name: '이대로 질문 받기' }));
+    await waitFor(() => expect(args.onsaved).toHaveBeenCalledOnce());
+
+    const saved = await (await fetch('/v1/records/record-1')).json();
+
+    await expect(
+      saved.blocks.map((b: { id: string; title: string | null }) => [b.id, b.title])
+    ).toEqual([
+      ['block-input', null],
+      ['block-logic', '정렬'],
+      ['block-output', null]
+    ]);
+    await expect(saved.questions.map((q: { id: string }) => q.id)).toEqual(
+      record.questions.map((q) => q.id)
+    );
   }}
 />
 

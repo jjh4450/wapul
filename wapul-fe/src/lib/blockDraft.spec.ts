@@ -126,7 +126,33 @@ describe('BlockDraft', () => {
 
     draft.setKind(1, 'input');
 
-    expect(draft.blocks).toEqual([block('input', [1]), block('logic', [3])]);
+    expect(draft.blocks).toEqual([{ ...block('input', [1]), title: null }, block('logic', [3])]);
+  });
+
+  it('keeps ids and titles while units move, and drops the title of a block that stops being logic', () => {
+    const draft = new BlockDraft([
+      { id: 'b1', kind: 'logic', units: [0, 1], title: '정렬', wrong: false },
+      { id: 'b2', kind: 'logic', units: [2], title: null, wrong: false }
+    ]);
+
+    // 문장을 옮겨도 블럭은 제 id와 제목을 지킨다
+    put(draft, [1], '로직 2');
+    expect(draft.blocks.map((b) => [b.id, b.title, b.units])).toEqual([
+      ['b1', '정렬', [0]],
+      ['b2', null, [1, 2]]
+    ]);
+    expect(draft.labels).toEqual(['정렬', '로직 2']);
+
+    // 앞뒤 공백은 떼고, 빈 제목은 지워서 로직 순번으로 부른다
+    draft.setTitle(0, ' 정렬하기 ');
+    draft.setTitle(1, '  ');
+    expect(draft.labels).toEqual(['정렬하기', '로직 2']);
+    draft.setTitle(0, '');
+    expect(draft.labels).toEqual(['로직 1', '로직 2']);
+
+    // 제목은 로직 블럭에만 붙는다
+    draft.setKind(0, 'output');
+    expect(draft.blocks.find((b) => b.kind === 'output')).toMatchObject({ id: 'b1', title: null });
   });
 
   it('marks and removes blocks', () => {

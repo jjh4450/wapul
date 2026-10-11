@@ -6,6 +6,7 @@
  * 사용자가 쓴 문장은 그대로 옮긴다. 답이 빈 질문은 싣지 않는다.
  */
 import type { BlockOut, LayoutOut, QuestionOut, RecordOut } from '#lib/api/client.js';
+import { blockLabels } from '#lib/study.js';
 
 function fence(code: string, language: string): string {
   // 코드 안의 백틱 줄보다 긴 펜스를 써야 블럭이 중간에 끊기지 않는다
@@ -38,14 +39,9 @@ export function buildLayouts(record: RecordOut): LayoutOut[] {
   // 문장 위치(units)와 같은 기준으로 줄을 나눈다
   const lines = record.code.split('\n');
 
-  // 블럭에 이름이 없어 종류와 로직 순번으로 부른다
-  let logic = 0;
-
+  // 화면과 같은 이름으로 부른다: 제목, 없으면 종류와 로직 순번
   const labels = new Map<string, string>(
-    blocks.map((b) => [
-      b.id,
-      b.kind === 'logic' ? `로직 ${++logic}` : b.kind === 'input' ? '입력' : '출력'
-    ])
+    blockLabels(blocks).map((label, i) => [blocks[i].id, label])
   );
 
   // 질문은 한 번만 나눠 둔다 (블럭마다 전체를 다시 훑으면 질문과 블럭이 많은 기록에서 멈춘다)

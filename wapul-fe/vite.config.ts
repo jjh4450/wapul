@@ -54,10 +54,11 @@ function contractSchemas(roots: string[]) {
 function maxLength(name: string, field: string): number {
   const property = schema(name).properties?.[field];
 
+  // 비울 수 있는 칸은 anyOf [문자열, null]이라 그 안의 문자열에서 찾는다
   const limit =
     property === undefined || property === true || property === false
       ? undefined
-      : property.maxLength;
+      : (property.maxLength ?? property.anyOf?.find((s) => s.maxLength !== undefined)?.maxLength);
 
   if (limit === undefined) throw new Error(`API 계약의 ${name}.${field}에 maxLength가 없다`);
 
@@ -92,7 +93,8 @@ export default defineConfig({
       keyIdea: maxLength('RecordCreate', 'key_idea'),
       code: maxLength('RecordCreate', 'code'),
       // 답은 저장할 때(AnswerIn)와 링크에 담을 때(QuestionIn) 모두 맞아야 한다
-      answer: Math.min(maxLength('AnswerIn', 'answer'), maxLength('QuestionIn', 'answer'))
+      answer: Math.min(maxLength('AnswerIn', 'answer'), maxLength('QuestionIn', 'answer')),
+      blockTitle: maxLength('BlockIn', 'title')
     })
   },
   // VITE_BACKEND=on으로 띄우면 개발 중 API 요청을 로컬 백엔드(wapul-be)로 넘긴다. 배포에서는 VITE_API_BASE_URL을 쓴다.

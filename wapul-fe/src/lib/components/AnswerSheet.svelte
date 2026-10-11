@@ -310,7 +310,7 @@
   let marking = $state(false);
 
   /**
-   * 저장 중인 틀렸다 표시. 끝나면 질문 id가 모두 바뀌어 있을 수 있어서, 답 저장과 '다 썼어요'는 이것이
+   * 저장 중인 틀렸다 표시. 그 요청에 실린 답이 그사이 보낸 답을 덮지 않게, 답 저장과 '다 썼어요'는 이것이
    * 끝난 뒤에 한다. 값은 표시를 저장했는지
    */
   let marked: Promise<boolean> | null = null;
@@ -329,9 +329,9 @@
   let markError = $state('');
 
   /**
-   * 블럭에 처음 제출에서 틀렸다는 표시를 켜거나 끈다. 표시는 그 블럭의 달라진 점 질문이라, 질문을
-   * 넣거나 빼고 블럭과 질문을 통째로 다시 저장한다. 아직 저장하지 않은 답도 함께 보낸다. 저장하지 못했으면
-   * false (바꿀 것이 없었으면 true)
+   * 블럭에 처음 제출에서 틀렸다는 표시를 켜거나 끈다. 표시는 그 블럭의 달라진 점 질문이라, 그 질문을 넣거나
+   * 빼서 블럭과 질문을 저장한다. 블럭과 질문은 id를 실어 보내 그 자리에서 고쳐서 id가 그대로 남는다. 아직
+   * 저장하지 않은 답도 함께 보낸다. 저장하지 못했으면 false (바꿀 것이 없었으면 true)
    */
   async function markWrong(block: number, wrong: boolean): Promise<boolean> {
     if (!record) return true;
@@ -347,83 +347,51 @@
 
     const position = new Map(blocks.map((b, i) => [b.id, i]));
 
-    // 질문과 그 질문의 예제 답, 옛 질문(from)을 같이 들고 가서, 새 id에 예제와 저장하는 동안 더 친 답을
-    // 옮긴다
-    const next = questions.flatMap(
-      (q): { question: QuestionIn; example: string; from?: QuestionOut }[] =>
-        q === revision
-          ? []
-          : [
-              {
-                question: {
-                  kind: q.kind,
-                  text: q.text,
-                  answer: q.answer,
-                  block: q.block_id === null ? null : (position.get(q.block_id) ?? null)
-                },
-                example: examples[q.id] ?? '',
-                from: q
-              }
-            ]
-    );
+    const next: QuestionIn[] = questions
+      .filter((q) => q !== revision)
+      .map((q) => ({
+        id: q.id,
+        kind: q.kind,
+        text: q.text,
+        answer: q.answer,
+        block: q.block_id === null ? null : (position.get(q.block_id) ?? null)
+      }));
 
     // 달라진 점 질문은 그 블럭 질문의 맨 뒤에 붙는다
-    if (wrong) {
-      const after = next.findLastIndex((n) => n.question.block === block);
-
-      next.splice(after + 1, 0, {
-        question: revisionQuestion(block),
-        example: pickExample('revision')
-      });
-    }
+    if (wrong)
+      next.splice(next.findLastIndex((q) => q.block === block) + 1, 0, revisionQuestion(block));
 
     marking = true;
 
     const result = await api.updateBlocks(
       id,
-      blocks.map(({ kind, units }) => ({ kind, units })),
-      next.map((n) => n.question)
+      blocks.map(({ id, kind, units, title }) => ({ id, kind, units, title })),
+      next
     );
 
     marking = false;
 
-    // 저장하는 동안 체크가 disabled라 커서가 빠진다. 그사이 답 칸으로 옮겨 쳤으면 그 질문과 커서 자리를,
-    // 칸이 새 id로 다시 그려지기 전에 잡아 둔다
-    const active = currentThread?.questions[step];
-
-    const field = document.activeElement;
-
-    const caret =
-      field instanceof HTMLTextAreaElement && field.id === active?.id
-        ? [field.selectionStart, field.selectionEnd]
-        : null;
-
     if (result.ok) {
       markError = '';
 
-      // 블럭과 질문을 다시 만들어 id가 모두 바뀐다. 펼친 묶음, 저장한 답, 예제를 새 id로 옮긴다.
-      // 펼친 질문은 번호로 기억해서 쓰던 질문이 그대로 남는다
-      const opened = blocks.findIndex((b) => b.id === current);
+      // id가 그대로라 펼친 묶음과 답 칸도 그대로 남는다. 저장하는 동안 더 친 답은 보낸 답에 덮이지 않게
+      // 화면에 두고 이어서 저장한다
+      const typed = new Map(questions.map((q) => [q.id, q.answer]));
 
       record = result.data;
-      examples = Object.fromEntries(
-        result.data.questions.map((q, i) => [q.id, next[i]?.example ?? pickExample(q.kind)])
-      );
       saved.clear();
 
-      for (const q of result.data.questions) saved.set(q.id, q.answer);
+      for (const q of record.questions) {
+        saved.set(q.id, q.answer);
+        examples[q.id] ??= pickExample(q.kind);
 
-      // 저장하는 동안 더 친 답은 새 질문으로 옮겨 다시 저장한다
-      record.questions.forEach((q, i) => {
-        const typed = next[i]?.from?.answer;
+        const answer = typed.get(q.id);
 
-        if (typed !== undefined && typed !== q.answer) {
-          q.answer = typed;
+        if (answer !== undefined && answer !== q.answer) {
+          q.answer = answer;
           void commit(q);
         }
-      });
-
-      if (opened !== -1) current = result.data.blocks[opened].id;
+      }
 
       step = Math.min(step, (currentThread?.questions.length ?? 1) - 1);
       status = kept;
@@ -431,18 +399,12 @@
       markError = `표시를 바꾸지 못했어요. ${result.message}`;
     }
 
+    // 저장하는 동안 체크가 disabled라 커서가 body로 빠진다(치던 달라진 점 칸이 빠져도 그렇다). 그때는
+    // 체크로 돌려준다
     await tick();
 
-    // 치던 질문이 남았으면 다시 그린 그 칸의 같은 자리로, 치던 질문이 빠졌거나(달라진 점) 커서가 body로
-    // 빠졌으면 체크로 커서를 돌려준다
-    if (caret && (!result.ok || next.some((n) => n.from === active))) {
-      focusActive(false);
-
-      if (document.activeElement instanceof HTMLTextAreaElement)
-        document.activeElement.setSelectionRange(caret[0], caret[1]);
-    } else if (caret || document.activeElement === document.body) {
+    if (document.activeElement === document.body)
       document.getElementById(`wrong-${current}`)?.focus();
-    }
 
     return result.ok;
   }
@@ -463,9 +425,8 @@
     hasBlank(t.questions.map((q) => ({ kind: q.kind, answer: saved.get(q.id) ?? '' })));
 
   async function send(question: QuestionOut): Promise<boolean> {
-    // 틀렸다 표시를 저장하는 중이면 끝난 뒤에 보낸다. 표시를 바꾸면 질문 id가 모두 바뀌어 옛 id로 보내면
-    // 백엔드가 찾지 못하므로 보내지 않는다(칸이 사라지며 blur로도 온다). 그사이 친 답은 markWrong이 새
-    // 질문으로 옮겨 보낸다
+    // 틀렸다 표시를 저장하는 중이면 끝난 뒤에 보낸다(그 요청에 실린 답이 이 답을 덮지 않게). 표시를 꺼서
+    // 빠진 달라진 점 질문은 보내지 않는다(칸이 사라지며 blur로도 온다)
     while (marked) await marked;
 
     if (!record?.questions.some((q) => q.id === question.id)) return true;
@@ -497,7 +458,7 @@
   }
 
   async function finish() {
-    // 틀렸다 표시를 저장하는 중이면 끝난 뒤의 질문(새 id)으로 모두 저장한다. 표시를 못 바꿨으면 체크 아래의
+    // 틀렸다 표시를 저장하는 중이면 끝난 뒤의 질문으로 모두 저장한다. 표시를 못 바꿨으면 체크 아래의
     // 이유를 보도록 끝내지 않는다
     let markedAll = true;
 

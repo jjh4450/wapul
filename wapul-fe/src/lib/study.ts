@@ -22,11 +22,20 @@ export const BLOCK_KIND_LABEL = {
   output: '출력'
 } satisfies { [K in BlockKind]: string };
 
-/** 블럭에는 이름이 없어 종류와 로직 순번으로 부른다: 입력, 로직 1, 로직 2, 출력 */
-export function blockLabels(blocks: { kind: BlockKind }[]): string[] {
+/**
+ * 블럭을 부르는 이름: 입력, 로직 1, 로직 2, 출력. 제목을 붙인 로직 블럭은 제목으로 부른다. 로직 순번은 제목
+ * 있는 블럭도 세어서, 제목을 붙여도 다른 블럭의 번호와 색(blockColors)이 밀리지 않는다
+ */
+export function blockLabels(blocks: { kind: BlockKind; title?: string | null }[]): string[] {
   let logic = 0;
 
-  return blocks.map((b) => (b.kind === 'logic' ? `로직 ${++logic}` : BLOCK_KIND_LABEL[b.kind]));
+  return blocks.map((b) => {
+    if (b.kind !== 'logic') return BLOCK_KIND_LABEL[b.kind];
+
+    logic += 1;
+
+    return b.title || `로직 ${logic}`;
+  });
 }
 
 /**

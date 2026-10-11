@@ -7,7 +7,13 @@ declare global {
   const __CONTRACT__: Schema;
 
   /** API 계약의 글자 수 한도. 입력 칸이 넘지 않게 한다 (vite.config.ts가 넣는다) */
-  const __LIMITS__: { problem: number; keyIdea: number; code: number; answer: number };
+  const __LIMITS__: {
+    problem: number;
+    keyIdea: number;
+    code: number;
+    answer: number;
+    blockTitle: number;
+  };
 
   namespace App {
     // interface Error {}

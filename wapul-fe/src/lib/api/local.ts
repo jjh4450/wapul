@@ -34,9 +34,9 @@ export interface RecordStore {
   values(): Iterable<RecordOut>;
 }
 
-/** 계약에는 적히지 않았지만 백엔드가 내는 실패: 없는 기록(404), 작성자가 아님(403) */
+/** 백엔드가 내는 실패: 없는 기록(404), 작성자가 아님(403), 받을 수 없는 블럭·질문(422) */
 class Failure {
-  constructor(readonly status: 403 | 404) {}
+  constructor(readonly status: 403 | 404 | 422) {}
 }
 
 /**
@@ -78,12 +78,16 @@ function route<
   ];
 }
 
-/** 블럭과 질문을 통째로 바꾼다. 백엔드처럼 새 id를 붙이고 블럭의 문장은 순서대로 둔다 */
+/**
+ * 블럭과 질문을 보낸 대로 맞춘다(백엔드의 _save_blocks). id가 있는 것은 그 id를 그대로 두고, 없는 것은 새 id를
+ * 붙이고, 보내지 않은 것은 빠진다. 블럭의 문장은 순서대로 둔다
+ */
 function withBlocks(record: RecordOut, blocks: BlockIn[], questions: QuestionIn[]): RecordOut {
   const made = blocks.map((b) => ({
-    id: crypto.randomUUID(),
+    id: b.id ?? crypto.randomUUID(),
     kind: b.kind,
-    units: [...b.units].sort((x, y) => x - y)
+    units: [...b.units].sort((x, y) => x - y),
+    title: b.title ?? null
   }));
 
   return {
@@ -91,13 +95,37 @@ function withBlocks(record: RecordOut, blocks: BlockIn[], questions: QuestionIn[
     updated_at: new Date().toISOString(),
     blocks: made,
     questions: questions.map((q) => ({
-      id: crypto.randomUUID(),
+      id: q.id ?? crypto.randomUUID(),
       block_id: q.block == null ? null : made[q.block].id,
       kind: q.kind,
       text: q.text,
       answer: q.answer
     }))
   };
+}
+
+/**
+ * 보낸 블럭과 질문을 받을 수 있는지(백엔드의 _known과 제목 검사). id는 이 기록의 것이고 한 번씩만 오며,
+ * 제목은 로직 블럭에만 붙는다. record가 없으면 새 기록이라 고칠 것이 없다
+ */
+function acceptable(record: RecordOut | null, blocks: BlockIn[], questions: QuestionIn[]): boolean {
+  const known = (ids: (string | null | undefined)[], existing: string[]) => {
+    const sent = ids.filter((i) => i != null);
+
+    return new Set(sent).size === sent.length && sent.every((i) => existing.includes(i));
+  };
+
+  return (
+    known(
+      blocks.map((b) => b.id),
+      record?.blocks.map((b) => b.id) ?? []
+    ) &&
+    known(
+      questions.map((q) => q.id),
+      record?.questions.map((q) => q.id) ?? []
+    ) &&
+    blocks.every((b) => b.title == null || b.kind === 'logic')
+  );
 }
 
 /** 새 기록. 담아 둔 기록을 되살릴 때(drafts.ts)도 이것으로 만들고 id와 시각만 담을 때 것으로 바꾼다 */
@@ -161,13 +189,19 @@ function recordRoutes(records: RecordStore): [string, FakeHandler][] {
         .sort((a, b) => b.updated_at.localeCompare(a.updated_at))
         .map(summary)
     ),
-    route('post', '/v1/records', 201, ({ body }) => keep(create(body))),
+    route('post', '/v1/records', 201, ({ body }) =>
+      acceptable(null, body.blocks, body.questions) ? keep(create(body)) : new Failure(422)
+    ),
     route('get', '/v1/records/{record_id}', 200, ({ id }) => withRecord(id, false, (r) => r)),
     route('get', '/v1/records/{record_id}/layouts', 200, ({ id }) =>
       withRecord(id, false, buildLayouts)
     ),
     route('put', '/v1/records/{record_id}/blocks', 200, ({ id, body }) =>
-      withRecord(id, true, (r) => keep(withBlocks(r, body.blocks, body.questions)))
+      withRecord(id, true, (r) =>
+        acceptable(r, body.blocks, body.questions)
+          ? keep(withBlocks(r, body.blocks, body.questions))
+          : new Failure(422)
+      )
     ),
     route('patch', '/v1/records/{record_id}/answers', 204, ({ id, body }) =>
       withRecord(id, true, (r) => {

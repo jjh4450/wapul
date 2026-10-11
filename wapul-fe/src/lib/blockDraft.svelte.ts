@@ -147,7 +147,9 @@ export class BlockDraft {
 
       next.push({ ...moved, kind });
     } else if (into === -1) {
+      // 제목은 로직 블럭에만 붙는다
       next[i].kind = kind;
+      next[i].title = null;
     } else {
       const target = next[into];
       const [moved] = next.splice(i, 1);
@@ -156,6 +158,14 @@ export class BlockDraft {
       target.wrong ||= moved.wrong;
     }
 
+    this.#change(next);
+  }
+
+  /** 로직 블럭의 제목을 바꾼다. 빈 제목이면 지워서 로직 순번으로 부른다 */
+  setTitle(i: number, title: string) {
+    const next = $state.snapshot(this.blocks);
+
+    next[i].title = title.trim() || null;
     this.#change(next);
   }
 

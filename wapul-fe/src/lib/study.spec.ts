@@ -33,6 +33,17 @@ describe('blockLabels', () => {
       '출력'
     ]);
   });
+
+  it('calls a titled logic block by its title and still counts it', () => {
+    expect(
+      blockLabels([
+        { kind: 'input' },
+        { kind: 'logic', title: '정렬' },
+        { kind: 'logic', title: null },
+        { kind: 'output' }
+      ])
+    ).toEqual(['입력', '정렬', '로직 2', '출력']);
+  });
 });
 
 describe('blockColors', () => {
